@@ -27,7 +27,8 @@ jobs:
   release:
     name: Release
     needs: ci
-    if: github.ref == 'refs/heads/master'
+    if: false
+#    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout

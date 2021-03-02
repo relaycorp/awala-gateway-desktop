@@ -1,5 +1,5 @@
 import { foo } from './example';
 
-test.todo('foo', () => {
+test('foo', () => {
   expect(foo()).toEqual('bar');
 });
