@@ -31,6 +31,7 @@ module.exports = {
   coveragePathIgnorePatterns: [
     "_test_utils\.ts",
     "/functionalTests",
+    "/testUtils",
     "/types",
     "/index\.ts",
   ],
