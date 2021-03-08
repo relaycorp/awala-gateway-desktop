@@ -4,7 +4,9 @@
   "description": "Awala Gateway for Desktop",
   "main": "app/electron.js",
   "scripts": {
-    "build": "webpack --config ./webpack.config.js",
+    "build": "run-s tsc webpack",
+    "webpack": "webpack --config ./webpack.config.js",
+    "tsc": "tsc -p tsconfig.json",
     "start": "npm run build && electron ./app/electron.js",
     "prebuild": "run-s clean",
     "fix": "run-s fix:*",
