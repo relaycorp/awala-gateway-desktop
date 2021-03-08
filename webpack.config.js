@@ -13,7 +13,7 @@ module.exports = [
       }]
     },
     output: {
-      path: __dirname + '/dist',
+      path: __dirname + '/app',
       filename: 'electron.js'
     }
   },
@@ -28,7 +28,7 @@ module.exports = [
       use: [{ loader: 'ts-loader' }]
     }] },
     output: {
-      path: __dirname + '/dist',
+      path: __dirname + '/app',
       filename: 'react.js'
     },
     plugins: [

@@ -2,10 +2,10 @@
   "name": "@relaycorp/awala-gateway-desktop",
   "version": "1.0.0",
   "description": "Awala Gateway for Desktop",
-  "main": "dist/electron.js",
+  "main": "app/electron.js",
   "scripts": {
     "build": "webpack --config ./webpack.config.js",
-    "start": "npm run build && electron ./dist/electron.js",
+    "start": "npm run build && electron ./app/electron.js",
     "prebuild": "run-s clean",
     "fix": "run-s fix:*",
     "fix:prettier": "prettier \"src/**/*.ts\" --write",
@@ -19,7 +19,8 @@
     "test:ci:unit": "run-s build test:ci:unit:jest",
     "test:ci:unit:jest": "jest --config jest.config.ci.js --coverage",
     "cov": "run-s build test:unit && opn coverage/lcov-report/index.html",
-    "clean": "trash build test coverage"
+    "clean": "trash build test coverage",
+    "dist": "electron-builder"
   },
   "engines": {
     "node": ">=12"
@@ -35,6 +36,7 @@
     "@types/verror": "^1.10.4",
     "@types/ws": "^7.4.0",
     "electron": "^12.0.0",
+    "electron-builder": "^22.10.5",
     "fastify-plugin": "^3.0.0",
     "html-webpack-plugin": "^5.2.0",
     "jest": "^26.6.3",
@@ -84,5 +86,17 @@
   "optionalDependencies": {
     "bufferutil": "^4.0.3",
     "utf-8-validate": "^5.0.4"
+  },
+  "build": {
+    "appId": "com.awala.gateway",
+    "linux": {
+      "target": "rpm"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    }
   }
 }
