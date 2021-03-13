@@ -26,13 +26,13 @@ class StepperButtons extends Component<Props> {
     return <div>{ this.buttons() }</div>;
   }
   private backButton() : JSX.Element {
-    return <Button onClick={this.props.prevStep} text="Back" />;
+    return <Button key="back" onClick={this.props.prevStep} text="Back" />;
   }
   private nextButton() : JSX.Element {
-    return <Button onClick={this.props.nextStep} text="Next" />;
+    return <Button key="next" onClick={this.props.nextStep} text="Next" />;
   }
   private completeButton() : JSX.Element {
-    return <Button onClick={this.props.onComplete} text="Get Started" />;
+    return <Button key="complete" onClick={this.props.onComplete} text="Get Started" />;
   }
   private buttons() : readonly JSX.Element[] {
     if (this.props.selected === 0) {
