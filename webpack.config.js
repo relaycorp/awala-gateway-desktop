@@ -8,7 +8,7 @@ module.exports = [
     module: {
       rules: [{
         test: /\.ts$/,
-        include: /src\/electron/,
+        include: /src/,
         use: [{ loader: 'ts-loader' }]
       }]
     },
@@ -24,9 +24,12 @@ module.exports = [
     devtool: 'source-map',
     module: { rules: [{
       test: /\.ts(x?)$/,
-      include: /src\/electron/,
+      include: /src/,
       use: [{ loader: 'ts-loader' }]
     }] },
+    resolve: {
+      extensions: ['.js', '.jsx', '.ts', '.tsx']
+    },
     output: {
       path: __dirname + '/app',
       filename: 'react.js'
