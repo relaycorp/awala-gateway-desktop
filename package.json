@@ -68,7 +68,7 @@
     "it-pipe": "^1.1.0",
     "pino": "^6.11.1",
     "verror": "^1.10.0",
-    "ws": "^7.4.3"
+    "ws": "^7.4.4"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.3",
