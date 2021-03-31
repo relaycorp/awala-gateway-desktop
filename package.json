@@ -15,7 +15,7 @@
     "test": "lerna run test",
     "pretest:ci": "run-s build",
     "test:ci": "lerna run test:ci:unit:jest",
-    "clean": "trash build test coverage"
+    "clean": "lerna run clean"
   },
   "engines": {
     "node": ">=12"

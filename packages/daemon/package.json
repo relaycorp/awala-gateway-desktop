@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "clean": "trash build test coverage",
     "test": "jest --coverage",
     "test:functional": "jest --config jest.config.functional.js --runInBand --detectOpenHandles",
     "test:ci:unit:jest": "jest --config jest.config.ci.js --coverage"

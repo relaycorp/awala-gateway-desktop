@@ -1,12 +1,12 @@
 const mainJestConfig = require('./jest.config');
 
 module.exports = Object.assign({}, mainJestConfig, {
-  collectCoverageFrom: ['services/**/*.js'],
+  collectCoverageFrom: ['**/*.js'],
   moduleFileExtensions: ['js'],
   preset: null,
-  roots: ['build/main'],
+  roots: ['build'],
   testPathIgnorePatterns: [
-    "build/main/functionalTests",
-    "build/main/testUtils",
+    "build/functionalTests",
+    "build/testUtils",
   ],
 });

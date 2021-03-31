@@ -1,6 +1,7 @@
 node_modules
 build
 
+packages/*/build
 packages/*/coverage
 packages/*/node_modules
 packages/*/src/*.js
