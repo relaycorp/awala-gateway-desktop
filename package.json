@@ -64,7 +64,7 @@
     "@relaycorp/cogrpc": "^1.3.6",
     "@relaycorp/relaynet-core": "^1.42.9",
     "buffer-to-arraybuffer": "0.0.6",
-    "fastify": "^3.14.0",
+    "fastify": "^3.14.1",
     "it-pipe": "^1.1.0",
     "pino": "^6.11.2",
     "verror": "^1.10.0",
