@@ -7,7 +7,7 @@
     "build": "lerna run build",
     "bootstrap": "lerna bootstrap",
     "fix": "run-s fix:*",
-    "fix:prettier": "prettier \"src/**/*.ts\" --write",
+    "fix:prettier": "prettier \"packages/**/*.ts\" --write",
     "fix:tslint": "tslint --fix --project .",
     "static-checks": "run-p static-checks:*",
     "static-checks:lint": "tslint --project .",
