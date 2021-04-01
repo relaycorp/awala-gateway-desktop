@@ -1,12 +1,7 @@
 const mainJestConfig = require('./jest.config');
+const ciJestConfig = require('../../jest.config.ci.json');
 
-module.exports = Object.assign({}, mainJestConfig, {
-  collectCoverageFrom: ['**/*.js'],
-  moduleFileExtensions: ['js'],
-  preset: null,
-  roots: ['build'],
-  testPathIgnorePatterns: [
-    "build/functionalTests",
-    "build/testUtils",
-  ],
-});
+module.exports = {
+  ...mainJestConfig,
+  ...ciJestConfig,
+};
