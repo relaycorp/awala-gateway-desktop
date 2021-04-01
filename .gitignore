@@ -1,5 +1,8 @@
 node_modules
 build
-test
-src/**.js
-coverage
+
+packages/*/build
+packages/*/coverage
+packages/*/node_modules
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
