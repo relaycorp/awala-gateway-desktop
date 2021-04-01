@@ -1,11 +1,5 @@
 # `daemon`
 
-> TODO: description
+## Environment variables
 
-## Usage
-
-```
-const daemon = require('daemon');
-
-// TODO: DEMONSTRATE API
-```
+- `LOG_LEVEL`: Any pino level (e.g., `debug`, info`).
