@@ -33,7 +33,6 @@ module.exports = {
     "/functionalTests",
     "/testUtils",
     "/types",
-    "/index\.ts",
   ],
 
   // A list of reporter names that Jest uses when writing coverage reports
