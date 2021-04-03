@@ -1,4 +1,9 @@
-import { PrivateKeyData, PrivateKeyStore } from '@relaycorp/relaynet-core';
+import {
+  BoundPrivateKeyData,
+  PrivateKeyData,
+  PrivateKeyStore,
+  UnboundPrivateKeyData,
+} from '@relaycorp/relaynet-core';
 import { Connection, Repository } from 'typeorm';
 import { PrivateKey, PrivateKeyType } from '../entity/PrivateKey';
 
@@ -30,7 +35,14 @@ export class DBPrivateKeyStore extends PrivateKeyStore {
     };
   }
 
-  protected async saveKey(_privateKeyData: PrivateKeyData, _keyId: string): Promise<void> {
-    return Promise.resolve(undefined);
+  protected async saveKey(privateKeyData: PrivateKeyData, keyId: string): Promise<void> {
+    const privateKey = await this.repository.create({
+      certificateDer: (privateKeyData as UnboundPrivateKeyData).certificateDer,
+      derSerialization: privateKeyData.keyDer,
+      id: keyId,
+      recipientPublicKeyDigest: (privateKeyData as BoundPrivateKeyData).recipientPublicKeyDigest,
+      type: privateKeyData.type as PrivateKeyType,
+    });
+    await this.repository.save(privateKey);
   }
 }
