@@ -26,7 +26,7 @@ export class DBPrivateKeyStore extends PrivateKeyStore {
     return {
       certificateDer: key.certificateDer!!,
       keyDer: key.derSerialization,
-      type: key.type as any,
+      type: key.type as PrivateKeyType.NODE | PrivateKeyType.SESSION_INITIAL,
     };
   }
 

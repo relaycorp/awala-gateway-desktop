@@ -1,5 +1,8 @@
 import {
   derSerializePrivateKey,
+  derSerializePublicKey,
+  generateECDHKeyPair,
+  issueInitialDHKeyCertificate,
   PrivateKeyStoreError,
   UnknownKeyError,
 } from '@relaycorp/relaynet-core';
@@ -11,6 +14,7 @@ import {
 import { getConnection, Repository } from 'typeorm';
 
 import { PrivateKey, PrivateKeyType } from '../entity/PrivateKey';
+import { sha256Hex } from '../testUtils/crypto';
 import { setUpTestDBConnection } from '../testUtils/db';
 import { DBPrivateKeyStore } from './DBPrivateKeyStore';
 
@@ -26,33 +30,35 @@ beforeEach(() => {
 
 let cryptoKey: CryptoKey;
 let certPath: PDACertPath;
+let sessionKeyPair: CryptoKeyPair;
 beforeAll(async () => {
   const pairSet = await generateNodeKeyPairSet();
   certPath = await generatePDACertificationPath(pairSet);
 
   cryptoKey = pairSet.privateGateway.privateKey;
+
+  sessionKeyPair = await generateECDHKeyPair();
 });
 
 const KEY_ID = Buffer.from('the id');
 let basePrivateKeyData: Partial<PrivateKey>;
 beforeAll(async () => {
   basePrivateKeyData = {
-    certificateDer: Buffer.from(certPath.privateGateway.serialize()),
-    derSerialization: await derSerializePrivateKey(cryptoKey),
     id: KEY_ID.toString('hex'),
   };
 });
 
-async function savePrivateKey(privateKeyData: Partial<PrivateKey>): Promise<void> {
-  const privateKey = await privateKeyRepository.create(privateKeyData);
-  await privateKeyRepository.save(privateKey);
-}
-
 describe('fetchKey', () => {
   test('Node key should be returned', async () => {
-    await savePrivateKey({ ...basePrivateKeyData, type: PrivateKeyType.NODE });
+    await savePrivateKey({
+      ...basePrivateKeyData,
+      certificateDer: Buffer.from(certPath.privateGateway.serialize()),
+      derSerialization: await derSerializePrivateKey(cryptoKey),
+      type: PrivateKeyType.NODE,
+    });
 
     const key = await keystore.fetchNodeKey(KEY_ID);
+
     await expect(derSerializePrivateKey(key.privateKey)).resolves.toEqual(
       await derSerializePrivateKey(cryptoKey),
     );
@@ -60,33 +66,49 @@ describe('fetchKey', () => {
   });
 
   test('Initial session key should be returned', async () => {
+    const sessionKeyCertificate = await issueInitialDHKeyCertificate({
+      issuerCertificate: certPath.privateGateway,
+      issuerPrivateKey: cryptoKey,
+      subjectPublicKey: sessionKeyPair.publicKey,
+      validityEndDate: certPath.privateGateway.expiryDate,
+    });
     await savePrivateKey({
       ...basePrivateKeyData,
+      certificateDer: Buffer.from(sessionKeyCertificate.serialize()),
+      derSerialization: await derSerializePrivateKey(sessionKeyPair.privateKey),
       type: PrivateKeyType.SESSION_INITIAL,
     });
 
-    await expect(keystore.fetchInitialSessionKey(KEY_ID)).resolves.toEqual(
-      basePrivateKeyData.derSerialization,
+    const key = await keystore.fetchInitialSessionKey(KEY_ID);
+
+    await expect(derSerializePrivateKey(key.privateKey)).resolves.toEqual(
+      await derSerializePrivateKey(sessionKeyPair.privateKey),
     );
+    await expect(key.certificate.isEqual(sessionKeyCertificate)).toBeTruthy();
   });
 
   test('Subsequent session key should be returned', async () => {
+    const recipientPublicKeyDer = await derSerializePublicKey(
+      await certPath.publicGateway.getPublicKey(),
+    );
+    const privateKeySerialized = await derSerializePrivateKey(sessionKeyPair.privateKey);
     await savePrivateKey({
       ...basePrivateKeyData,
-      certificateDer: undefined,
-      recipientPublicKeyDigest: await certPath.publicGateway.getSerialNumberHex(),
+      derSerialization: privateKeySerialized,
+      recipientPublicKeyDigest: sha256Hex(recipientPublicKeyDer),
       type: PrivateKeyType.SESSION_SUBSEQUENT,
     });
 
-    await expect(keystore.fetchSessionKey(KEY_ID, certPath.publicGateway)).resolves.toEqual(
-      basePrivateKeyData.derSerialization,
-    );
+    const key = await keystore.fetchSessionKey(KEY_ID, certPath.publicGateway);
+
+    await expect(derSerializePrivateKey(key)).resolves.toEqual(privateKeySerialized);
   });
 
   test('Lookup should fail if key is bound to different recipient', async () => {
     const recipientPublicKeyDigest = 'foo';
     await savePrivateKey({
       ...basePrivateKeyData,
+      derSerialization: await derSerializePrivateKey(sessionKeyPair.privateKey),
       recipientPublicKeyDigest,
       type: PrivateKeyType.SESSION_SUBSEQUENT,
     });
@@ -101,6 +123,11 @@ describe('fetchKey', () => {
       UnknownKeyError,
     );
   });
+
+  async function savePrivateKey(privateKeyData: Partial<PrivateKey>): Promise<void> {
+    const privateKey = await privateKeyRepository.create(privateKeyData);
+    await privateKeyRepository.save(privateKey);
+  }
 });
 
 describe('saveKey', () => {
