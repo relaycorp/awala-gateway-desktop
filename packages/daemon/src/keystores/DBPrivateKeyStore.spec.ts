@@ -28,14 +28,14 @@ beforeEach(() => {
   privateKeyRepository = connection.getRepository(PrivateKey);
 });
 
-let cryptoKey: CryptoKey;
 let certPath: PDACertPath;
+let nodeKeyPair: CryptoKeyPair;
 let sessionKeyPair: CryptoKeyPair;
 beforeAll(async () => {
   const pairSet = await generateNodeKeyPairSet();
   certPath = await generatePDACertificationPath(pairSet);
 
-  cryptoKey = pairSet.privateGateway.privateKey;
+  nodeKeyPair = pairSet.privateGateway;
 
   sessionKeyPair = await generateECDHKeyPair();
 });
@@ -50,25 +50,24 @@ beforeAll(async () => {
 
 describe('fetchKey', () => {
   test('Node key should be returned', async () => {
+    const privateKeySerialized = await derSerializePrivateKey(nodeKeyPair.privateKey);
     await savePrivateKey({
       ...basePrivateKeyData,
       certificateDer: Buffer.from(certPath.privateGateway.serialize()),
-      derSerialization: await derSerializePrivateKey(cryptoKey),
+      derSerialization: privateKeySerialized,
       type: PrivateKeyType.NODE,
     });
 
     const key = await keystore.fetchNodeKey(KEY_ID);
 
-    await expect(derSerializePrivateKey(key.privateKey)).resolves.toEqual(
-      await derSerializePrivateKey(cryptoKey),
-    );
+    await expect(derSerializePrivateKey(key.privateKey)).resolves.toEqual(privateKeySerialized);
     await expect(key.certificate.isEqual(certPath.privateGateway)).toBeTruthy();
   });
 
   test('Initial session key should be returned', async () => {
     const sessionKeyCertificate = await issueInitialDHKeyCertificate({
       issuerCertificate: certPath.privateGateway,
-      issuerPrivateKey: cryptoKey,
+      issuerPrivateKey: nodeKeyPair.privateKey,
       subjectPublicKey: sessionKeyPair.publicKey,
       validityEndDate: certPath.privateGateway.expiryDate,
     });
