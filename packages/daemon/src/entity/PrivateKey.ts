@@ -1,4 +1,3 @@
-// tslint:disable:readonly-keyword
 import { Column, CreateDateColumn, Entity, PrimaryColumn } from 'typeorm';
 
 export enum PrivateKeyType {
@@ -10,20 +9,20 @@ export enum PrivateKeyType {
 @Entity()
 export class PrivateKey {
   @PrimaryColumn()
-  public id!: string;
+  public readonly id!: string;
 
   @Column()
-  public derSerialization!: Buffer;
+  public readonly derSerialization!: Buffer;
 
   @Column({ type: 'simple-enum', enum: PrivateKeyType })
-  public type!: PrivateKeyType;
+  public readonly type!: PrivateKeyType;
 
   @CreateDateColumn()
-  public creationDate!: Date;
+  public readonly creationDate!: Date;
 
   @Column({ type: 'blob', nullable: true })
-  public certificateDer!: Buffer | null;
+  public readonly certificateDer!: Buffer | null;
 
   @Column({ type: 'varchar', nullable: true })
-  public recipientPublicKeyDigest!: string | null;
+  public readonly recipientPublicKeyDigest!: string | null;
 }
