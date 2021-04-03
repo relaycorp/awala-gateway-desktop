@@ -48,39 +48,26 @@ beforeAll(async () => {
   recipientNodeCertificate = certPath.publicGateway;
 });
 
-// TODO: DELETE
-const KEY_ID = Buffer.from('the id');
-const KEY_ID_HEX = KEY_ID.toString('hex');
-let basePrivateKeyData: Partial<PrivateKey>;
-beforeAll(async () => {
-  basePrivateKeyData = { id: KEY_ID_HEX };
-});
+const SUBSEQUENT_KEY_ID = Buffer.from('the id');
 
 describe('fetchKey', () => {
   test('Node key should be returned', async () => {
-    const privateKeySerialized = await derSerializePrivateKey(nodeKeyPair.privateKey);
-    await savePrivateKey({
-      ...basePrivateKeyData,
-      certificateDer: Buffer.from(nodeCertificate.serialize()),
-      derSerialization: privateKeySerialized,
-      type: PrivateKeyType.NODE,
-    });
+    await keystore.saveNodeKey(nodeKeyPair.privateKey, nodeCertificate);
 
-    const key = await keystore.fetchNodeKey(KEY_ID);
+    const key = await keystore.fetchNodeKey(nodeCertificate.getSerialNumber());
 
-    await expect(derSerializePrivateKey(key.privateKey)).resolves.toEqual(privateKeySerialized);
+    await expect(derSerializePrivateKey(key.privateKey)).resolves.toEqual(
+      await derSerializePrivateKey(nodeKeyPair.privateKey),
+    );
     await expect(key.certificate.isEqual(nodeCertificate)).toBeTruthy();
   });
 
   test('Initial session key should be returned', async () => {
-    await savePrivateKey({
-      ...basePrivateKeyData,
-      certificateDer: Buffer.from(sessionKeyInitialCertificate.serialize()),
-      derSerialization: await derSerializePrivateKey(sessionKeyPair.privateKey),
-      type: PrivateKeyType.SESSION_INITIAL,
-    });
+    await keystore.saveInitialSessionKey(sessionKeyPair.privateKey, sessionKeyInitialCertificate);
 
-    const key = await keystore.fetchInitialSessionKey(KEY_ID);
+    const key = await keystore.fetchInitialSessionKey(
+      sessionKeyInitialCertificate.getSerialNumber(),
+    );
 
     await expect(derSerializePrivateKey(key.privateKey)).resolves.toEqual(
       await derSerializePrivateKey(sessionKeyPair.privateKey),
@@ -89,32 +76,27 @@ describe('fetchKey', () => {
   });
 
   test('Subsequent session key should be returned', async () => {
-    const recipientPublicKeyDer = await derSerializePublicKey(
-      await recipientNodeCertificate.getPublicKey(),
+    await keystore.saveSubsequentSessionKey(
+      sessionKeyPair.privateKey,
+      SUBSEQUENT_KEY_ID,
+      recipientNodeCertificate,
     );
-    const privateKeySerialized = await derSerializePrivateKey(sessionKeyPair.privateKey);
-    await savePrivateKey({
-      ...basePrivateKeyData,
-      derSerialization: privateKeySerialized,
-      recipientPublicKeyDigest: sha256Hex(recipientPublicKeyDer),
-      type: PrivateKeyType.SESSION_SUBSEQUENT,
-    });
 
-    const key = await keystore.fetchSessionKey(KEY_ID, recipientNodeCertificate);
+    const key = await keystore.fetchSessionKey(SUBSEQUENT_KEY_ID, recipientNodeCertificate);
 
-    await expect(derSerializePrivateKey(key)).resolves.toEqual(privateKeySerialized);
+    await expect(derSerializePrivateKey(key)).resolves.toEqual(
+      await derSerializePrivateKey(sessionKeyPair.privateKey),
+    );
   });
 
   test('Lookup should fail if key is bound to different recipient', async () => {
-    const recipientPublicKeyDigest = 'foo';
-    await savePrivateKey({
-      ...basePrivateKeyData,
-      derSerialization: await derSerializePrivateKey(sessionKeyPair.privateKey),
-      recipientPublicKeyDigest,
-      type: PrivateKeyType.SESSION_SUBSEQUENT,
-    });
+    await keystore.saveSubsequentSessionKey(
+      sessionKeyPair.privateKey,
+      SUBSEQUENT_KEY_ID,
+      recipientNodeCertificate,
+    );
 
-    await expect(keystore.fetchSessionKey(KEY_ID, recipientNodeCertificate)).rejects.toEqual(
+    await expect(keystore.fetchSessionKey(SUBSEQUENT_KEY_ID, nodeCertificate)).rejects.toEqual(
       new PrivateKeyStoreError('Key is bound to another recipient'),
     );
   });
@@ -124,11 +106,6 @@ describe('fetchKey', () => {
       UnknownKeyError,
     );
   });
-
-  async function savePrivateKey(privateKeyData: Partial<PrivateKey>): Promise<void> {
-    const privateKey = await privateKeyRepository.create(privateKeyData);
-    await privateKeyRepository.save(privateKey);
-  }
 });
 
 describe('saveKey', () => {
@@ -161,11 +138,11 @@ describe('saveKey', () => {
   test('Subsequent session key should have all its attributes stored', async () => {
     await keystore.saveSubsequentSessionKey(
       sessionKeyPair.privateKey,
-      KEY_ID,
+      SUBSEQUENT_KEY_ID,
       recipientNodeCertificate,
     );
 
-    const key = await privateKeyRepository.findOne(KEY_ID_HEX);
+    const key = await privateKeyRepository.findOne(SUBSEQUENT_KEY_ID.toString('hex'));
     const recipientPublicKeyDer = await derSerializePublicKey(
       await recipientNodeCertificate.getPublicKey(),
     );
