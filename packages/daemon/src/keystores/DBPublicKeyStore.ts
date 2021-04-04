@@ -12,8 +12,16 @@ export class DBPublicKeyStore extends PublicKeyStore {
     this.repository = connection.getRepository(PublicKey);
   }
 
-  protected fetchKey(_peerPrivateAddress: string): Promise<SessionPublicKeyData | null> {
-    return Promise.resolve(null);
+  protected async fetchKey(peerPrivateAddress: string): Promise<SessionPublicKeyData | null> {
+    const publicKey = await this.repository.findOne(peerPrivateAddress);
+    if (publicKey === undefined) {
+      return null;
+    }
+    return {
+      publicKeyCreationTime: publicKey!.creationDate,
+      publicKeyDer: publicKey!.derSerialization,
+      publicKeyId: publicKey!.id,
+    };
   }
 
   protected async saveKey(

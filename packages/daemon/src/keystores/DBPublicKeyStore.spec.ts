@@ -39,13 +39,30 @@ beforeAll(async () => {
   peerSessionPublicKey = sessionKeyPair.publicKey;
 });
 
-describe('saveKey', () => {
-  const keyId = Buffer.from([1, 3, 5, 7, 9]);
-  let peerSessionKey: OriginatorSessionKey;
-  beforeAll(() => {
-    peerSessionKey = { keyId, publicKey: peerSessionPublicKey };
+const KEY_ID = Buffer.from([1, 3, 5, 7, 9]);
+let peerSessionKey: OriginatorSessionKey;
+beforeAll(() => {
+  peerSessionKey = { keyId: KEY_ID, publicKey: peerSessionPublicKey };
+});
+
+describe('fetchKey', () => {
+  test('Existing key should be returned', async () => {
+    await keystore.saveSessionKey(peerSessionKey, peerIdentityCertificate, new Date());
+
+    const key = await keystore.fetchLastSessionKey(peerIdentityCertificate);
+
+    expect(key?.keyId).toEqual(KEY_ID);
+    await expect(derSerializePublicKey(key!.publicKey)).resolves.toEqual(
+      await derSerializePublicKey(peerSessionPublicKey),
+    );
   });
 
+  test('Non-existing key should result in null', async () => {
+    await expect(keystore.fetchLastSessionKey(peerIdentityCertificate)).resolves.toBeNull();
+  });
+});
+
+describe('saveKey', () => {
   test('Key should be created if it does not exist', async () => {
     const creationDate = new Date();
 
@@ -55,7 +72,7 @@ describe('saveKey', () => {
       await peerIdentityCertificate.calculateSubjectPrivateAddress(),
     );
     expect(key?.creationDate).toEqual(creationDate);
-    expect(key?.id).toEqual(keyId);
+    expect(key?.id).toEqual(KEY_ID);
     expect(key?.derSerialization).toEqual(await derSerializePublicKey(peerSessionPublicKey));
   });
 
