@@ -9,7 +9,7 @@ interface State {
 }
 
 class Home extends Component<Props, State> {
-  _isMounted = false;
+  private mutableIsMounted: boolean = false;
 
   constructor(props: Props) {
     super(props);
@@ -17,14 +17,16 @@ class Home extends Component<Props, State> {
   }
 
   public async componentDidMount() : Promise<void> {
-    this._isMounted = true;
+    this.mutableIsMounted = true;
     for await (const item of pollConnectionStatus()) {
-      this._isMounted && this.setState({status: item});
+      if (this.mutableIsMounted) {
+        this.setState({status: item});
+      }
     }
   }
 
   public componentWillUnmount() : void {
-    this._isMounted = false;
+    this.mutableIsMounted = false;
   }
 
   public render() : JSX.Element {

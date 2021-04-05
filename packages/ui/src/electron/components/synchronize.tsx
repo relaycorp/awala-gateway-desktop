@@ -11,32 +11,37 @@ interface State {
 }
 
 class Synchronize extends Component<Props, State> {
-  _isMounted = false;
+  private mutableIsMounted: boolean = false;
 
   constructor(props: Props) {
     super(props);
     this.state = {
-      status: CourierSyncStatus.WAITING,
       complete: false,
       error: false,
+      status: CourierSyncStatus.WAITING,
     };
-    this._isMounted = false;
   }
 
   public async componentDidMount() : Promise<void> {
-    this._isMounted = true;
+    this.mutableIsMounted = true;
     try {
       for await (const item of synchronizeWithCourier()) {
-        this._isMounted && this.setState({status: item});
+        if (this.mutableIsMounted) {
+          this.setState({status: item});
+        }
       }
-      this._isMounted && this.setState({complete: true});
+      if (this.mutableIsMounted) {
+        this.setState({complete: true});
+      }
     } catch (error) {
-      this._isMounted && this.setState({error: true});
+      if (this.mutableIsMounted) {
+        this.setState({error: true});
+      }
     }
   }
 
   public componentWillUnmount() : void {
-    this._isMounted = false;
+    this.mutableIsMounted = false;
   }
 
   public render() : JSX.Element {
