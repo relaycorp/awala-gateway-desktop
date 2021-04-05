@@ -51,7 +51,7 @@
     "webpack-cli": "^4.5.0"
   },
   "build": {
-    "appId": "com.awala.gateway",
+    "appId": "tech.relaycorp.gateway",
     "linux": {
       "target": "rpm"
     },

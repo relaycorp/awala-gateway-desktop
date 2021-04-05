@@ -10,4 +10,5 @@ module.exports = {
       "statements": 60
     }
   },
+  testEnvironment: "jsdom",
 };
