@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "scripts": {
     "build": "tsc",
-    "clean": "trash build test coverage",
+    "clean": "trash build data test coverage",
     "start": "ts-node-dev src/bin/gateway-daemon.ts",
     "test": "jest --coverage",
     "test:functional": "jest --config jest.config.functional.js --runInBand --detectOpenHandles",
@@ -13,7 +13,7 @@
   "private": "true",
   "dependencies": {
     "@relaycorp/cogrpc": "^1.1.5",
-    "@relaycorp/relaynet-core": "^1.42.10",
+    "@relaycorp/relaynet-core": "^1.42.11",
     "buffer-to-arraybuffer": "0.0.6",
     "bufferutil": "^4.0.3",
     "env-var": "^7.0.0",
@@ -24,7 +24,9 @@
     "reflect-metadata": "^0.1.13",
     "split2": "^3.2.2",
     "sqlite3": "^5.0.2",
+    "typedi": "^0.10.0",
     "typeorm": "^0.2.32",
+    "typeorm-typedi-extensions": "^0.4.1",
     "utf-8-validate": "^5.0.4",
     "verror": "^1.10.0",
     "ws": "^7.4.4"
