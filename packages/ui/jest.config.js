@@ -2,6 +2,7 @@ const mainJestConfig = require('../../jest.config');
 
 module.exports = {
   ...mainJestConfig,
+  collectCoverageFrom: ["**/*.ts", "**/*.tsx"],
   coverageThreshold: {
     "global": {
       "branches": 60,
