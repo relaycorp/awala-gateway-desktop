@@ -8,15 +8,24 @@ interface State {
 }
 
 class Synchronize extends Component<Props, State> {
+  _isMounted = false;
+
   constructor(props: Props) {
     super(props);
     this.state = { status: CourierSyncStatus.WAITING };
+    this._isMounted = false;
   }
 
   public async componentDidMount() : Promise<void> {
+    this._isMounted = true;
     for await (const item of synchronizeWithCourier()) {
-      this.setState({status: item});
+      this._isMounted && this.setState({status: item});
     }
+    this._isMounted && this.setState({complete: true});
+  }
+
+  public componentWillUnmount() : void {
+    this._isMounted = false;
   }
 
   public render() : JSX.Element {

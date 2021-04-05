@@ -9,15 +9,22 @@ interface State {
 }
 
 class Home extends Component<Props, State> {
+  _isMounted = false;
+
   constructor(props: Props) {
     super(props);
     this.state = { status: ConnectionStatus.DISCONNECTED_FROM_ALL };
   }
 
   public async componentDidMount() : Promise<void> {
+    this._isMounted = true;
     for await (const item of pollConnectionStatus()) {
-      this.setState({status: item});
+      this._isMounted && this.setState({status: item});
     }
+  }
+
+  public componentWillUnmount() : void {
+    this._isMounted = false;
   }
 
   public render() : JSX.Element {
