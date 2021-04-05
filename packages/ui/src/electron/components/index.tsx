@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import Home from './home';
 import Onboarding from './onboarding';
+import Synchronize from './synchronize';
 
 enum ModalState {
   MODAL_NONE,
@@ -30,6 +31,8 @@ class Index extends Component<Props, State> {
   public render() : JSX.Element {
     if (!this.state.onboarded) {
       return <Onboarding onComplete={this.onOnboardingComplete.bind(this)} />;
+    } else if (this.state.synchronize) {
+      return <Synchronize />;
     }
     return (
       <Home onSynchronize={this.onSynchronize.bind(this)}/>
