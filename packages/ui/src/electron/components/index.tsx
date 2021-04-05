@@ -32,7 +32,7 @@ class Index extends Component<Props, State> {
     if (!this.state.onboarded) {
       return <Onboarding onComplete={this.onOnboardingComplete.bind(this)} />;
     } else if (this.state.synchronize) {
-      return <Synchronize />;
+      return <Synchronize onComplete={this.onSynchronizeComplete.bind(this)} />;
     }
     return (
       <Home onSynchronize={this.onSynchronize.bind(this)}/>
@@ -44,6 +44,9 @@ class Index extends Component<Props, State> {
   }
   private onSynchronize() : void {
     this.setState({'synchronize': true});
+  }
+  private onSynchronizeComplete() : void {
+    this.setState({'synchronize': false});
   }
 }
 
