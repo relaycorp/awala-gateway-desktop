@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { ConnectionStatus, pollConnectionStatus } from '../../ipc/connectionStatus';
 
 interface Props {
+  readonly onSynchronize: () => void
 }
 interface State {
   readonly status: ConnectionStatus
