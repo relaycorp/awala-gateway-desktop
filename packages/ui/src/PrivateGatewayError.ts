@@ -1,3 +1,2 @@
-import VError from 'verror';
 
-export default class PrivateGatewayError extends VError {}
+export default class PrivateGatewayError extends Error {}
