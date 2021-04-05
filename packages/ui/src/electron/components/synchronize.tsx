@@ -25,10 +25,14 @@ class Synchronize extends Component<Props, State> {
 
   public async componentDidMount() : Promise<void> {
     this._isMounted = true;
-    for await (const item of synchronizeWithCourier()) {
-      this._isMounted && this.setState({status: item});
+    try {
+      for await (const item of synchronizeWithCourier()) {
+        this._isMounted && this.setState({status: item});
+      }
+      this._isMounted && this.setState({complete: true});
+    } catch (error) {
+      this._isMounted && this.setState({error: true});
     }
-    this._isMounted && this.setState({complete: true});
   }
 
   public componentWillUnmount() : void {
