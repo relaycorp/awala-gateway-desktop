@@ -4,3 +4,11 @@ update_configs:
     directory: /
     update_schedule: weekly
     version_requirement_updates: increase_versions
+  - package_manager: javascript
+    directory: /packages/daemon
+    update_schedule: weekly
+    version_requirement_updates: increase_versions
+  - package_manager: javascript
+    directory: /packages/ui
+    update_schedule: weekly
+    version_requirement_updates: increase_versions

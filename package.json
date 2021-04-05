@@ -2,105 +2,46 @@
   "name": "@relaycorp/awala-gateway-desktop",
   "version": "1.0.0",
   "description": "Awala Gateway for Desktop",
-  "main": "app/electron.js",
   "scripts": {
-    "build": "run-s tsc webpack",
-    "webpack": "webpack --config ./webpack.config.js",
-    "tsc": "tsc -p tsconfig.json",
-    "start": "npm run build && electron ./app/electron.js",
     "prebuild": "run-s clean",
+    "build": "lerna run build",
+    "bootstrap": "lerna bootstrap",
     "fix": "run-s fix:*",
-    "fix:prettier": "prettier \"src/**/*.ts\" --write",
+    "fix:prettier": "prettier \"packages/**/*.ts\" --write",
     "fix:tslint": "tslint --fix --project .",
-    "test": "run-s static-checks test:unit",
-    "test:unit": "jest --coverage",
-    "test:functional": "jest --config jest.config.functional.js --runInBand --detectOpenHandles",
     "static-checks": "run-p static-checks:*",
     "static-checks:lint": "tslint --project .",
-    "static-checks:prettier": "prettier \"src/**/*.ts\" --list-different",
-    "test:ci:unit": "run-s build test:ci:unit:jest",
-    "test:ci:unit:jest": "jest --config jest.config.ci.js --coverage",
-    "cov": "run-s build test:unit && opn coverage/lcov-report/index.html",
-    "clean": "trash build test coverage",
-    "dist": "electron-builder"
+    "static-checks:prettier": "prettier \"packages/**/*.ts\" --list-different",
+    "test": "lerna run test",
+    "pretest:ci": "run-s build",
+    "test:ci": "lerna run test:ci:unit:jest",
+    "clean": "lerna run clean"
   },
   "engines": {
     "node": ">=12"
   },
   "devDependencies": {
-    "@relaycorp/relaynet-poweb": "^1.3.14",
-    "@relaycorp/shared-config": "^1.4.12",
-    "@relaycorp/ws-mock": "^1.4.10",
-    "@testing-library/jest-dom": "^5.11.9",
-    "@testing-library/react": "^11.2.5",
-    "@types/jest": "^26.0.20",
-    "@types/pino": "^6.3.6",
-    "@types/react": "^17.0.2",
-    "@types/react-dom": "^17.0.1",
-    "@types/verror": "^1.10.4",
-    "@types/ws": "^7.4.0",
-    "electron": "^12.0.0",
-    "electron-builder": "^22.10.5",
-    "fastify-plugin": "^3.0.0",
-    "html-webpack-plugin": "^5.2.0",
-    "jest": "^26.6.3",
-    "jest-extended": "^0.11.5",
-    "light-my-request": "^4.4.1",
+    "@relaycorp/shared-config": "^1.4.13",
+    "lerna": "^4.0.0",
     "npm-run-all": "^4.1.5",
     "prettier": "^2.2.1",
-    "react": "^17.0.1",
-    "react-dom": "^17.0.1",
     "trash-cli": "^4.0.0",
-    "ts-jest": "^26.5.2",
-    "ts-loader": "^8.0.17",
+    "ts-jest": "^26.5.4",
     "ts-node": "^9.1.1",
     "ts-node-dev": "^1.1.1",
     "tslint": "^5.18.0",
-    "typescript": "^4.2.2",
-    "webpack": "^5.24.2",
-    "webpack-cli": "^4.5.0"
+    "typescript": "^4.2.3"
   },
   "prettier": "@relaycorp/shared-config/.prettierrc.json",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/relaycorp/awala-gateway-desktop.git"
   },
-  "keywords": [
-    "relaynet"
-  ],
   "author": {
     "email": "no-reply@relaycorp.tech",
     "name": "Relaycorp, Inc.",
     "url": "https://relaycorp.tech/"
   },
   "license": "GPL-3.0",
-  "bugs": {
-    "url": "https://github.com/relaycorp/awala-gateway-desktop/issues"
-  },
-  "dependencies": {
-    "@relaycorp/cogrpc": "^1.3.1",
-    "@relaycorp/relaynet-core": "^1.42.5",
-    "buffer-to-arraybuffer": "0.0.6",
-    "fastify": "^3.12.0",
-    "it-pipe": "^1.1.0",
-    "pino": "^6.11.1",
-    "verror": "^1.10.0",
-    "ws": "^7.4.3"
-  },
-  "optionalDependencies": {
-    "bufferutil": "^4.0.3",
-    "utf-8-validate": "^5.0.4"
-  },
-  "build": {
-    "appId": "com.awala.gateway",
-    "linux": {
-      "target": "rpm"
-    },
-    "win": {
-      "target": "nsis"
-    },
-    "mac": {
-      "target": "dmg"
-    }
-  }
+  "private": "true"
 }

@@ -1,0 +1,7 @@
+{
+  "collectCoverageFrom": ["**/*.js"],
+  "moduleFileExtensions": ["js"],
+  "preset": null,
+  "roots": ["build"],
+  "testPathIgnorePatterns": ["build/functionalTests", "build/testUtils"]
+}
