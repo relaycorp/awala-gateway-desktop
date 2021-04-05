@@ -26,7 +26,12 @@ class Home extends Component<Props, State> {
       case ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY:
         return <h1>connected to public gateway</h1>;
       case ConnectionStatus.CONNECTED_TO_COURIER:
-        return <h1>connected to courier</h1>;
+      return (
+        <div>
+          <h1>connected to courier</h1>
+          <button onClick={this.props.onSynchronize}>Synchronize</button>
+        </div>
+      );
       default:
         return <h1>disconnected</h1>;
     }
