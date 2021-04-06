@@ -8,9 +8,9 @@ class HomeContent extends Component<HomeContentProps> {
   public render() : JSX.Element {
     return (
       <div className="home">
-        <h1>{this.props.title}</h1>
         <img src={this.props.image} />
-        {this.props.children}
+        <h1>{this.props.title}</h1>
+        <div> {this.props.children} </div>
       </div>
     );
   }
