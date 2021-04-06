@@ -2,32 +2,30 @@ import {
   Certificate,
   derSerializePublicKey,
   GSCClient,
-  MockPrivateKeyStore,
   PrivateNodeRegistration,
   PrivateNodeRegistrationRequest,
 } from '@relaycorp/relaynet-core';
 import { generateNodeKeyPairSet, generatePDACertificationPath } from '@relaycorp/relaynet-testing';
 import { Container } from 'typedi';
 
-import { Config } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { arrayBufferFrom } from '../../testUtils/buffer';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { PreRegisterNodeCall, RegisterNodeCall } from '../../testUtils/gscClient/methodCalls';
 import { MockGSCClient } from '../../testUtils/gscClient/MockGSCClient';
 import { mockSpy } from '../../testUtils/jest';
+import { mockPrivateKeyStore } from '../../testUtils/keystores';
 import { PUBLIC_GATEWAY_ADDRESS } from '../../tokens';
 import { GatewayRegistrar } from './GatewayRegistrar';
 import * as gscClient from './gscClient';
 
 setUpTestDBConnection();
 
-const privateKeyStore = new MockPrivateKeyStore();
+const privateKeyStore = mockPrivateKeyStore();
+
 let registrar: GatewayRegistrar;
 beforeEach(() => {
-  privateKeyStore.clear();
-
-  registrar = new GatewayRegistrar(privateKeyStore, Container.get(Config));
+  registrar = Container.get(GatewayRegistrar);
 });
 
 let mockGSCClient: GSCClient | null;
