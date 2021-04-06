@@ -3,7 +3,7 @@ import { getConnection, Repository } from 'typeorm';
 import { Config } from './Config';
 
 import { ConfigItem } from './entity/ConfigItem';
-import { ConfigError } from './PrivateGatewayError';
+import { ConfigError } from './errors';
 import { setUpTestDBConnection } from './testUtils/db';
 
 setUpTestDBConnection();

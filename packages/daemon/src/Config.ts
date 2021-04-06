@@ -3,7 +3,7 @@ import { Repository } from 'typeorm';
 import { InjectRepository } from 'typeorm-typedi-extensions';
 
 import { ConfigItem } from './entity/ConfigItem';
-import { ConfigError } from './PrivateGatewayError';
+import { ConfigError } from './errors';
 
 @Service()
 export class Config {
