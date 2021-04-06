@@ -1,8 +1,8 @@
 import React, { Component } from 'react';
+import { ConnectionStatus, pollConnectionStatus } from '../../ipc/connectionStatus';
 import connected from '../assets/connected.svg';
 import courier from '../assets/courier.svg';
 import disconnected from '../assets/disconnected.svg';
-import { ConnectionStatus, pollConnectionStatus } from '../../ipc/connectionStatus';
 import HomeContent from './homeContent';
 
 interface Props {
