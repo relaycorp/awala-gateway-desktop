@@ -1,7 +1,9 @@
 import React, { Component } from 'react';
+import connected from '../../../assets/connected.svg';
+import courier from '../../../assets/courier.svg';
+import disconnected from '../../../assets/disconnected.svg';
 import { ConnectionStatus, pollConnectionStatus } from '../../ipc/connectionStatus';
 import HomeContent from './homeContent';
-import connected from '../../../assets/connected.svg';
 
 interface Props {
   readonly onSynchronize: () => void
@@ -42,13 +44,13 @@ class Home extends Component<Props, State> {
         );
       case ConnectionStatus.CONNECTED_TO_COURIER:
         return (
-          <HomeContent title="connected to courier" image="/bar.jpg" >
+          <HomeContent title="connected to courier" image={courier} >
             <button onClick={this.props.onSynchronize}>Synchronize</button>
           </HomeContent>
         );
       default:
         return (
-          <HomeContent title="disconnected" image="/baz.jpg" >
+          <HomeContent title="disconnected" image={disconnected} >
             <p>baaaz</p>
           </HomeContent>
         );
