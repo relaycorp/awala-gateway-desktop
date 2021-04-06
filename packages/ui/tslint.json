@@ -1,7 +1,0 @@
-{
-  "extends": ["../../tslint.json"],
-  "rules": {
-    "no-object-mutation": false,
-    "readonly-keyword": [true, {"ignore-prefix": "mutable"}]
-  }
-}

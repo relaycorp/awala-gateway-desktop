@@ -6,27 +6,27 @@ interface Props {
 }
 interface State {
   readonly status: ConnectionStatus
+  readonly abort?: () => void
 }
 
 class Home extends Component<Props, State> {
-  private mutableIsMounted: boolean = false;
-
   constructor(props: Props) {
     super(props);
     this.state = { status: ConnectionStatus.DISCONNECTED_FROM_ALL };
   }
 
   public async componentDidMount() : Promise<void> {
-    this.mutableIsMounted = true;
-    for await (const item of pollConnectionStatus()) {
-      if (this.mutableIsMounted) {
-        this.setState({status: item});
-      }
+    const {promise, abort} = pollConnectionStatus();
+    this.setState({ abort });
+    for await (const item of promise) {
+      this.setState({status: item});
     }
   }
 
   public componentWillUnmount() : void {
-    this.mutableIsMounted = false;
+    if (this.state.abort) {
+      this.state.abort();
+    }
   }
 
   public render() : JSX.Element {
