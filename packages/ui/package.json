@@ -23,6 +23,7 @@
   },
   "private": "true",
   "dependencies": {
+    "abortable-iterator": "^3.0.0",
     "bufferutil": "^4.0.3",
     "it-pipe": "^1.1.0",
     "pino": "^6.11.2",

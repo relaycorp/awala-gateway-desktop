@@ -1,4 +1,5 @@
 import { sleep } from './_utils';
+import abortable from 'abortable-iterator';
 
 export enum ConnectionStatus {
   CONNECTED_TO_PUBLIC_GATEWAY,
@@ -18,36 +19,25 @@ export interface ConnectionStatusPoller {
  */
 export function pollConnectionStatus(): ConnectionStatusPoller {
   const controller = new AbortController();
+  const promise = abortable(_pollConnectionStatus(), controller.signal, { returnOnAbort: true });
   return {
     abort: () => {
       controller.abort();
     },
-    promise: _pollConnectionStatus(controller.signal),
+    promise,
   };
 }
 
-async function* _pollConnectionStatus(signal: AbortSignal): AsyncIterable<ConnectionStatus> {
-  if (signal.aborted) {
-    return;
-  }
+async function* _pollConnectionStatus(): AsyncIterable<ConnectionStatus> {
   yield ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY;
   await sleep(3);
 
-  if (signal.aborted) {
-    return;
-  }
   yield ConnectionStatus.CONNECTED_TO_COURIER;
   await sleep(5);
 
-  if (signal.aborted) {
-    return;
-  }
   yield ConnectionStatus.DISCONNECTED_FROM_PUBLIC_GATEWAY;
   await sleep(5);
 
-  if (signal.aborted) {
-    return;
-  }
   yield ConnectionStatus.DISCONNECTED_FROM_ALL;
   await sleep(2);
 }
