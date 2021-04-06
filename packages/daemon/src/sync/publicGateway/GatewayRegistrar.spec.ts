@@ -10,6 +10,7 @@ import { Container } from 'typedi';
 
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { arrayBufferFrom } from '../../testUtils/buffer';
+import { makeConfigTokenEphemeral } from '../../testUtils/config';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { PreRegisterNodeCall, RegisterNodeCall } from '../../testUtils/gscClient/methodCalls';
 import { MockGSCClient } from '../../testUtils/gscClient/MockGSCClient';
@@ -33,11 +34,9 @@ beforeEach(() => {
   mockGSCClient = null;
 });
 
-beforeEach(() => {
-  Container.remove(PUBLIC_GATEWAY_ADDRESS);
-});
-
 const mockMakeGSCClient = mockSpy(jest.spyOn(gscClient, 'makeGSCClient'), () => mockGSCClient);
+
+makeConfigTokenEphemeral(PUBLIC_GATEWAY_ADDRESS);
 
 describe('register', () => {
   let publicGatewayIdCertificate: Certificate;

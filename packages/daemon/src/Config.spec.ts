@@ -4,6 +4,7 @@ import { Config } from './Config';
 
 import { ConfigItem } from './entity/ConfigItem';
 import { ConfigError } from './errors';
+import { makeConfigTokenEphemeral } from './testUtils/config';
 import { setUpTestDBConnection } from './testUtils/db';
 
 setUpTestDBConnection();
@@ -18,12 +19,7 @@ beforeEach(() => {
 
 const TOKEN = new Token<string>('the-token');
 const VALUE = 'foo';
-
-function removeToken(): void {
-  Container.remove(TOKEN);
-}
-beforeEach(removeToken);
-afterAll(removeToken);
+makeConfigTokenEphemeral(TOKEN);
 
 describe('load', () => {
   test('Missing key should raise an error', async () => {
