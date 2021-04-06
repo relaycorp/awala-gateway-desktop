@@ -41,7 +41,9 @@ export class MockMethodCall<CallArguments extends CallArgs, ResultType> {
       throw new Error('Method was already called');
     }
 
+    // tslint:disable-next-line:no-object-mutation
     this._wasCalled = true;
+    // tslint:disable-next-line:no-object-mutation
     this.args = args;
     if (this.error) {
       throw this.error;
