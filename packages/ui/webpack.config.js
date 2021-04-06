@@ -37,7 +37,11 @@ module.exports = [
       {
         test: /\.svg/,
         type: 'asset/resource'
-      }
+      },
+      {
+        test: /\.(woff|woff2|eot|ttf|otf)$/i,
+        type: 'asset/resource',
+      },
     ] },
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx']

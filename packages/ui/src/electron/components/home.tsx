@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
-import connected from '../../../assets/connected.svg';
-import courier from '../../../assets/courier.svg';
-import disconnected from '../../../assets/disconnected.svg';
+import connected from '../assets/connected.svg';
+import courier from '../assets/courier.svg';
+import disconnected from '../assets/disconnected.svg';
 import { ConnectionStatus, pollConnectionStatus } from '../../ipc/connectionStatus';
 import HomeContent from './homeContent';
 

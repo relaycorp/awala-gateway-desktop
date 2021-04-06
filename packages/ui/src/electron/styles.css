@@ -1,3 +1,28 @@
+@font-face {
+  font-family: 'Inria Sans';
+  font-style: normal;
+  font-weight: normal;
+  src: url('./assets/fonts/InriaSans-Regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Inria Sans';
+  font-style: italic;
+  font-weight: normal;
+  src: url('./assets/fonts/InriaSans-Italic.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Inria Sans';
+  font-style: normal;
+  font-weight: 700;
+  src: url('./assets/fonts/InriaSans-Bold.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Inria Sans';
+  font-style: italic;
+  font-weight: 700;
+  src: url('./assets/fonts/InriaSans-BoldItalic.ttf') format('truetype');
+}
+
 html, body, #app {
   border: 0;
   height: 100%;
@@ -5,15 +30,15 @@ html, body, #app {
   margin: 0;
   overflow: auto;
   padding: 0;
-  font-family: Inria Sans;
   color: #27302B;
+  font-family: 'Inria Sans', sans-serif;
   font-size: 16px;
   line-height: 23px;
 }
 
 h1 {
   color: #27302B;
-  font-family: Inria Sans;
+  font-family: 'Inria Sans', sans-serif;
   font-size: 34px;
   font-style: normal;
   font-weight: 700;
