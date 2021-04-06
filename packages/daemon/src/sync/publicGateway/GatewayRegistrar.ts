@@ -6,6 +6,7 @@ import {
 import { Inject, Service } from 'typedi';
 
 import { Config } from '../../Config';
+import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
 import { PUBLIC_GATEWAY_ADDRESS } from '../../tokens';
 import { makeGSCClient } from './gscClient';
@@ -44,5 +45,12 @@ export class GatewayRegistrar {
     );
 
     await this.config.set(PUBLIC_GATEWAY_ADDRESS, publicGatewayAddress);
+  }
+
+  public async registerIfUnregistered(): Promise<void> {
+    const publicGatewayAddress = await this.config.get(PUBLIC_GATEWAY_ADDRESS);
+    if (publicGatewayAddress === null) {
+      await this.register(DEFAULT_PUBLIC_GATEWAY);
+    }
   }
 }

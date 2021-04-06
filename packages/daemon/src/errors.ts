@@ -3,5 +3,3 @@
 import VError from 'verror';
 
 export class PrivateGatewayError extends VError {}
-
-export class ConfigError extends PrivateGatewayError {}

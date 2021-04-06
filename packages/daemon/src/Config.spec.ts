@@ -1,9 +1,7 @@
-import { Container, Token } from 'typedi';
 import { getConnection, Repository } from 'typeorm';
-import { Config } from './Config';
+import { Config, ConfigKey } from './Config';
 
 import { ConfigItem } from './entity/ConfigItem';
-import { ConfigError } from './errors';
 import { makeConfigTokenEphemeral } from './testUtils/config';
 import { setUpTestDBConnection } from './testUtils/db';
 
@@ -17,26 +15,21 @@ beforeEach(() => {
   config = new Config(configRepository);
 });
 
-const TOKEN = new Token<string>('the-token');
+const TOKEN = new ConfigKey('the-token');
 const VALUE = 'foo';
 makeConfigTokenEphemeral(TOKEN);
 
-describe('load', () => {
-  test('Missing key should raise an error', async () => {
-    const nonExistingToken = new Token<string>('baz');
+describe('get', () => {
+  test('Missing key should result in null', async () => {
+    const nonExistingKey = new ConfigKey('baz');
 
-    await expect(config.load([nonExistingToken])).rejects.toEqual(
-      new ConfigError(`Token "baz" was not found on the DB`),
-    );
+    await expect(config.get(nonExistingKey)).resolves.toBeNull();
   });
 
-  test('Existing key should be set', async () => {
+  test('Existing key should be returned', async () => {
     await config.set(TOKEN, VALUE);
-    Container.remove(TOKEN);
 
-    await config.load([TOKEN]);
-
-    expect(Container.get(TOKEN)).toEqual(VALUE);
+    await expect(config.get(TOKEN)).resolves.toEqual(VALUE);
   });
 });
 
@@ -54,11 +47,5 @@ describe('set', () => {
     await config.set(TOKEN, newValue);
 
     await expect(configRepository.findOne(TOKEN.name)).resolves.toHaveProperty('value', newValue);
-  });
-
-  test('Token value should be saved', async () => {
-    await config.set(TOKEN, VALUE);
-
-    expect(Container.get(TOKEN)).toEqual(VALUE);
   });
 });

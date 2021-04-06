@@ -8,6 +8,7 @@ import {
 import { generateNodeKeyPairSet, generatePDACertificationPath } from '@relaycorp/relaynet-testing';
 import { Container } from 'typedi';
 
+import { Config } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { arrayBufferFrom } from '../../testUtils/buffer';
 import { makeConfigTokenEphemeral } from '../../testUtils/config';
@@ -95,6 +96,32 @@ describe('register', () => {
   test('Public gateway address should be stored in config', async () => {
     await registrar.register(DEFAULT_PUBLIC_GATEWAY);
 
-    expect(Container.get(PUBLIC_GATEWAY_ADDRESS)).toEqual(DEFAULT_PUBLIC_GATEWAY);
+    const config = Container.get(Config);
+    await expect(config.get(PUBLIC_GATEWAY_ADDRESS)).resolves.toEqual(DEFAULT_PUBLIC_GATEWAY);
+  });
+});
+
+describe('registerIfUnregistered', () => {
+  let registerSpy: jest.SpyInstance;
+  beforeEach(() => {
+    registerSpy = jest.spyOn(registrar, 'register').mockResolvedValue();
+  });
+  afterEach(() => {
+    registerSpy.mockRestore();
+  });
+
+  test('Registration should proceed if unregistered', async () => {
+    await registrar.registerIfUnregistered();
+
+    expect(registerSpy).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
+  });
+
+  test('Registration should be skipped if already registered', async () => {
+    const config = Container.get(Config);
+    await config.set(PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
+
+    await registrar.registerIfUnregistered();
+
+    expect(registerSpy).toBeCalledTimes(0);
   });
 });

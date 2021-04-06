@@ -1,3 +1,3 @@
-import { Token } from 'typedi';
+import { ConfigKey } from './Config';
 
-export const PUBLIC_GATEWAY_ADDRESS = new Token<string>('public_gateway_address');
+export const PUBLIC_GATEWAY_ADDRESS = new ConfigKey('public_gateway_address');
