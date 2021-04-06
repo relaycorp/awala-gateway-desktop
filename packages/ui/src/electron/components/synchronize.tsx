@@ -47,7 +47,7 @@ class Synchronize extends Component<Props, State> {
       case CourierSyncStatus.COLLECTING_CARGO:
         return (
           <div>
-            <h1>collecting cargo</h1>;
+            <h1>collecting cargo</h1>
             <button onClick={this.props.onComplete}> Stop </button>
           </div>
         );
