@@ -1,4 +1,5 @@
 import React, { Component } from 'react';
+import '../styles.css'
 import Home from './home';
 import Onboarding from './onboarding';
 import Synchronize from './synchronize';
