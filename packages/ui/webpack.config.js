@@ -1,4 +1,6 @@
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+
 
 module.exports = [
   {
@@ -22,11 +24,17 @@ module.exports = [
     entry: './src/electron/react.tsx',
     target: 'electron-renderer',
     devtool: 'source-map',
-    module: { rules: [{
-      test: /\.ts(x?)$/,
-      include: /src/,
-      use: [{ loader: 'ts-loader' }]
-    }] },
+    module: { rules: [
+      {
+        test: /\.ts(x?)$/,
+        include: /src/,
+        use: [{ loader: 'ts-loader' }]
+      },
+      {
+        test: /\.css$/i,
+        use: [ MiniCssExtractPlugin.loader, 'css-loader' ],
+      },
+    ] },
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx']
     },
@@ -37,7 +45,8 @@ module.exports = [
     plugins: [
       new HtmlWebpackPlugin({
         template: './src/electron/index.html'
-      })
+      }),
+      new MiniCssExtractPlugin({filename: "styles.[hash].css"})
     ]
   }
 ];
