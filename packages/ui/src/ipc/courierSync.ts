@@ -1,6 +1,6 @@
+import abortable from 'abortable-iterator';
 import PrivateGatewayError from '../PrivateGatewayError';
 import { sleep } from './_utils';
-import abortable from 'abortable-iterator';
 
 export enum CourierSyncStatus {
   COLLECTING_CARGO,

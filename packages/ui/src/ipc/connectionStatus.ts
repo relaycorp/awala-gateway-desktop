@@ -1,5 +1,5 @@
-import { sleep } from './_utils';
 import abortable from 'abortable-iterator';
+import { sleep } from './_utils';
 
 export enum ConnectionStatus {
   CONNECTED_TO_PUBLIC_GATEWAY,
