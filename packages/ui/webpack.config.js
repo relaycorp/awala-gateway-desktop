@@ -34,6 +34,10 @@ module.exports = [
         test: /\.css$/i,
         use: [ MiniCssExtractPlugin.loader, 'css-loader' ],
       },
+      {
+        test: /\.svg/,
+        type: 'asset/resource'
+      }
     ] },
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx']

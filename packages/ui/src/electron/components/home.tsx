@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { ConnectionStatus, pollConnectionStatus } from '../../ipc/connectionStatus';
 import HomeContent from './homeContent';
+import connected from '../../../assets/connected.svg';
 
 interface Props {
   readonly onSynchronize: () => void
@@ -35,7 +36,7 @@ class Home extends Component<Props, State> {
     switch (status) {
       case ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY:
         return (
-          <HomeContent title="connected to public gateway" image="/foo.jpg" >
+          <HomeContent title="connected to public gateway" image={connected} >
             <p>foooo</p>
           </HomeContent>
         );
