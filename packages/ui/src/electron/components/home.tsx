@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import { ConnectionStatus, pollConnectionStatus } from '../../ipc/connectionStatus';
+import HomeContent from './homeContent';
 
 interface Props {
   readonly onSynchronize: () => void
@@ -33,16 +34,23 @@ class Home extends Component<Props, State> {
     const { status } = this.state;
     switch (status) {
       case ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY:
-        return <h1>connected to public gateway</h1>;
+        return (
+          <HomeContent title="connected to public gateway" image="/foo.jpg" >
+            <p>foooo</p>
+          </HomeContent>
+        );
       case ConnectionStatus.CONNECTED_TO_COURIER:
-      return (
-        <div>
-          <h1>connected to courier</h1>
-          <button onClick={this.props.onSynchronize}>Synchronize</button>
-        </div>
-      );
+        return (
+          <HomeContent title="connected to courier" image="/bar.jpg" >
+            <button onClick={this.props.onSynchronize}>Synchronize</button>
+          </HomeContent>
+        );
       default:
-        return <h1>disconnected</h1>;
+        return (
+          <HomeContent title="disconnected" image="/baz.jpg" >
+            <p>baaaz</p>
+          </HomeContent>
+        );
     }
   }
 }
