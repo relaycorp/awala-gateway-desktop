@@ -19,7 +19,7 @@ class Status extends Component<Props> {
     switch (this.props.status) {
       case ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY:
         return (
-          <HomeContent title="connected to public gateway" image={connected} >
+          <HomeContent title="connected to Awala" image={connected} >
             <p>foooo</p>
           </HomeContent>
         );
