@@ -156,6 +156,7 @@ a:hover {
 }
 .stepper .buttons {
   width: 100%;
+  margin-bottom: -36px;
 }
 .stepper .buttons .back {
   float: left;
