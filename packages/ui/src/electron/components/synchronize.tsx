@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import { CourierSyncStatus, synchronizeWithCourier } from '../../ipc/courierSync';
+import SynchronizeStatus from './synchronizeStatus';
 
 interface Props {
   readonly onComplete: () => void
@@ -39,31 +40,12 @@ class Synchronize extends Component<Props, State> {
   }
 
   public render() : JSX.Element {
-    if (this.state.error) {
-      return <h1>Something went wrong</h1>;
-    }
-    const { status } = this.state;
-    switch (status) {
-      case CourierSyncStatus.COLLECTING_CARGO:
-        return (
-          <div>
-            <h1>collecting cargo</h1>
-            <button onClick={this.props.onComplete}> Stop </button>
-          </div>
-        );
-      case CourierSyncStatus.DELIVERING_CARGO:
-        return <h1>delivering cargo</h1>;
-      case CourierSyncStatus.COMPLETE:
-        return (
-          <div>
-            <h1>Done</h1>
-            <button onClick={this.props.onComplete}> Home </button>
-          </div>
-        );
-      case CourierSyncStatus.WAITING:
-      default:
-        return <h1>waiting</h1>;
-    }
+    return (
+      <SynchronizeStatus
+        status={this.state.status}
+        error={this.state.error}
+        onComplete={this.props.onComplete} />
+    );
   }
 }
 
