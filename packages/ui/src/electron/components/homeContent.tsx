@@ -10,7 +10,7 @@ class HomeContent extends Component<HomeContentProps> {
       <div className="home">
         <img src={this.props.image} />
         <h1>{this.props.title}</h1>
-        <div> {this.props.children} </div>
+        <div className='content'> {this.props.children} </div>
       </div>
     );
   }
