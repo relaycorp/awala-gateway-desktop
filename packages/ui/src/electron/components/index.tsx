@@ -4,50 +4,48 @@ import Home from './home';
 import Onboarding from './onboarding';
 import Synchronize from './synchronize';
 
-enum ModalState {
-  MODAL_NONE,
-  MODAL_ABOUT,
-  MODAL_LIBRARIES,
-  MODAL_SETTINGS
+enum Status {
+  HOME,
+  ONBOARDING,
+  SYNCHRONIZE,
+  SETTINGS
 }
 
 interface Props {
 }
 
 interface State {
-  readonly modal: ModalState,
-  readonly onboarded: boolean,
-  readonly synchronize: boolean
+  readonly status: Status
 }
 
 class Index extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
+    const onboarded = typeof localStorage.getItem('onboarded') === 'string';
     this.state = {
-      modal: ModalState.MODAL_NONE,
-      onboarded: typeof localStorage.getItem('onboarded') === 'string',
-      synchronize: false
+      status: !onboarded ? Status.ONBOARDING : Status.HOME
     };
   }
   public render() : JSX.Element {
-    if (!this.state.onboarded) {
-      return <Onboarding onComplete={this.onOnboardingComplete.bind(this)} />;
-    } else if (this.state.synchronize) {
-      return <Synchronize onComplete={this.onSynchronizeComplete.bind(this)} />;
+    switch(this.state.status) {
+      case Status.ONBOARDING:
+        return <Onboarding onComplete={this.onOnboardingComplete.bind(this)} />;
+      case Status.SYNCHRONIZE:
+        return <Synchronize onComplete={this.onSynchronizeComplete.bind(this)} />;
+      case Status.HOME:
+      default:
+        return <Home onSynchronize={this.onSynchronize.bind(this)}/>;
     }
-    return (
-      <Home onSynchronize={this.onSynchronize.bind(this)}/>
-    );
   }
   private onOnboardingComplete() : void {
     localStorage.setItem('onboarded', 'onboarded');
-    this.setState({'onboarded': true});
+    this.setState({'status': Status.HOME});
   }
   private onSynchronize() : void {
-    this.setState({'synchronize': true});
+    this.setState({'status': Status.SYNCHRONIZE});
   }
   private onSynchronizeComplete() : void {
-    this.setState({'synchronize': false});
+    this.setState({'status': Status.HOME});
   }
 }
 
