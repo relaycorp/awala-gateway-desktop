@@ -47,6 +47,50 @@ h1 {
   text-align: center;
 }
 
+button {
+  font-family: Inria Sans;
+  font-size: 15px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 28px;
+  letter-spacing: 0.4444443881511688px;
+  text-align: center;
+  padding: 7px 26px 10px;
+  border: 1px solid #27302B;
+  background: white;
+  border-radius: 3px;
+}
+
+button:hover {
+  background: #27302B;
+  color: white;
+}
+
+button.yellow {
+  background: #F2C94C;
+  color: #27302B;
+  border-color: transparent;
+}
+button.yellow:hover {
+  background: #FFE081;
+}
+
+a {
+  font-family: Inria Sans;
+  font-size: 15px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 28px;
+  letter-spacing: 0.4444443881511688px;
+  text-align: left;
+  text-decoration: underline;
+}
+
+a:hover {
+  color: #F2C94C;
+}
+
+.sync,
 .home {
   height: 100%;
   width: 100%;
@@ -54,9 +98,12 @@ h1 {
   padding: 50px 0;
   margin: 0;
   overflow: auto;
-  background: #F2C94C;
   text-align: center;
 }
+.home {
+  background: #F2C94C;
+}
+.sync img,
 .home img {
   display: block;
   height: 200px;

@@ -1,5 +1,8 @@
 import React, { Component } from 'react';
 import { CourierSyncStatus } from '../../ipc/courierSync';
+import syncingDone from '../assets/syncingDone.svg';
+import syncingError from '../assets/syncingError.svg';
+import SyncContent from './syncContent';
 
 interface Props {
   readonly error: boolean
@@ -15,28 +18,39 @@ class SynchronizeStatus extends Component<Props> {
 
   public render() : JSX.Element {
     if (this.props.error) {
-      return <h1>Something went wrong</h1>;
+      return (
+        <SyncContent image={syncingError} title="Something went wrong" text="you may try again">
+          <button onClick={this.props.onComplete}> Close </button>
+          <button className="yellow" > Try Again </button>
+        </SyncContent>
+      );
     }
     switch (this.props.status) {
       case CourierSyncStatus.COLLECTING_CARGO:
         return (
-          <div>
-            <h1>collecting cargo</h1>
+          <SyncContent text="collecting cargo">
             <button onClick={this.props.onComplete}> Stop </button>
-          </div>
+          </SyncContent>
         );
       case CourierSyncStatus.DELIVERING_CARGO:
-        return <h1>delivering cargo</h1>;
+        return (
+          <SyncContent text="delivering cargo">
+            <button onClick={this.props.onComplete}> Stop </button>
+          </SyncContent>
+        );
       case CourierSyncStatus.COMPLETE:
         return (
-          <div>
-            <h1>Done</h1>
-            <button onClick={this.props.onComplete}> Home </button>
-          </div>
+          <SyncContent image={syncingDone} text="done">
+            <button onClick={this.props.onComplete}> Close </button>
+          </SyncContent>
         );
       case CourierSyncStatus.WAITING:
       default:
-        return <h1>waiting</h1>;
+        return (
+          <SyncContent text="waiting">
+            <button onClick={this.props.onComplete}> Stop </button>
+          </SyncContent>
+        );
     }
   }
 }
