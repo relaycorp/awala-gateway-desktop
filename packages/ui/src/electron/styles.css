@@ -200,3 +200,28 @@ a:hover {
 .stepper .selected {
   background: #27302B;
 }
+
+ol {
+    counter-reset:item;
+    margin:0;
+    padding-left:0;
+}
+ol>li {
+    counter-increment:item;
+    list-style:none inside;
+    margin: 22px 0;
+    overflow: hidden;
+}
+ol>li:before {
+    content:counter(item) ;
+    margin-right: 15px;
+    padding: 0 2px;
+    display: block;
+    border-radius: 50%;
+    width: 18px;
+    text-align: center;
+    float: left;
+    border: solid 1px black;
+    font-size: 14px;
+    line-height: 22px;
+}
