@@ -19,7 +19,8 @@ class SynchronizeStatus extends Component<Props> {
   public render() : JSX.Element {
     if (this.props.error) {
       return (
-        <SyncContent image={syncingError} title="Something went wrong" text="you may try again">
+        <SyncContent image={syncingError} title="Something went wrong"
+          text="You may try again. ">
           <button onClick={this.props.onComplete}> Close </button>
           <button className="yellow" > Try Again </button>
         </SyncContent>
@@ -28,26 +29,26 @@ class SynchronizeStatus extends Component<Props> {
     switch (this.props.status) {
       case CourierSyncStatus.COLLECTING_CARGO:
         return (
-          <SyncContent text="collecting cargo">
+          <SyncContent text="Collecting data...">
             <button onClick={this.props.onComplete}> Stop </button>
           </SyncContent>
         );
       case CourierSyncStatus.DELIVERING_CARGO:
         return (
-          <SyncContent text="delivering cargo">
+          <SyncContent text="Delivering data...">
             <button onClick={this.props.onComplete}> Stop </button>
           </SyncContent>
         );
       case CourierSyncStatus.COMPLETE:
         return (
-          <SyncContent image={syncingDone} text="done">
+          <SyncContent image={syncingDone} text="Done!">
             <button onClick={this.props.onComplete}> Close </button>
           </SyncContent>
         );
       case CourierSyncStatus.WAITING:
       default:
         return (
-          <SyncContent text="waiting">
+          <SyncContent text="Waiting for the incoming data to become available ...">
             <button onClick={this.props.onComplete}> Stop </button>
           </SyncContent>
         );
