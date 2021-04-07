@@ -44,7 +44,6 @@ h1 {
   font-weight: 700;
   line-height: 36px;
   letter-spacing: 0.25px;
-  text-align: center;
 }
 
 button {
@@ -151,8 +150,12 @@ a:hover {
   align-items: flex-start;
 
 }
+.stepper .right h1 {
+  text-align: left;
+}
 .stepper .right .content {
   flex-grow: 1;
+  text-align: left;
 }
 .stepper .buttons {
   width: 100%;
