@@ -4,6 +4,7 @@ import StepperDots from './stepperDots';
 
 interface Props {
   readonly getContent: (step: number) => JSX.Element,
+  readonly getImage: (step: number) => string,
   readonly onComplete: () => void,
   readonly numSteps: number
 }
@@ -19,7 +20,8 @@ class Stepper extends Component<Props, State> {
   }
   public render() : JSX.Element {
     return (
-      <div>
+      <div className='stepper'>
+        <img src={this.props.getImage(this.state.step)} />
         {this.props.getContent(this.state.step)}
         <StepperButtons
           numSteps={this.props.numSteps}

@@ -1,4 +1,7 @@
 import React, { Component } from 'react';
+import image1 from '../assets/onboarding1.svg';
+import image2 from '../assets/onboarding2.svg';
+import image3 from '../assets/onboarding3.svg';
 import Stepper from './stepper';
 
 enum OnboardingStep {
@@ -23,8 +26,11 @@ class Onboarding extends Component<Props, State> {
   }
   public render() : JSX.Element {
     return (
-      <Stepper numSteps={OnboardingStep.NUM_STEPS}
-        getContent={this.getContent} onComplete={this.props.onComplete}
+      <Stepper
+        getContent={this.getContent}
+        getImage={this.getImage}
+        numSteps={OnboardingStep.NUM_STEPS}
+        onComplete={this.props.onComplete}
       />
     );
   }
@@ -39,6 +45,20 @@ class Onboarding extends Component<Props, State> {
       default:
         return <p>Unknown step</p>
     }
+  }
+
+  private getImage(step: number) : string {
+    switch (step) {
+      case OnboardingStep.WELCOME:
+        return image1;
+      case OnboardingStep.EASY:
+        return image2;
+      case OnboardingStep.START:
+        return image3;
+      default:
+        return 'Unknown step'
+    }
+
   }
 }
 

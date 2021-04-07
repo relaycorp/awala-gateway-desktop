@@ -11,7 +11,10 @@ describe('Stepper', () => {
     function getContent(step: number) : JSX.Element {
       return <p>Step {step + 1}</p>;
     }
-    render(<Stepper numSteps={3} onComplete={onComplete} getContent={getContent} />);
+    function getImage(step: number) : string {
+      return 'url' + step;
+    }
+    render(<Stepper numSteps={3} onComplete={onComplete} getContent={getContent} getImage={getImage} />);
 
     // First screen
     expect(screen.getByText("Step 1")).toBeInTheDocument();
