@@ -15,7 +15,7 @@ describe('SynchronizeStatus', () => {
         onComplete={onComplete}
       />
     );
-    expect(screen.getByText("collecting cargo")).toBeInTheDocument();
+    expect(screen.getByText("Collecting data...")).toBeInTheDocument();
   });
   test('renders delivering cargo', async () => {
     render(
@@ -25,7 +25,7 @@ describe('SynchronizeStatus', () => {
         onComplete={onComplete}
       />
     );
-    expect(screen.getByText("delivering cargo")).toBeInTheDocument();
+    expect(screen.getByText("Delivering data...")).toBeInTheDocument();
   });
   test('renders waiting for cargo', async () => {
     render(
@@ -35,7 +35,7 @@ describe('SynchronizeStatus', () => {
         onComplete={onComplete}
       />
     );
-    expect(screen.getByText("waiting")).toBeInTheDocument();
+    expect(screen.getByText("Waiting for the incoming data to become available ...")).toBeInTheDocument();
   });
   test('renders complete', async () => {
     render(
@@ -45,7 +45,7 @@ describe('SynchronizeStatus', () => {
         onComplete={onComplete}
       />
     );
-    expect(screen.getByText("done")).toBeInTheDocument();
+    expect(screen.getByText("Done!")).toBeInTheDocument();
   });
   test('renders error', async () => {
     render(

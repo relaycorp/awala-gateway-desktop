@@ -32,7 +32,7 @@ class Status extends Component<Props> {
         );
       case ConnectionStatus.CONNECTED_TO_COURIER:
         return (
-          <HomeContent title="You're connected to courier" image={courier} >
+          <HomeContent title="You're connected to a courier" image={courier} >
             <p>
               So you’re good to go!
             </p>

@@ -12,6 +12,6 @@ describe('Index', () => {
     fireEvent.click(screen.getByText("Next"));
     fireEvent.click(screen.getByText("Next"));
     fireEvent.click(screen.getByText("Get Started"));
-    expect(screen.getByText("disconnected")).toBeInTheDocument();
+    expect(screen.getByText("You're disconnected from Awala")).toBeInTheDocument();
   });
 });
