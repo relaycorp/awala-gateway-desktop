@@ -6,11 +6,11 @@ interface Props {
 }
 function StepperDots(props: Props) : JSX.Element {
   const dots : readonly JSX.Element[] = Array.from(Array(props.count).keys()).map( (i: number) => {
-    let className = "";
+    let className = "dot";
     if ( i === props.selected ) {
-      className = "selected";
+      className += " selected";
     }
-    return <span key={i.toString()} className={className}>&middot;</span>;
+    return <span key={i.toString()} className={className}></span>;
   });
   return <span className="dots">{dots}</span>;
 }

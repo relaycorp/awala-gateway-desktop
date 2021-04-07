@@ -21,16 +21,22 @@ class Stepper extends Component<Props, State> {
   public render() : JSX.Element {
     return (
       <div className='stepper'>
-        <img src={this.props.getImage(this.state.step)} />
-        {this.props.getContent(this.state.step)}
-        <StepperButtons
-          numSteps={this.props.numSteps}
-          selected={this.state.step}
-          prevStep={this.prevStep.bind(this)}
-          nextStep={this.nextStep.bind(this)}
-          onComplete={this.props.onComplete}
-        />
-        <StepperDots count={this.props.numSteps} selected={this.state.step} />
+        <div className='left'>
+          <img src={this.props.getImage(this.state.step)} />
+        </div>
+        <div className='right'>
+          <div className='content'>
+            {this.props.getContent(this.state.step)}
+          </div>
+          <StepperButtons
+            numSteps={this.props.numSteps}
+            selected={this.state.step}
+            prevStep={this.prevStep.bind(this)}
+            nextStep={this.nextStep.bind(this)}
+            onComplete={this.props.onComplete}
+          />
+          <StepperDots count={this.props.numSteps} selected={this.state.step} />
+        </div>
       </div>
     );
   }

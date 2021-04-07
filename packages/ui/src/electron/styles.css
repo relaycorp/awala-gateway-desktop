@@ -90,15 +90,17 @@ a:hover {
   color: #F2C94C;
 }
 
+.onboarding,
 .sync,
 .home {
   height: 100%;
   width: 100%;
   border: 0;
-  padding: 50px 0;
   margin: 0;
   overflow: auto;
   text-align: center;
+  box-sizing: border-box;
+  padding: 50px 20px;
 }
 .home {
   background: #F2C94C;
@@ -117,4 +119,63 @@ a:hover {
   font-weight: 400;
   line-height: 20px;
   letter-spacing: 0px;
+}
+
+.onboarding {
+  padding: 0;
+  display: flex;
+  background: #F4F4F4;
+  flex-direction: row;
+  align-items: center;
+}
+.stepper {
+  width: 770px;
+  height: 460px;
+  margin: auto;
+  display: flex;
+  flex-direction: row;
+  background: white;
+  box-shadow: 4px 4px 10px 0px rgb(0, 0, 0, 0.1);
+}
+.stepper .left {
+  padding: 10px 30px;
+  background: #F2C94C;
+  display: flex;
+  align-items: center;
+}
+.stepper .right {
+  flex-grow: 1;
+  padding: 40px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+}
+.stepper .right .content {
+  flex-grow: 1;
+}
+.stepper .buttons {
+  width: 100%;
+}
+.stepper .buttons .back {
+  float: left;
+}
+.stepper .buttons .complete,
+.stepper .buttons .next {
+  float: right;
+}
+.stepper .dots {
+  align-self: center;
+}
+
+.stepper .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 100%;
+  background: #e5e5e5;
+  margin: 0 6px;
+}
+.stepper .selected {
+  background: #27302B;
 }

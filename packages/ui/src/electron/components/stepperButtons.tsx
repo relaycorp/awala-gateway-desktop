@@ -10,11 +10,16 @@ interface Props {
 
 interface ButtonProps {
   readonly onClick: () => void,
-  readonly text: string
+  readonly text: string,
+  readonly className?: string
 }
 
 function Button(props: ButtonProps) : JSX.Element {
-  return <button onClick={props.onClick}>{props.text}</button>;
+  return (
+    <button className={props.className} onClick={props.onClick}>
+      {props.text}
+    </button>
+  );
 }
 
 class StepperButtons extends Component<Props> {
@@ -23,16 +28,16 @@ class StepperButtons extends Component<Props> {
     this.state = { step: 0 };
   }
   public render() : JSX.Element {
-    return <div>{ this.buttons() }</div>;
+    return <div className='buttons'>{ this.buttons() }</div>;
   }
   private backButton() : JSX.Element {
-    return <Button key="back" onClick={this.props.prevStep} text="Back" />;
+    return <Button className='back' key="back" onClick={this.props.prevStep} text="Back" />;
   }
   private nextButton() : JSX.Element {
-    return <Button key="next" onClick={this.props.nextStep} text="Next" />;
+    return <Button className='next' key="next" onClick={this.props.nextStep} text="Next" />;
   }
   private completeButton() : JSX.Element {
-    return <Button key="complete" onClick={this.props.onComplete} text="Get Started" />;
+    return <Button className='complete yellow' key="complete" onClick={this.props.onComplete} text="Get Started" />;
   }
   private buttons() : readonly JSX.Element[] {
     if (this.props.selected === 0) {

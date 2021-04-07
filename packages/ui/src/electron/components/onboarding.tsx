@@ -26,12 +26,14 @@ class Onboarding extends Component<Props, State> {
   }
   public render() : JSX.Element {
     return (
-      <Stepper
-        getContent={this.getContent}
-        getImage={this.getImage}
-        numSteps={OnboardingStep.NUM_STEPS}
-        onComplete={this.props.onComplete}
-      />
+      <div className='onboarding'>
+        <Stepper
+          getContent={this.getContent}
+          getImage={this.getImage}
+          numSteps={OnboardingStep.NUM_STEPS}
+          onComplete={this.props.onComplete}
+        />
+      </div>
     );
   }
   private getContent(step: number) : JSX.Element {
@@ -41,7 +43,7 @@ class Onboarding extends Component<Props, State> {
       case OnboardingStep.EASY:
         return <h1>Using Awala is easy</h1>;
       case OnboardingStep.START:
-        return <h1>Awala keeps you safe.</h1>;
+        return <h1>Awala keeps you safe</h1>;
       default:
         return <p>Unknown step</p>
     }
