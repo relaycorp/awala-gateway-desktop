@@ -101,6 +101,13 @@ a:hover {
   box-sizing: border-box;
   padding: 50px 20px;
 }
+.sync,
+.home {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
 .home {
   background: #F2C94C;
 }
@@ -109,7 +116,6 @@ a:hover {
   display: block;
   height: 200px;
   width: auto;
-  margin: auto;
 }
 
 .home .content {
@@ -118,6 +124,17 @@ a:hover {
   font-weight: 400;
   line-height: 20px;
   letter-spacing: 0px;
+  max-width: 600px;
+}
+.home .content.disconnected {
+  font-family: Inria Sans;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 23px;
+  letter-spacing: 0px;
+  text-align: left;
+  max-width: 500px;
 }
 
 .onboarding {
