@@ -1,3 +1,4 @@
+import { ipcRenderer } from 'electron';
 import React, { Component } from 'react';
 import '../styles.css'
 import Home from './home';
@@ -26,6 +27,7 @@ class Index extends Component<Props, State> {
     this.state = {
       status: !onboarded ? Status.ONBOARDING : Status.HOME
     };
+    ipcRenderer.on('show-public-gateway', this.showSettings.bind(this));
   }
   public render() : JSX.Element {
     switch(this.state.status) {
@@ -49,6 +51,9 @@ class Index extends Component<Props, State> {
   }
   private returnToHome() : void {
     this.setState({'status': Status.HOME});
+  }
+  private showSettings() : void {
+    this.setState({'status': Status.SETTINGS});
   }
 }
 

@@ -1,4 +1,5 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Menu } from 'electron';
+import buildMenuTemplate from './menu';
 
 app.on('ready', function createWindow(): void {
   // Create the browser window.
@@ -13,4 +14,6 @@ app.on('ready', function createWindow(): void {
 
   // and load the index.html of the app.
   win.loadFile('index.html');
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenuTemplate(win)));
 });

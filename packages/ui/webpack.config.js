@@ -14,6 +14,9 @@ module.exports = [
         use: [{ loader: 'ts-loader' }]
       }]
     },
+    resolve: {
+      extensions: ['.js', '.ts']
+    },
     output: {
       path: __dirname + '/app',
       filename: 'electron.js'
