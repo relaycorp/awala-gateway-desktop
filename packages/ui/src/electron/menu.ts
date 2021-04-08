@@ -2,7 +2,8 @@ import { BrowserWindow, MenuItemConstructorOptions } from 'electron';
 
 export default function buildMenuTemplate(mainWindow: BrowserWindow): MenuItemConstructorOptions[] {
   return [
-    { role: 'appMenu' },
+    { role: 'fileMenu' },
+    { role: 'editMenu' },
     {
       label: 'Settings',
       submenu: [
