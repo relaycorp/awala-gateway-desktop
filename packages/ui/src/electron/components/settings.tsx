@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import { getPublicGatewayAddress, migratePublicGatewayAddress , SettingError } from '../../ipc/settings';
+import migrated from '../assets/migrated.svg';
 import Gateway from './gateway';
 import GatewayEditor from './gatewayEditor';
 
@@ -38,19 +39,27 @@ class Settings extends Component<Props, State> {
       case Status.DONE:
       return (
         <div className='settings'>
-          <h1>gateway changed</h1>
-          <button onClick={this.props.onComplete}>Close</button>
+          <div className='content'>
+            <div className='migrated'>
+              <img src={migrated} />
+              <h3>Successfully migrated to</h3>
+              <p>{this.state.gateway}</p>
+              <button onClick={this.props.onComplete}>Close</button>
+            </div>
+          </div>
         </div>
       );
       case Status.EDIT:
       return (
         <div className='settings'>
           <button className='back' onClick={this.props.onComplete}>Return to home</button>
-          <GatewayEditor
-            gateway={ this.state.gateway }
-            onMigrate={ this.onMigrate.bind(this) }
-            gatewayError={ this.state.gatewayError }
-          />
+          <div className='content'>
+            <GatewayEditor
+              gateway={ this.state.gateway }
+              onMigrate={ this.onMigrate.bind(this) }
+              gatewayError={ this.state.gatewayError }
+            />
+          </div>
         </div>
       );
       case Status.DISPLAY:
@@ -58,10 +67,12 @@ class Settings extends Component<Props, State> {
       return (
         <div className='settings'>
           <button className='back' onClick={this.props.onComplete}>Return to home</button>
-          <Gateway
-            gateway={ this.state.gateway }
-            onEdit={ this.editGateway.bind(this) }
-          />
+          <div className='content'>
+            <Gateway
+              gateway={ this.state.gateway }
+              onEdit={ this.editGateway.bind(this) }
+            />
+          </div>
         </div>
       );
     }

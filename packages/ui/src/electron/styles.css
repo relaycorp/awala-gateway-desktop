@@ -101,7 +101,7 @@ a:hover {
   overflow: auto;
   text-align: center;
   box-sizing: border-box;
-  padding: 50px 20px;
+  padding: 50px;
 }
 .settings,
 .sync,
@@ -229,39 +229,56 @@ ol>li:before {
     line-height: 22px;
 }
 
-.gateway,
-.gatewayEditor {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  max-width: 400px;
-  text-align: left;
-}
-.gatewayEditor .submit {
-  align-self: flex-end;
-  margin-top: 50px;
-}
 .settings {
   justify-content: flex-start;
 }
-
+.settings .content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.settings .back:hover,
+.settings .back {
+  align-self: flex-start;
+  border: none;
+  font-size: 15px;
+  padding: 0;
+  background: white;
+  color: inherit;
+  cursor: pointer;
+}
+.settings .back::before {
+  content: ' ';
+  display: inline-block;
+  background: url('./assets/back.svg') center no-repeat;
+  width: 10px;
+  height: 10px;
+  margin-right: 0.2em;
+}
 .settings input[type=text] {
   width: 100%;
   box-sizing: border-box;
-  margin: 1em 0;
+  margin-bottom: 1em;
   padding: 1em;
   font-size: 15px;
 }
 .settings input[type=checkbox] {
   margin-right: 1em;
 }
-.settings .back {
-  align-self: flex-start;
-}
 .settings .checkbox {
   display: flex;
   flex-direction: row;
   align-items: baseline;
+  color: #27302bde;
+}
+.gateway,
+.gatewayEditor {
+  max-width: 390px;
+  text-align: left;
+  font-size: 14px;
+}
+.gatewayEditor .submit {
+  float: right;
+  margin-top: 50px;
 }
