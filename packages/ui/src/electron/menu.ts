@@ -64,6 +64,13 @@ export default function buildMenuTemplate(mainWindow: BrowserWindow): MenuItemCo
           },
           label: 'Open Dev Tools',
         },
+        {
+          accelerator: process.platform === 'darwin' ? 'Cmd+R' : 'Ctrl+R',
+          click: async () => {
+            mainWindow.webContents.reload();
+          },
+          label: 'Reload',
+        },
       ],
     },
   ];
