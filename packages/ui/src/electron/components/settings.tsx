@@ -85,7 +85,7 @@ class Settings extends Component<Props, State> {
   private async migrateGateway(newAddress : string) : Promise<void> {
     try {
       await migratePublicGatewayAddress(newAddress);
-      this.setState({status: Status.DONE});
+      this.setState({status: Status.DONE, gateway: newAddress});
     } catch (error) {
       if (error instanceof SettingError) {
         this.setState({status: Status.EDIT, gatewayError: true});
