@@ -15,5 +15,5 @@ app.on('ready', function createWindow(): void {
   // and load the index.html of the app.
   win.loadFile('index.html');
 
-  Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenuTemplate(win)));
+  Menu.setApplicationMenu(buildMenuTemplate(win));
 });

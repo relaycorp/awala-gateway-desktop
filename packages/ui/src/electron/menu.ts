@@ -1,7 +1,7 @@
-import { BrowserWindow, MenuItemConstructorOptions } from 'electron';
+import { BrowserWindow, Menu } from 'electron';
 
-export default function buildMenuTemplate(mainWindow: BrowserWindow): MenuItemConstructorOptions[] {
-  return [
+export default function buildMenuTemplate(mainWindow: BrowserWindow): Menu {
+  return Menu.buildFromTemplate([
     { role: 'fileMenu' },
     { role: 'editMenu' },
     {
@@ -74,5 +74,5 @@ export default function buildMenuTemplate(mainWindow: BrowserWindow): MenuItemCo
         },
       ],
     },
-  ];
+  ]);
 }
