@@ -6,9 +6,19 @@ interface Props {
   readonly gatewayError: boolean
 }
 interface State {
-  readonly newGateway: string
+  readonly confirmed: boolean,
+  readonly newGateway: string,
+  readonly valid: boolean,
 }
 class GatewayEditor extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = {
+      confirmed: false,
+      newGateway: '',
+      valid: false
+    }
+  }
   public render() : JSX.Element {
     return (
       <div className='gatewayEditor'>
@@ -29,9 +39,11 @@ class GatewayEditor extends Component<Props, State> {
         <h4>Enter the new address</h4>
         <input name='gateway' type='text' placeholder='New Public Gateway'
           onChange={this.onChange.bind(this)} />
-        { this.errorMessage() }
+        <div className='info'>
+          { this.infoMessage() }
+        </div>
         <label className='checkbox'>
-          <input name='confirm' type='checkbox' />
+          <input name='confirm' type='checkbox' onChange={this.onCheckbox.bind(this)}/>
           I understand the consequences of this change.
         </label>
         <button className='yellow submit' onClick={this.submit.bind(this)}>
@@ -41,23 +53,46 @@ class GatewayEditor extends Component<Props, State> {
     );
   }
 
-  private errorMessage() : JSX.Element | null {
+  private infoMessage() : JSX.Element | null {
     if (this.props.gatewayError) {
       return (
         <p className='error'>
           Could not resolve  public gateway address. Please confirm it is correct.
         </p>
       );
+    } else if (this.state.valid) {
+      return (
+        <p className='valid'>
+          Address looks valid
+        </p>
+      );
     }
     return null;
   }
 
-  private onChange(event: ChangeEvent<HTMLInputElement>) {
-    this.setState({newGateway: event.target.value});
+  private onCheckbox(event: ChangeEvent<HTMLInputElement>) : void {
+    this.setState({confirmed: event.target.checked});
   }
 
-  private submit() {
-    this.props.onMigrate(this.state.newGateway);
+  private onChange(event: ChangeEvent<HTMLInputElement>) : void {
+    this.setState({
+      newGateway: event.target.value,
+      valid: this.validateGateway(event.target.value)
+    });
+  }
+
+  private validateGateway(newGateway: string) : boolean {
+    if (newGateway === '') {
+      return false;
+    }
+    // TODO Is it a valid url?
+    return true;
+  }
+
+  private submit() : void {
+    if (this.state.confirmed && this.state.valid) {
+      this.props.onMigrate(this.state.newGateway);
+    }
   }
 }
 

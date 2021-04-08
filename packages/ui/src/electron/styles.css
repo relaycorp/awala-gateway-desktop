@@ -259,7 +259,6 @@ ol>li:before {
 .settings input[type=text] {
   width: 100%;
   box-sizing: border-box;
-  margin-bottom: 1em;
   padding: 1em;
   font-size: 15px;
 }
@@ -272,11 +271,23 @@ ol>li:before {
   align-items: baseline;
   color: #27302bde;
 }
+.settings .error {
+  color: #ff0000de;
+}
+.settings .valid {
+  color: #2ba137de;
+}
 .gateway,
 .gatewayEditor {
   max-width: 390px;
   text-align: left;
   font-size: 14px;
+}
+.gatewayEditor .info {
+  font-size: 13px;
+  line-height: 16px;
+  min-height: 16px;
+  margin: 1em 0;
 }
 .gatewayEditor .submit {
   float: right;
