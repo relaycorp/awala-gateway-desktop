@@ -231,6 +231,7 @@ ol>li:before {
 
 .gateway,
 .gatewayEditor {
+  flex-grow: 1;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -238,6 +239,13 @@ ol>li:before {
   max-width: 400px;
   text-align: left;
 }
+.settings {
+  justify-content: flex-start;
+}
+
 .settings input {
   width: 100%;
+}
+.settings .back {
+  align-self: flex-start;
 }

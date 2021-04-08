@@ -45,7 +45,7 @@ class Settings extends Component<Props, State> {
       case Status.EDIT:
       return (
         <div className='settings'>
-          <button onClick={this.props.onComplete}>Return to home</button>
+          <button className='back' onClick={this.props.onComplete}>Return to home</button>
           <GatewayEditor
             gateway={ this.state.gateway }
             onMigrate={ this.onMigrate.bind(this) }
@@ -57,6 +57,7 @@ class Settings extends Component<Props, State> {
       default:
       return (
         <div className='settings'>
+          <button className='back' onClick={this.props.onComplete}>Return to home</button>
           <Gateway
             gateway={ this.state.gateway }
             onEdit={ this.editGateway.bind(this) }
