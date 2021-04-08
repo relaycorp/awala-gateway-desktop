@@ -26,11 +26,15 @@ class GatewayEditor extends Component<Props, State> {
           and we don’t spy or censors our users. If you switch to another
           provider, make sure they don’t either.
         </p>
-        <label htmlFor='gateway'>Enter the new address</label>
+        <h4>Enter the new address</h4>
         <input name='gateway' type='text' placeholder='New Public Gateway'
           onChange={this.onChange.bind(this)} />
         { this.errorMessage() }
-        <button className='yellow' onClick={this.submit.bind(this)}>
+        <label className='checkbox'>
+          <input name='confirm' type='checkbox' />
+          I understand the consequences of this change.
+        </label>
+        <button className='yellow submit' onClick={this.submit.bind(this)}>
           Migrate
         </button>
       </div>

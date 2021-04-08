@@ -239,13 +239,29 @@ ol>li:before {
   max-width: 400px;
   text-align: left;
 }
+.gatewayEditor .submit {
+  align-self: flex-end;
+  margin-top: 50px;
+}
 .settings {
   justify-content: flex-start;
 }
 
-.settings input {
+.settings input[type=text] {
   width: 100%;
+  box-sizing: border-box;
+  margin: 1em 0;
+  padding: 1em;
+  font-size: 15px;
+}
+.settings input[type=checkbox] {
+  margin-right: 1em;
 }
 .settings .back {
   align-self: flex-start;
+}
+.settings .checkbox {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
 }
