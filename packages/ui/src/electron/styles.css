@@ -83,12 +83,14 @@ a {
   letter-spacing: 0.4444443881511688px;
   text-align: left;
   text-decoration: underline;
+  color: #27302B;
 }
 
 a:hover {
   color: #F2C94C;
 }
 
+.settings,
 .onboarding,
 .sync,
 .home {
@@ -101,6 +103,7 @@ a:hover {
   box-sizing: border-box;
   padding: 50px 20px;
 }
+.settings,
 .sync,
 .home {
   display: flex;
@@ -224,4 +227,17 @@ ol>li:before {
     border: solid 1px black;
     font-size: 14px;
     line-height: 22px;
+}
+
+.gateway,
+.gatewayEditor {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  max-width: 400px;
+  text-align: left;
+}
+.settings input {
+  width: 100%;
 }

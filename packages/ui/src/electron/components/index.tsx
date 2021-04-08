@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import '../styles.css'
 import Home from './home';
 import Onboarding from './onboarding';
+import Settings from './settings';
 import Synchronize from './synchronize';
 
 enum Status {
@@ -31,7 +32,9 @@ class Index extends Component<Props, State> {
       case Status.ONBOARDING:
         return <Onboarding onComplete={this.onOnboardingComplete.bind(this)} />;
       case Status.SYNCHRONIZE:
-        return <Synchronize onComplete={this.onSynchronizeComplete.bind(this)} />;
+        return <Synchronize onComplete={this.returnToHome.bind(this)} />;
+      case Status.SETTINGS:
+        return <Settings onComplete={this.returnToHome.bind(this)} />;
       case Status.HOME:
       default:
         return <Home onSynchronize={this.onSynchronize.bind(this)}/>;
@@ -44,7 +47,7 @@ class Index extends Component<Props, State> {
   private onSynchronize() : void {
     this.setState({'status': Status.SYNCHRONIZE});
   }
-  private onSynchronizeComplete() : void {
+  private returnToHome() : void {
     this.setState({'status': Status.HOME});
   }
 }
