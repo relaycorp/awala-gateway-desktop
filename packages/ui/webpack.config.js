@@ -1,5 +1,6 @@
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const CopyPlugin = require("copy-webpack-plugin");
 
 const rendererBaseConfig = {
   mode: 'development',
@@ -52,8 +53,16 @@ module.exports = [
     },
     output: {
       path: __dirname + '/app',
-      filename: 'electron.js'
-    }
+      filename: 'electron.js',
+      clean: true
+    },
+    plugins: [
+      new CopyPlugin({
+        patterns: [
+          { from: './src/electron/template.package.json', to: 'package.json' }
+        ],
+      }),
+    ]
   },
   {
     ...rendererBaseConfig,
