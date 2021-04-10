@@ -17,7 +17,7 @@ const rendererBaseConfig = {
       use: [ MiniCssExtractPlugin.loader, 'css-loader' ],
     },
     {
-      test: /\.svg/,
+      test: /\.(svg|png)$/i,
       type: 'asset/resource'
     },
     {
@@ -28,9 +28,14 @@ const rendererBaseConfig = {
   resolve: {
     extensions: ['.js', '.jsx', '.ts', '.tsx']
   },
+  output: {
+    path: __dirname + '/app',
+    filename: '[name].js'
+  },
   plugins: [
     new HtmlWebpackPlugin({
-      template: './src/electron/index.html'
+      template: './src/electron/index.html',
+      filename: '[name].html'
     }),
     new MiniCssExtractPlugin({filename: "styles.[hash].css"})
   ]
@@ -42,11 +47,17 @@ module.exports = [
     entry: './src/electron/electron.ts',
     target: 'electron-main',
     module: {
-      rules: [{
-        test: /\.ts$/,
-        include: /src/,
-        use: [{ loader: 'ts-loader' }]
-      }]
+      rules: [
+        {
+          test: /\.ts$/,
+          include: /src/,
+          use: [{ loader: 'ts-loader' }]
+        },
+        {
+          test: /\.(png)$/i,
+          type: 'asset/resource'
+        },
+      ]
     },
     resolve: {
       extensions: ['.js', '.ts']
@@ -66,11 +77,11 @@ module.exports = [
   },
   {
     ...rendererBaseConfig,
-    entry: './src/electron/app.tsx',
-    output: {
-      path: __dirname + '/app',
-      filename: 'app.js'
-    },
+    entry: { app: './src/electron/app.tsx', },
+  },
+  {
+    ...rendererBaseConfig,
+    entry: { about: './src/electron/about.tsx', },
   }
 ];
 

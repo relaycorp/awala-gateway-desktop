@@ -5,6 +5,7 @@ app.on('ready', function createWindow(): void {
   // Create the browser window.
   const win = new BrowserWindow({
     height: 700,
+    title: 'Awala',
     webPreferences: {
       contextIsolation: false,
       nodeIntegration: true,
@@ -13,7 +14,7 @@ app.on('ready', function createWindow(): void {
   });
 
   // and load the index.html of the app.
-  win.loadFile('index.html');
+  win.loadFile('app.html');
 
   Menu.setApplicationMenu(buildMenuTemplate(win));
 });

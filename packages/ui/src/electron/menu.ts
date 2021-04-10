@@ -1,4 +1,5 @@
 import { BrowserWindow, Menu } from 'electron';
+import logo from './assets/logo.png';
 
 export default function buildMenuTemplate(mainWindow: BrowserWindow): Menu {
   return Menu.buildFromTemplate([
@@ -12,6 +13,7 @@ export default function buildMenuTemplate(mainWindow: BrowserWindow): Menu {
           click: () => {
             if (mainWindow) {
               mainWindow.webContents.send('show-public-gateway');
+              mainWindow.focus();
             }
           },
           label: 'Public Gateway...',
@@ -24,7 +26,9 @@ export default function buildMenuTemplate(mainWindow: BrowserWindow): Menu {
         {
           click: async () => {
             const win = new BrowserWindow({
-              height: 500,
+              height: 320,
+              icon: logo,
+              title: 'About Awala',
               webPreferences: {
                 contextIsolation: false,
                 nodeIntegration: true,
@@ -61,14 +65,20 @@ export default function buildMenuTemplate(mainWindow: BrowserWindow): Menu {
         {
           accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Alt+Shift+I',
           click: async () => {
-            mainWindow.webContents.toggleDevTools();
+            const win = BrowserWindow.getFocusedWindow();
+            if (win) {
+              win.webContents.toggleDevTools();
+            }
           },
           label: 'Open Dev Tools',
         },
         {
           accelerator: process.platform === 'darwin' ? 'Cmd+R' : 'Ctrl+R',
           click: async () => {
-            mainWindow.webContents.reload();
+            const win = BrowserWindow.getFocusedWindow();
+            if (win) {
+              win.webContents.reload();
+            }
           },
           label: 'Reload',
         },
