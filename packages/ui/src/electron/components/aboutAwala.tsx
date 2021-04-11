@@ -12,9 +12,9 @@ class AboutAwala extends Component {
           By Relaycorp
         </p>
         <div>
-          <a href='https://relaynet.org/'>Learn more about Awala</a>
+          <a href='https://awala.network/'>Learn more about Awala</a>
           <br />
-          <a href='https://relaynet.org/legal'>Legal policies</a>
+          <a href='https://awala.network/legal'>Legal policies</a>
         </div>
       </div>
     );
