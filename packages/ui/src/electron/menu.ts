@@ -45,11 +45,13 @@ export default function buildMenuTemplate(mainWindow: BrowserWindow): Menu {
           click: async () => {
             const win = new BrowserWindow({
               height: 500,
+              icon: logo,
+              title: 'Open Source Libraries',
               webPreferences: {
                 contextIsolation: false,
                 nodeIntegration: true,
               },
-              width: 400,
+              width: 500,
             });
 
             // and load the index.html of the app.

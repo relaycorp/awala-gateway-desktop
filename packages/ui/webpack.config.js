@@ -82,6 +82,10 @@ module.exports = [
   {
     ...rendererBaseConfig,
     entry: { about: './src/electron/about.tsx', },
+  },
+  {
+    ...rendererBaseConfig,
+    entry: { libraries: './src/electron/libraries.tsx', },
   }
 ];
 
