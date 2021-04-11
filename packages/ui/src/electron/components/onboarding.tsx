@@ -59,6 +59,7 @@ class Onboarding extends Component<Props> {
         </div>
       );
       case OnboardingStep.START:
+      default:
       return (
         <div>
         <h1>Awala keeps you safe</h1>
@@ -72,8 +73,6 @@ class Onboarding extends Component<Props> {
           </p>
         </div>
       );
-      default:
-        return <p>Unknown step</p>
     }
   }
 
@@ -84,9 +83,8 @@ class Onboarding extends Component<Props> {
       case OnboardingStep.EASY:
         return image2;
       case OnboardingStep.START:
-        return image3;
       default:
-        return 'Unknown step'
+        return image3;
     }
 
   }
