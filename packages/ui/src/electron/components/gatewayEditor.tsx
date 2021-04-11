@@ -58,7 +58,7 @@ class GatewayEditor extends Component<Props, State> {
     if (this.props.gatewayError) {
       return (
         <p className='error'>
-          Could not resolve  public gateway address. Please confirm it is correct.
+          Could not resolve public gateway address. Please confirm it is correct.
         </p>
       );
     } else if (this.state.valid) {
