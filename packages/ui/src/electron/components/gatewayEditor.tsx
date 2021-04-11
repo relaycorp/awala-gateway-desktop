@@ -1,3 +1,4 @@
+import isValidDomain from 'is-valid-domain';
 import React, { ChangeEvent, Component } from 'react';
 
 interface Props {
@@ -82,11 +83,10 @@ class GatewayEditor extends Component<Props, State> {
   }
 
   private validateGateway(newGateway: string) : boolean {
-    if (newGateway === '') {
-      return false;
+    if (isValidDomain(newGateway)) {
+      return true;
     }
-    // TODO Is it a valid url?
-    return true;
+    return false;
   }
 
   private submit() : void {
