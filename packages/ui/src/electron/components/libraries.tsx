@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 
-interface Library {
+export interface Library {
   readonly author? : string;
   readonly department : string;
   readonly installedVersion : string;
