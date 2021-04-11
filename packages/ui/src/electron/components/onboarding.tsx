@@ -15,14 +15,9 @@ interface Props {
   readonly onComplete: () => void
 }
 
-interface State {
-}
-
-class Onboarding extends Component<Props, State> {
+class Onboarding extends Component<Props> {
   constructor(props: Props) {
     super(props);
-    this.state = {
-    };
   }
   public render() : JSX.Element {
     return (
