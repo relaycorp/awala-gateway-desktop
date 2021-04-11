@@ -8,12 +8,12 @@
   "files": [
     "lib"
   ],
-  "main": "app/electron.js",
+  "main": "app/main.js",
   "scripts": {
     "build": "run-s tsc webpack",
     "webpack": "webpack --config ./webpack.config.js",
     "tsc": "tsc -p tsconfig.json",
-    "start": "npm run build && electron ./app/electron.js",
+    "start": "npm run build && electron ./app/main.js",
     "clean": "trash build test coverage",
     "cov": "run-s build test:unit && opn coverage/lcov-report/index.html",
     "dist": "electron-builder",

@@ -44,7 +44,7 @@ const rendererBaseConfig = {
 module.exports = [
   {
     mode: 'development',
-    entry: './src/electron/electron.ts',
+    entry: './src/electron/main.ts',
     target: 'electron-main',
     module: {
       rules: [
@@ -64,7 +64,7 @@ module.exports = [
     },
     output: {
       path: __dirname + '/app',
-      filename: 'electron.js',
+      filename: 'main.js',
       clean: true
     },
     plugins: [

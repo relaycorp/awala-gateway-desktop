@@ -2,7 +2,7 @@
   "name": "awala-gateway-desktop",
   "version": "1.0.0",
   "description": "Awala Gateway for Desktop",
-  "main": "electron.js",
+  "main": "main.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/relaycorp/awala-gateway-desktop.git"
