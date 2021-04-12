@@ -22,8 +22,8 @@ afterAll(() => {
 const customLogger = pino();
 
 describe('makeServer', () => {
-  test('Logger should be honoured', () => {
-    makeServer(customLogger);
+  test('Logger should be honoured', async () => {
+    await makeServer(customLogger);
 
     expect(fastify).toBeCalledWith(
       expect.objectContaining({
@@ -32,17 +32,17 @@ describe('makeServer', () => {
     );
   });
 
-  test('Maximum request body should allow for the largest RAMF message', () => {
-    makeServer(customLogger);
+  test('Maximum request body should allow for the largest RAMF message', async () => {
+    await makeServer(customLogger);
 
     const fastifyCallArgs = getMockContext(fastify).calls[0];
     expect(fastifyCallArgs[0]).toHaveProperty('bodyLimit', MAX_RAMF_MESSAGE_LENGTH);
   });
 
-  test('Routes should be loaded', async () => {
+  test('Control routes should be loaded', async () => {
     await makeServer(customLogger);
 
-    expect(mockFastify.register).toBeCalledWith(controlRoutes);
+    expect(mockFastify.register).toBeCalledWith(controlRoutes, { prefix: '/_control' });
   });
 
   test('Routes should be "awaited" for', async () => {

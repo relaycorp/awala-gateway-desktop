@@ -5,7 +5,9 @@ import { Logger } from 'pino';
 import controlRoutes from './control';
 import RouteOptions from './RouteOptions';
 
-const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [controlRoutes];
+const ROUTES: { readonly [key: string]: FastifyPluginCallback<RouteOptions> } = {
+  '/_control': controlRoutes,
+};
 
 const SERVER_PORT = 13276;
 const SERVER_HOST = '127.0.0.1';
@@ -16,7 +18,9 @@ export async function makeServer(logger: Logger): Promise<FastifyInstance> {
     logger,
   });
 
-  await Promise.all(ROUTES.map((route) => server.register(route)));
+  await Promise.all(
+    Object.entries(ROUTES).map(([prefix, route]) => server.register(route, { prefix } as any)),
+  );
 
   await server.ready();
 

@@ -1,9 +1,11 @@
 import { FastifyInstance } from 'fastify';
+
 import RouteOptions from '../RouteOptions';
+import publicGatewayRoutes from './publicGateway';
 
 export default async function registerRoutes(
-  _fastify: FastifyInstance,
-  _options: RouteOptions,
+  fastify: FastifyInstance,
+  options: RouteOptions,
 ): Promise<void> {
-  // TODO
+  await fastify.register(publicGatewayRoutes, options);
 }
