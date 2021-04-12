@@ -27,7 +27,7 @@
     "abortable-iterator": "^3.0.0",
     "bufferutil": "^4.0.3",
     "it-pipe": "^1.1.0",
-    "daemon": "../daemon",
+    "daemon": "0.0.0",
     "pino": "^6.11.2",
     "utf-8-validate": "^5.0.4",
     "verror": "^1.10.0"
