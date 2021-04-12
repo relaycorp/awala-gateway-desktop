@@ -65,12 +65,12 @@ module.exports = [
     output: {
       path: __dirname + '/app',
       filename: 'main.js',
-      clean: true
     },
     plugins: [
       new CopyPlugin({
         patterns: [
-          { from: './src/electron/template.package.json', to: 'package.json' }
+          { from: './src/electron/template.package.json', to: 'package.json' },
+          { from: './node_modules/daemon/', to: 'daemon' }
         ],
       }),
     ]
