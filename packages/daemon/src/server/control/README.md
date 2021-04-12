@@ -21,5 +21,3 @@ Possible responses:
 - `500` with one of the following `code`s:
   - `ADDRESS_RESOLUTION_FAILURE` if the DNS lookup or DNSSEC verification failed. **This would also happen if the device is disconnected from the Internet**.
   - `REGISTRATION_FAILURE` the address was valid, but the new public gateway failed to complete the registration. Retrying later might work.
-
-#### Migrate public gateway (PUT)
