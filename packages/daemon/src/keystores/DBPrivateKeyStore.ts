@@ -4,13 +4,17 @@ import {
   PrivateKeyStore,
   UnboundPrivateKeyData,
 } from '@relaycorp/relaynet-core';
+import { Service } from 'typedi';
 import { Connection, Repository } from 'typeorm';
+import { InjectConnection } from 'typeorm-typedi-extensions';
+
 import { PrivateKey, PrivateKeyType } from '../entity/PrivateKey';
 
+@Service()
 export class DBPrivateKeyStore extends PrivateKeyStore {
   private readonly repository: Repository<PrivateKey>;
 
-  constructor(connection: Connection) {
+  constructor(@InjectConnection() connection: Connection) {
     super();
 
     this.repository = connection.getRepository(PrivateKey);

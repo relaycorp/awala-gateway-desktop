@@ -1,12 +1,15 @@
 import { PublicKeyStore, SessionPublicKeyData } from '@relaycorp/relaynet-core';
+import { Service } from 'typedi';
 import { Connection, Repository } from 'typeorm';
+import { InjectConnection } from 'typeorm-typedi-extensions';
 
 import { PublicKey } from '../entity/PublicKey';
 
+@Service()
 export class DBPublicKeyStore extends PublicKeyStore {
   private readonly repository: Repository<PublicKey>;
 
-  constructor(connection: Connection) {
+  constructor(@InjectConnection() connection: Connection) {
     super();
 
     this.repository = connection.getRepository(PublicKey);
