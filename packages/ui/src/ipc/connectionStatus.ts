@@ -1,3 +1,4 @@
+import abortable from 'abortable-iterator';
 import { sleep } from './_utils';
 
 export enum ConnectionStatus {
@@ -7,7 +8,27 @@ export enum ConnectionStatus {
   DISCONNECTED_FROM_ALL,
 }
 
-export async function* pollConnectionStatus(): AsyncIterable<ConnectionStatus> {
+export interface ConnectionStatusPoller {
+  readonly promise: AsyncIterable<ConnectionStatus>;
+  readonly abort: () => void;
+}
+
+/**
+ * Wrapper for status polling that exposes an abort method
+ *
+ */
+export function pollConnectionStatus(): ConnectionStatusPoller {
+  const controller = new AbortController();
+  const promise = abortable(_pollConnectionStatus(), controller.signal, { returnOnAbort: true });
+  return {
+    abort: () => {
+      controller.abort();
+    },
+    promise,
+  };
+}
+
+async function* _pollConnectionStatus(): AsyncIterable<ConnectionStatus> {
   yield ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY;
   await sleep(3);
 

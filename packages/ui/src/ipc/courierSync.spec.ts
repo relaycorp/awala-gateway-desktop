@@ -7,12 +7,13 @@ describe('synchronizeWithCourier', () => {
   test('should temporarily cycle through all the possible statuses', async () => {
     jest.setTimeout(20_000);
 
-    const statuses = await pipe(synchronizeWithCourier(), asyncIterableToArray);
+    const statuses = await pipe(synchronizeWithCourier().promise, asyncIterableToArray);
 
     expect(statuses).toEqual([
       CourierSyncStatus.COLLECTING_CARGO,
       CourierSyncStatus.WAITING,
       CourierSyncStatus.DELIVERING_CARGO,
+      CourierSyncStatus.COMPLETE,
     ]);
   });
 });

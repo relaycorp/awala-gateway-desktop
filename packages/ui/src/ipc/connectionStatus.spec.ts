@@ -7,7 +7,11 @@ describe('pollConnectionStatus', () => {
   test('should temporarily cycle through all the possible statuses', async () => {
     jest.setTimeout(30_000);
 
-    const statuses = await pipe(pollConnectionStatus(), iterableTake(4), asyncIterableToArray);
+    const statuses = await pipe(
+      pollConnectionStatus().promise,
+      iterableTake(4),
+      asyncIterableToArray,
+    );
 
     expect(statuses).toEqual([
       ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY,

@@ -1,0 +1,20 @@
+{
+  "name": "awala-gateway-desktop",
+  "version": "1.0.0",
+  "description": "Awala Gateway for Desktop",
+  "main": "main.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/relaycorp/awala-gateway-desktop.git"
+  },
+  "keywords": [
+    "relaynet"
+  ],
+  "author": {
+    "email": "no-reply@relaycorp.tech",
+    "name": "Relaycorp, Inc.",
+    "url": "https://relaycorp.tech/"
+  },
+  "license": "GPL-3.0",
+  "dependencies": {}
+}

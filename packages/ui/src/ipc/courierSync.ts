@@ -1,3 +1,4 @@
+import abortable from 'abortable-iterator';
 import PrivateGatewayError from '../PrivateGatewayError';
 import { sleep } from './_utils';
 
@@ -5,9 +6,30 @@ export enum CourierSyncStatus {
   COLLECTING_CARGO,
   WAITING,
   DELIVERING_CARGO,
+  COMPLETE,
 }
 
 export class CourierSyncError extends PrivateGatewayError {}
+
+export interface CourierSync {
+  readonly promise: AsyncIterable<CourierSyncStatus>;
+  readonly abort: () => void;
+}
+
+/**
+ * Wrapper for synchronization that exposes an abort method
+ *
+ */
+export function synchronizeWithCourier(): CourierSync {
+  const controller = new AbortController();
+  const promise = abortable(_synchronizeWithCourier(), controller.signal, { returnOnAbort: true });
+  return {
+    abort: () => {
+      controller.abort();
+    },
+    promise,
+  };
+}
 
 /**
  * Initialize synchronization with courier and wait until it completes.
@@ -16,7 +38,7 @@ export class CourierSyncError extends PrivateGatewayError {}
  *
  * @throws CourierSyncError if the synchronization fails at any point
  */
-export async function* synchronizeWithCourier(): AsyncIterable<CourierSyncStatus> {
+async function* _synchronizeWithCourier(): AsyncIterable<CourierSyncStatus> {
   yield CourierSyncStatus.COLLECTING_CARGO;
   await sleep(5);
 
@@ -25,4 +47,6 @@ export async function* synchronizeWithCourier(): AsyncIterable<CourierSyncStatus
 
   yield CourierSyncStatus.DELIVERING_CARGO;
   await sleep(5);
+
+  yield CourierSyncStatus.COMPLETE;
 }
