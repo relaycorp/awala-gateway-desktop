@@ -23,9 +23,6 @@ app.on('ready', function createWindow(): void {
 
   // Launch the daemon process and get a token via IPC
   const server = fork(path.join(app.getAppPath(), 'daemon/build/bin/gateway-daemon.js'));
-  server.on('error', (err) => {
-    return;
-  });
   server.on('message', (message: ServerMessage) => {
     // console.log('Token from server', message.token);
     win.webContents.send('token', message.token);
