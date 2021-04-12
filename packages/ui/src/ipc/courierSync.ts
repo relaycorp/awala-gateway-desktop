@@ -20,9 +20,9 @@ export interface CourierSync {
  * Wrapper for synchronization that exposes an abort method
  *
  */
-export function synchronizeWithCourier(): CourierSync {
+export function synchronizeWithCourier(token: string): CourierSync {
   const controller = new AbortController();
-  const promise = abortable(_synchronizeWithCourier(), controller.signal, { returnOnAbort: true });
+  const promise = abortable(_synchronizeWithCourier(token), controller.signal, { returnOnAbort: true });
   return {
     abort: () => {
       controller.abort();
@@ -38,7 +38,10 @@ export function synchronizeWithCourier(): CourierSync {
  *
  * @throws CourierSyncError if the synchronization fails at any point
  */
-async function* _synchronizeWithCourier(): AsyncIterable<CourierSyncStatus> {
+async function* _synchronizeWithCourier(token: string): AsyncIterable<CourierSyncStatus> {
+  if (token === '') {
+    return Promise.reject(new CourierSyncError());
+  }
   yield CourierSyncStatus.COLLECTING_CARGO;
   await sleep(5);
 

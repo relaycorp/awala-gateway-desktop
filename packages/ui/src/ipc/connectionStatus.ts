@@ -17,9 +17,9 @@ export interface ConnectionStatusPoller {
  * Wrapper for status polling that exposes an abort method
  *
  */
-export function pollConnectionStatus(): ConnectionStatusPoller {
+export function pollConnectionStatus(token: string): ConnectionStatusPoller {
   const controller = new AbortController();
-  const promise = abortable(_pollConnectionStatus(), controller.signal, { returnOnAbort: true });
+  const promise = abortable(_pollConnectionStatus(token), controller.signal, { returnOnAbort: true });
   return {
     abort: () => {
       controller.abort();
@@ -28,7 +28,10 @@ export function pollConnectionStatus(): ConnectionStatusPoller {
   };
 }
 
-async function* _pollConnectionStatus(): AsyncIterable<ConnectionStatus> {
+async function* _pollConnectionStatus(token: string): AsyncIterable<ConnectionStatus> {
+  if (token === '') {
+    return Promise.resolve(ConnectionStatus.DISCONNECTED_FROM_ALL);
+  }
   yield ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY;
   await sleep(3);
 

@@ -8,7 +8,7 @@ describe('pollConnectionStatus', () => {
     jest.setTimeout(30_000);
 
     const statuses = await pipe(
-      pollConnectionStatus().promise,
+      pollConnectionStatus('TOKEN').promise,
       iterableTake(4),
       asyncIterableToArray,
     );

@@ -2,7 +2,7 @@ import { getPublicGatewayAddress, migratePublicGatewayAddress } from './settings
 
 describe('getPublicGatewayAddress', () => {
   test('should temporarily return braavos.relaycorp.cloud', async () => {
-    const publicGateway = await getPublicGatewayAddress();
+    const publicGateway = await getPublicGatewayAddress('TOKEN');
 
     expect(publicGateway).toEqual('braavos.relaycorp.cloud');
   });
@@ -10,6 +10,6 @@ describe('getPublicGatewayAddress', () => {
 
 describe('migratePublicGatewayAddress', () => {
   test('should temporarily accept any address', async () => {
-    await migratePublicGatewayAddress('kings-landing.relaycorp.cloud');
+    await migratePublicGatewayAddress('kings-landing.relaycorp.cloud', 'TOKEN');
   });
 });

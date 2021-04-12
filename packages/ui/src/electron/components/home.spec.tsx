@@ -7,7 +7,7 @@ describe('Home', () => {
     function onSynchronize() : void {
       return;
     }
-    const el = render(<Home onSynchronize={onSynchronize}/>);
+    const el = render(<Home token={"TOKEN"} onSynchronize={onSynchronize}/>);
     expect(el.container.firstChild).toBeTruthy();
   });
 });

@@ -4,6 +4,7 @@ import SynchronizeStatus from './synchronizeStatus';
 
 interface Props {
   readonly onComplete: () => void
+  readonly token: string
 }
 interface State {
   readonly status: CourierSyncStatus,
@@ -22,7 +23,7 @@ class Synchronize extends Component<Props, State> {
   }
 
   public async componentDidMount() : Promise<void> {
-    const {promise, abort} = synchronizeWithCourier();
+    const {promise, abort} = synchronizeWithCourier(this.props.token);
     this.setState({ abort });
     try {
       for await (const item of promise) {
