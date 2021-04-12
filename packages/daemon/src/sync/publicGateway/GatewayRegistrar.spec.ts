@@ -61,6 +61,16 @@ describe('register', () => {
     mockGSCClient = new MockGSCClient([preRegisterCall, registerCall]);
   });
 
+  test('Registration should be skipped if already registered with new gateway', async () => {
+    const config = Container.get(Config);
+    await config.set(PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
+
+    await registrar.register(DEFAULT_PUBLIC_GATEWAY);
+
+    expect(mockMakeGSCClient).not.toBeCalled();
+    expect(preRegisterCall.wasCalled).toBeFalsy();
+  });
+
   test('PoWeb client should complete registration with resolved endpoint', async () => {
     await registrar.register(DEFAULT_PUBLIC_GATEWAY);
 

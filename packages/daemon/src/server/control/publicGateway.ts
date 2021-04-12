@@ -8,7 +8,6 @@ import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { GatewayRegistrar } from '../../sync/publicGateway/GatewayRegistrar';
 import { NonExistingAddressError } from '../../sync/publicGateway/gscClient';
 import { PUBLIC_GATEWAY_ADDRESS } from '../../tokens';
-import RouteOptions from '../RouteOptions';
 
 enum ErrorCode {
   ADDRESS_RESOLUTION_FAILURE = 'ADDRESS_RESOLUTION_FAILURE',
@@ -19,10 +18,7 @@ enum ErrorCode {
 
 const ENDPOINT_PATH = '/public-gateway';
 
-export default async function registerRoutes(
-  fastify: FastifyInstance,
-  _options: RouteOptions,
-): Promise<void> {
+export default async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   const config = Container.get(Config);
   const registrar = Container.get(GatewayRegistrar);
 
