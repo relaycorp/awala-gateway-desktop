@@ -3,11 +3,10 @@ import { fastify, FastifyInstance, FastifyPluginCallback } from 'fastify';
 import { Logger } from 'pino';
 
 import controlRoutes from './control';
+import { disableCors } from './cors';
 import RouteOptions from './RouteOptions';
 
-const ROUTES: { readonly [key: string]: FastifyPluginCallback<RouteOptions> } = {
-  '/_control': controlRoutes,
-};
+const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [controlRoutes];
 
 const SERVER_PORT = 13276;
 const SERVER_HOST = '127.0.0.1';
@@ -18,9 +17,9 @@ export async function makeServer(logger: Logger): Promise<FastifyInstance> {
     logger,
   });
 
-  await Promise.all(
-    Object.entries(ROUTES).map(([prefix, route]) => server.register(route, { prefix } as any)),
-  );
+  await server.addHook('onRequest', disableCors);
+
+  await Promise.all(ROUTES.map((route) => server.register(route)));
 
   await server.ready();
 

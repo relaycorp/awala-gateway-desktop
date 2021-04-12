@@ -4,9 +4,11 @@ import pino from 'pino';
 
 import { getMockContext, getMockInstance, mockSpy } from '../testUtils/jest';
 import controlRoutes from './control';
+import { disableCors } from './cors';
 import { makeServer, runServer } from './index';
 
 const mockFastify: FastifyInstance = {
+  addHook: mockSpy(jest.fn()),
   listen: mockSpy(jest.fn()),
   ready: mockSpy(jest.fn()),
   register: mockSpy(jest.fn()),
@@ -39,10 +41,16 @@ describe('makeServer', () => {
     expect(fastifyCallArgs[0]).toHaveProperty('bodyLimit', MAX_RAMF_MESSAGE_LENGTH);
   });
 
+  test('CORS should be disabled', async () => {
+    await makeServer(customLogger);
+
+    expect(mockFastify.addHook).toBeCalledWith('onRequest', disableCors);
+  });
+
   test('Control routes should be loaded', async () => {
     await makeServer(customLogger);
 
-    expect(mockFastify.register).toBeCalledWith(controlRoutes, { prefix: '/_control' });
+    expect(mockFastify.register).toBeCalledWith(controlRoutes);
   });
 
   test('Routes should be "awaited" for', async () => {
