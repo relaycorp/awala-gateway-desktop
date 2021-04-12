@@ -4,9 +4,11 @@ import pino from 'pino';
 
 import { getMockContext, getMockInstance, mockSpy } from '../testUtils/jest';
 import controlRoutes from './control';
+import { disableCors } from './cors';
 import { makeServer, runServer } from './index';
 
 const mockFastify: FastifyInstance = {
+  addHook: mockSpy(jest.fn()),
   listen: mockSpy(jest.fn()),
   ready: mockSpy(jest.fn()),
   register: mockSpy(jest.fn()),
@@ -22,8 +24,8 @@ afterAll(() => {
 const customLogger = pino();
 
 describe('makeServer', () => {
-  test('Logger should be honoured', () => {
-    makeServer(customLogger);
+  test('Logger should be honoured', async () => {
+    await makeServer(customLogger);
 
     expect(fastify).toBeCalledWith(
       expect.objectContaining({
@@ -32,14 +34,20 @@ describe('makeServer', () => {
     );
   });
 
-  test('Maximum request body should allow for the largest RAMF message', () => {
-    makeServer(customLogger);
+  test('Maximum request body should allow for the largest RAMF message', async () => {
+    await makeServer(customLogger);
 
     const fastifyCallArgs = getMockContext(fastify).calls[0];
     expect(fastifyCallArgs[0]).toHaveProperty('bodyLimit', MAX_RAMF_MESSAGE_LENGTH);
   });
 
-  test('Routes should be loaded', async () => {
+  test('CORS should be disabled', async () => {
+    await makeServer(customLogger);
+
+    expect(mockFastify.addHook).toBeCalledWith('onRequest', disableCors);
+  });
+
+  test('Control routes should be loaded', async () => {
     await makeServer(customLogger);
 
     expect(mockFastify.register).toBeCalledWith(controlRoutes);
