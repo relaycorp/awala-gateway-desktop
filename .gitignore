@@ -6,3 +6,5 @@ packages/*/coverage
 packages/*/node_modules
 packages/*/src/**/*.js
 packages/*/src/**/*.js.map
+packages/ui/app/
+packages/ui/dist
