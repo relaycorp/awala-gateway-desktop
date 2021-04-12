@@ -22,7 +22,9 @@ export interface CourierSync {
  */
 export function synchronizeWithCourier(token: string): CourierSync {
   const controller = new AbortController();
-  const promise = abortable(_synchronizeWithCourier(token), controller.signal, { returnOnAbort: true });
+  const promise = abortable(_synchronizeWithCourier(token), controller.signal, {
+    returnOnAbort: true,
+  });
   return {
     abort: () => {
       controller.abort();

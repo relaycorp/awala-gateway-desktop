@@ -1,16 +1,13 @@
 import { BrowserWindow, Menu } from 'electron';
 import logo from './assets/logo.png';
 
-const isMac = process.platform === 'darwin'
+const isMac = process.platform === 'darwin';
 
 export default function buildMenuTemplate(mainWindow: BrowserWindow): Menu {
   return Menu.buildFromTemplate([
     {
       label: 'Awala',
-      submenu: [
-        { role: 'close'},
-        { role: 'quit' },
-      ]
+      submenu: [{ role: 'close' }, { role: 'quit' }],
     },
     { role: 'editMenu' },
     {

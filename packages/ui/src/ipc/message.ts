@@ -1,3 +1,3 @@
 export default interface ServerMessage {
-  token: string;
+  readonly token: string;
 }

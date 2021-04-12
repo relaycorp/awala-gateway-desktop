@@ -19,7 +19,9 @@ export interface ConnectionStatusPoller {
  */
 export function pollConnectionStatus(token: string): ConnectionStatusPoller {
   const controller = new AbortController();
-  const promise = abortable(_pollConnectionStatus(token), controller.signal, { returnOnAbort: true });
+  const promise = abortable(_pollConnectionStatus(token), controller.signal, {
+    returnOnAbort: true,
+  });
   return {
     abort: () => {
       controller.abort();
