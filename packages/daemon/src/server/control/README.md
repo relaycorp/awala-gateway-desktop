@@ -2,7 +2,7 @@
 
 By default, the API address is `http://127.0.0.1:13276/_control`.
 
-The request and response content type should always be `application/json`, except for WebSocket connections.
+The request and response content type should always be `application/json`, except for any request or request that doesn't have a payload.
 
 `4XX` and `5XX` responses may include a `code` field to explain the reason for the failure, unless it's unambiguous from the HTTP status code. Either way, the daemon logs will include the exact failure reason, including any tracebacks.
 
@@ -10,7 +10,21 @@ The request and response content type should always be `application/json`, excep
 
 ### Public gateway (`/public-gateway`)
 
+#### Get current gateway (`GET`)
+
+This can only return a `200` response containing the `publicAddress`. For example:
+
+```json
+{"publicAddress": "braavos.relaycorp.cloud"}
+```
+
 #### Migrate public gateway (`PUT`)
+
+The request payload MUST include the field `publicGateway` set to the public address of the new gateway. For example:
+
+```json
+{"publicAddress": "braavos.relaycorp.cloud"}
+```
 
 Possible responses:
 
