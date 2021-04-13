@@ -10,6 +10,7 @@
   ],
   "main": "app/main.js",
   "scripts": {
+    "postinstall": "npm link ../daemon",
     "license-report": "node ./license-report.js",
     "build": "run-s license-report tsc webpack",
     "webpack": "webpack --config ./webpack.config.js",
@@ -26,7 +27,7 @@
   "dependencies": {
     "abortable-iterator": "^3.0.0",
     "bufferutil": "^4.0.3",
-    "daemon": "0.0.0",
+    "daemon": "file:../daemon",
     "it-pipe": "^1.1.0",
     "pino": "^6.11.2",
     "utf-8-validate": "^5.0.4",
@@ -44,7 +45,7 @@
     "@types/verror": "^1.10.4",
     "copy-webpack-plugin": "^8.1.1",
     "css-loader": "^5.2.0",
-    "electron": "^12.0.0",
+    "electron": "^12.0.2",
     "electron-builder": "^22.10.5",
     "html-webpack-plugin": "^5.2.0",
     "is-valid-domain": "0.0.19",
