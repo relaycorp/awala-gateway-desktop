@@ -29,8 +29,14 @@ test('Server should be run', async () => {
 });
 
 test('DB connection should be established', async () => {
+  const originalConnectionOptions = await typeorm.getConnectionOptions();
+
   await daemon();
 
-  expect(mockCreateConnection).toBeCalledWith();
+  const isTypescript = __filename.endsWith('.ts');
+  expect(mockCreateConnection).toBeCalledWith({
+    ...originalConnectionOptions,
+    ...(!isTypescript && { entities: ['build/entity/**/*.js'] }),
+  });
   expect(mockCreateConnection).toHaveBeenCalledBefore(makeServer as any);
 });
