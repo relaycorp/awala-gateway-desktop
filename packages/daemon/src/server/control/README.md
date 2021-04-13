@@ -20,6 +20,28 @@ As soon as the connection is established, it outputs the last known status.
 
 The server will never close the connection. If that happens, it'd be due to a bug.
 
+This endpoint can be tested with the following client:
+
+```typescript
+import { source } from 'stream-to-it';
+import WebSocket from 'ws';
+
+async function main(): Promise<void> {
+  for await (const status of streamStatuses()) {
+    // tslint:disable-next-line:no-console
+    console.log('Got status', status);
+  }
+}
+
+async function* streamStatuses(): AsyncIterable<string> {
+  const client = new WebSocket('http://127.0.0.1:13276/_control/sync-status');
+  const socketStream = WebSocket.createWebSocketStream(client, { encoding: 'utf-8' });
+  yield* await source(socketStream);
+}
+
+main();
+```
+
 ### Public gateway (`/public-gateway`)
 
 #### Get current gateway (`GET`)
