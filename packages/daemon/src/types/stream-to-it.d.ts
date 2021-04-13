@@ -3,5 +3,5 @@ declare module 'stream-to-it' {
 
   export function source(source: Readable): IterableIterator<any>;
 
-  export function sink(destination: Writable): any;
+  export function sink(destination: Writable): (source: any) => Promise<void>;
 }
