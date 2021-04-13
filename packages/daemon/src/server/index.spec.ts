@@ -119,7 +119,7 @@ describe('WebSocket servers', () => {
     const mockWSServer = mockWebsocketServer();
     getMockInstance(makeConnectionStatusServer).mockReturnValue(mockWSServer);
     const fastifyInstance = await makeServer(customLogger);
-    const mockRequest = { url: 'http://127.0.0.1/_control/sync-status' };
+    const mockRequest = { url: '/_control/sync-status' };
     const mockSocket = { what: 'the socket' };
     const mockHeaders = { key: 'value' };
 
@@ -146,22 +146,7 @@ describe('WebSocket servers', () => {
     const mockWSServer = mockWebsocketServer();
     getMockInstance(makeConnectionStatusServer).mockReturnValue(mockWSServer);
     const fastifyInstance = await makeServer(customLogger);
-    const mockRequest = { url: 'http://127.0.0.1/non-existing' };
-    const mockSocket = { destroy: jest.fn() };
-
-    const upgradeHandler = getMockContext(fastifyInstance.server.on).calls[0][1];
-
-    upgradeHandler(mockRequest, mockSocket, {});
-
-    expect(mockSocket.destroy).toBeCalled();
-    expect(mockWSServer.handleUpgrade).not.toBeCalled();
-  });
-
-  test('Malformed paths should result in the socket destroyed', async () => {
-    const mockWSServer = mockWebsocketServer();
-    getMockInstance(makeConnectionStatusServer).mockReturnValue(mockWSServer);
-    const fastifyInstance = await makeServer(customLogger);
-    const mockRequest = { url: 'invalid url' };
+    const mockRequest = { url: '/non-existing' };
     const mockSocket = { destroy: jest.fn() };
 
     const upgradeHandler = getMockContext(fastifyInstance.server.on).calls[0][1];

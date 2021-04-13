@@ -39,8 +39,7 @@ export async function runServer(fastifyInstance: FastifyInstance): Promise<void>
 function registerWebsocketEndpoints(logger: Logger, server: FastifyInstance<Server>): void {
   const connectionStatusWebsocketServer = makeConnectionStatusServer(logger);
   server.server.on('upgrade', (request, socket, headers) => {
-    const path = parseURL(request.url)?.pathname;
-    if (path === CONNECTION_STATUS_PATH) {
+    if (request.url === CONNECTION_STATUS_PATH) {
       connectionStatusWebsocketServer.handleUpgrade(request, socket, headers, (websocket) => {
         connectionStatusWebsocketServer.emit('connection', websocket, request);
       });
@@ -48,12 +47,4 @@ function registerWebsocketEndpoints(logger: Logger, server: FastifyInstance<Serv
       socket.destroy();
     }
   });
-}
-
-function parseURL(url: string): URL | null {
-  try {
-    return new URL(url);
-  } catch (_) {
-    return null;
-  }
 }
