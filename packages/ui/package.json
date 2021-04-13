@@ -10,7 +10,7 @@
   ],
   "main": "app/main.js",
   "scripts": {
-    "license-report": "license-report --exclude=daemon --output=json > src/licenses.json",
+    "license-report": "node ./license-report.js",
     "build": "run-s license-report tsc webpack",
     "webpack": "webpack --config ./webpack.config.js",
     "tsc": "tsc -p tsconfig.json",
