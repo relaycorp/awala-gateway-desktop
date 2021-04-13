@@ -35,8 +35,10 @@ export class StatusMonitor {
     this.events.on('change', streamNewStatus);
 
     yield this.lastStatus;
-    yield* await source(stream);
-
-    this.events.removeListener('change', streamNewStatus);
+    try {
+      yield* await source(stream);
+    } finally {
+      this.events.removeListener('change', streamNewStatus);
+    }
   }
 }
