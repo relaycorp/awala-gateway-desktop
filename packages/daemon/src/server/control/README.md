@@ -8,6 +8,18 @@ The request and response content type should always be `application/json`, excep
 
 ## Endpoints
 
+### Sync status (`clientTracking`)
+
+This is a WebSocket endpoint. It doesn't take any input, and it outputs one of the following string frames which correspond to the new status as soon as it changes:
+
+- `CONNECTED_TO_PUBLIC_GATEWAY`: The device is connected to the Internet and we can communicate with the public gateway.
+- `CONNECTED_TO_COURIER`: The device is connected to the WiFi hotspot of a courier. The device may or may not have a sync in progress.
+- `DISCONNECTED_FROM_ALL`: The device is not connected to the public gateway via the Internet or a courier. This status is also used if the device is connected to the Internet but the public gateway is unreachable (e.g., it's been blocked using DPI).
+
+As soon as the connection is established, it outputs the last known status.
+
+The server will never close the connection. If that happens, it'd be due to a bug.
+
 ### Public gateway (`/public-gateway`)
 
 #### Get current gateway (`GET`)
