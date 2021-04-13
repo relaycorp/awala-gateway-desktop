@@ -3,6 +3,7 @@ import { fastify, FastifyInstance, FastifyPluginCallback } from 'fastify';
 import { Logger } from 'pino';
 
 import controlRoutes from './control';
+import { disableCors } from './cors';
 import RouteOptions from './RouteOptions';
 
 const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [controlRoutes];
@@ -15,6 +16,8 @@ export async function makeServer(logger: Logger): Promise<FastifyInstance> {
     bodyLimit: MAX_RAMF_MESSAGE_LENGTH,
     logger,
   });
+
+  await server.addHook('onRequest', disableCors);
 
   await Promise.all(ROUTES.map((route) => server.register(route)));
 

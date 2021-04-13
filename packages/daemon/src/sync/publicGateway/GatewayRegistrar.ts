@@ -26,6 +26,11 @@ export class GatewayRegistrar {
    * @throws NonExistingAddressError if the DNS+DNSSEC lookup succeeded but the address doesn't exist
    */
   public async register(publicGatewayAddress: string): Promise<void> {
+    const currentPublicGatewayAddress = await this.getPublicGatewayAddress();
+    if (currentPublicGatewayAddress === publicGatewayAddress) {
+      return;
+    }
+
     const client = await makeGSCClient(publicGatewayAddress);
 
     const identityKeyPair = await generateRSAKeyPair();
@@ -48,9 +53,13 @@ export class GatewayRegistrar {
   }
 
   public async registerIfUnregistered(): Promise<void> {
-    const publicGatewayAddress = await this.config.get(PUBLIC_GATEWAY_ADDRESS);
-    if (publicGatewayAddress === null) {
+    const publicGatewayAddress = await this.getPublicGatewayAddress();
+    if (!publicGatewayAddress) {
       await this.register(DEFAULT_PUBLIC_GATEWAY);
     }
+  }
+
+  private getPublicGatewayAddress(): Promise<string | null> {
+    return this.config.get(PUBLIC_GATEWAY_ADDRESS);
   }
 }
