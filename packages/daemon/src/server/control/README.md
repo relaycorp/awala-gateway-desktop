@@ -8,7 +8,7 @@ The request and response content type should always be `application/json`, excep
 
 ## Endpoints
 
-### Sync status (`clientTracking`)
+### Sync status (`/sync-status`)
 
 This is a WebSocket endpoint. It doesn't take any input, and it outputs one of the following string frames which correspond to the new status as soon as it changes:
 

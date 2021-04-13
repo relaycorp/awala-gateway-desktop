@@ -27,3 +27,5 @@ export default function makeConnectionStatusServer(logger: Logger): Server {
     await pipe(abortableStatusStream, sink(connectionStream));
   }, logger);
 }
+
+export const PATH = '/_control/sync-status';

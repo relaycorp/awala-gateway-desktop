@@ -1,17 +1,24 @@
 import { MAX_RAMF_MESSAGE_LENGTH } from '@relaycorp/relaynet-core';
 import { fastify, FastifyInstance } from 'fastify';
 import pino from 'pino';
+import WebSocket from 'ws';
 
 import { getMockContext, getMockInstance, mockSpy } from '../testUtils/jest';
 import controlRoutes from './control';
+import makeConnectionStatusServer from './control/connectionStatus';
 import { disableCors } from './cors';
 import { makeServer, runServer } from './index';
+
+jest.mock('./control/connectionStatus');
 
 const mockFastify: FastifyInstance = {
   addHook: mockSpy(jest.fn()),
   listen: mockSpy(jest.fn()),
   ready: mockSpy(jest.fn()),
   register: mockSpy(jest.fn()),
+  server: {
+    on: mockSpy(jest.fn()),
+  },
 } as any;
 jest.mock('fastify', () => {
   return { fastify: jest.fn().mockImplementation(() => mockFastify) };
@@ -106,3 +113,69 @@ describe('runServer', () => {
     await expect(runServer(mockFastify)).rejects.toEqual(error);
   });
 });
+
+describe('WebSocket servers', () => {
+  test('Connection status should be mounted on /_control/sync-status', async () => {
+    const mockWSServer = mockWebsocketServer();
+    getMockInstance(makeConnectionStatusServer).mockReturnValue(mockWSServer);
+    const fastifyInstance = await makeServer(customLogger);
+    const mockRequest = { url: 'http://127.0.0.1/_control/sync-status' };
+    const mockSocket = { what: 'the socket' };
+    const mockHeaders = { key: 'value' };
+
+    expect(fastifyInstance.server.on).toBeCalledWith('upgrade', expect.any(Function));
+    const upgradeHandler = getMockContext(fastifyInstance.server.on).calls[0][1];
+
+    upgradeHandler(mockRequest, mockSocket, mockHeaders);
+
+    expect(mockWSServer.handleUpgrade).toBeCalledWith(
+      mockRequest,
+      mockSocket,
+      mockHeaders,
+      expect.any(Function),
+    );
+    const preUpgradeHandler = getMockContext(mockWSServer.handleUpgrade).calls[0][3];
+    preUpgradeHandler(mockSocket);
+    expect(mockWSServer.emit).toBeCalledWith('connection', mockSocket, mockRequest);
+    expect(mockWSServer.handleUpgrade).toHaveBeenCalledBefore(mockWSServer.emit as any);
+
+    expect(makeConnectionStatusServer).toBeCalledWith(customLogger);
+  });
+
+  test('Unrecognised paths should result in the socket destroyed', async () => {
+    const mockWSServer = mockWebsocketServer();
+    getMockInstance(makeConnectionStatusServer).mockReturnValue(mockWSServer);
+    const fastifyInstance = await makeServer(customLogger);
+    const mockRequest = { url: 'http://127.0.0.1/non-existing' };
+    const mockSocket = { destroy: jest.fn() };
+
+    const upgradeHandler = getMockContext(fastifyInstance.server.on).calls[0][1];
+
+    upgradeHandler(mockRequest, mockSocket, {});
+
+    expect(mockSocket.destroy).toBeCalled();
+    expect(mockWSServer.handleUpgrade).not.toBeCalled();
+  });
+
+  test('Malformed paths should result in the socket destroyed', async () => {
+    const mockWSServer = mockWebsocketServer();
+    getMockInstance(makeConnectionStatusServer).mockReturnValue(mockWSServer);
+    const fastifyInstance = await makeServer(customLogger);
+    const mockRequest = { url: 'invalid url' };
+    const mockSocket = { destroy: jest.fn() };
+
+    const upgradeHandler = getMockContext(fastifyInstance.server.on).calls[0][1];
+
+    upgradeHandler(mockRequest, mockSocket, {});
+
+    expect(mockSocket.destroy).toBeCalled();
+    expect(mockWSServer.handleUpgrade).not.toBeCalled();
+  });
+});
+
+function mockWebsocketServer(): WebSocket.Server {
+  return {
+    emit: jest.fn(),
+    handleUpgrade: jest.fn(),
+  } as any;
+}
