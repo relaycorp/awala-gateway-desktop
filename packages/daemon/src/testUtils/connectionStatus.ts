@@ -1,4 +1,5 @@
 import { Container } from 'typedi';
+
 import { ConnectionStatus, StatusMonitor } from '../sync/StatusMonitor';
 
 export function restoreStatusMonitor(): void {
