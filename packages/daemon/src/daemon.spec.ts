@@ -32,4 +32,5 @@ test('DB connection should be established', async () => {
   await daemon();
 
   expect(mockCreateConnection).toBeCalledWith();
+  expect(mockCreateConnection).toHaveBeenCalledBefore(makeServer as any);
 });
