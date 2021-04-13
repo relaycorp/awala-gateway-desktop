@@ -28,6 +28,7 @@ export default function buildMenuTemplate(mainWindow: BrowserWindow): Menu {
             const win = new BrowserWindow({
               height: 320,
               icon: logo,
+              resizable: false,
               title: 'About Awala',
               webPreferences: {
                 contextIsolation: false,
