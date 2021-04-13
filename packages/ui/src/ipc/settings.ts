@@ -16,7 +16,7 @@ export async function getPublicGatewayAddress(token: string): Promise<string> {
   if (response.status === 200) {
     return json.publicAddress;
   } else {
-    throw new SettingError(json.message || response.status);
+    throw new SettingError(json.message || response.statusText);
   }
 }
 
@@ -36,14 +36,16 @@ export async function migratePublicGatewayAddress(
     body: JSON.stringify({ publicAddress: newAddress }),
     headers: {
       Authentication: token,
-      'Content-Type': 'application/json; charset=UTF-8',
+      'Content-Type': 'application/json',
     },
     method: 'PUT',
   });
-  const json = await response.json();
   if (response.status === 204) {
-    return json.publicAddress;
+    return;
+  } else if (response.status === 400 || response.status === 500) {
+    const json = await response.json();
+    throw new SettingError(json.code || response.statusText);
   } else {
-    throw new SettingError(json.message || response.status);
+    throw new SettingError(response.statusText);
   }
 }
