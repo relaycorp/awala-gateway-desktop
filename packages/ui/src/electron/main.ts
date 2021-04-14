@@ -22,10 +22,17 @@ app.on('ready', function createWindow(): void {
   Menu.setApplicationMenu(buildMenuTemplate(win));
 
   // Launch the daemon process and get a token via IPC
-  const server = fork(path.join(app.getAppPath(), 'daemon/build/bin/gateway-daemon.js'));
+  const server = fork(
+    path.join(app.getAppPath(), 'daemon/build/bin/gateway-daemon.js'),
+    { cwd: path.join(app.getAppPath(), 'daemon/') }
+  );
   server.on('message', (message: ServerMessage) => {
     // console.log('Token from server', message.token);
     win.webContents.send('token', message.token);
+  });
+  server.on('error', (err: Error) => {
+    //console.log(err); // TODO handle/log it
+    app.quit();
   });
 
   app.on('window-all-closed', (event: Event) => {
