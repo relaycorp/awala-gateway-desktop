@@ -7,17 +7,15 @@ beforeEach(() => {
 
 describe('getPublicGatewayAddress', () => {
   const publicAddress = 'braavos.relaycorp.cloud';
+  const request = {
+    url: 'http://127.0.0.1:13276/_control/public-gateway',
+    headers: { 'Content-Type': 'application/json; charset=UTF-8' }
+  };
   test('should fetch and return the publicAddress', async () => {
-    fetchMock.once(
-      {
-        method: 'GET',
-        url: 'http://127.0.0.1:13276/_control/public-gateway',
-      },
-      {
-        body: { publicAddress },
-        status: 200,
-      },
-    );
+    fetchMock.get(request, {
+      body: { publicAddress },
+      status: 200,
+    });
 
     const publicGateway = await getPublicGatewayAddress('TOKEN');
     expect(publicGateway).toEqual(publicAddress);
@@ -25,7 +23,7 @@ describe('getPublicGatewayAddress', () => {
     expect(fetchMock.lastUrl()).toEqual('http://127.0.0.1:13276/_control/public-gateway');
   });
   test('should throw SettingError on a random response', async () => {
-    fetchMock.once('http://127.0.0.1:13276/_control/public-gateway', {
+    fetchMock.get(request, {
       status: 404,
       statusText: 'Unknown',
     });
@@ -39,19 +37,19 @@ describe('getPublicGatewayAddress', () => {
 });
 
 describe('migratePublicGatewayAddress', () => {
+  const request = {
+    url: 'http://127.0.0.1:13276/_control/public-gateway',
+    headers: { 'Content-Type': 'application/json' }
+  };
   test('should temporarily accept any address', async () => {
-    fetchMock.once(
-      {
-        method: 'PUT',
-        url: 'http://127.0.0.1:13276/_control/public-gateway',
-      },
-      { status: 204 },
-    );
+    fetchMock.put(request, {
+      status: 204
+    });
     await migratePublicGatewayAddress('kings-landing.relaycorp.cloud', 'TOKEN');
     expect(fetchMock.lastUrl()).toEqual('http://127.0.0.1:13276/_control/public-gateway');
   });
   test('should throw SettingError on a 400 with a code', async () => {
-    fetchMock.once('http://127.0.0.1:13276/_control/public-gateway', {
+    fetchMock.put(request, {
       body: { code: 'MALFORMED_ADDRESS' },
       status: 400,
     });
@@ -63,7 +61,7 @@ describe('migratePublicGatewayAddress', () => {
     }
   });
   test('should throw SettingError on a 500 with a code', async () => {
-    fetchMock.once('http://127.0.0.1:13276/_control/public-gateway', {
+    fetchMock.put(request, {
       body: { code: 'ADDRESS_RESOLUTION_FAILURE' },
       status: 500,
     });
@@ -75,7 +73,7 @@ describe('migratePublicGatewayAddress', () => {
     }
   });
   test('should throw SettingError on a random response', async () => {
-    fetchMock.once('http://127.0.0.1:13276/_control/public-gateway', {
+    fetchMock.put(request, {
       status: 404,
       statusText: 'Unknown',
     });
