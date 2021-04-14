@@ -23,7 +23,7 @@ app.on('ready', (): void => {
   // TODO: if auto-launch on startup, don't open the window?
   showMainWindow();
 
-  Menu.setApplicationMenu(buildMenu(showSettings));
+  Menu.setApplicationMenu(buildMenu(showMainWindow, showSettings));
 
   app.on('window-all-closed', (event: Event) => {
     // Override the default behavior to quit the app,

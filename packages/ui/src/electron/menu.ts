@@ -3,11 +3,18 @@ import logo from './assets/logo.png';
 
 const isMac = process.platform === 'darwin';
 
-export default function buildMenu(showSettings: () => void): Menu {
+export default function buildMenu(showMainWindow: () => void, showSettings: () => void): Menu {
   return Menu.buildFromTemplate([
     {
       label: 'Awala',
-      submenu: [{ role: 'close' }, { role: 'quit' }],
+      submenu: [
+        {
+          click: showMainWindow,
+          label: 'Open Awala',
+        },
+        { role: 'close' },
+        { role: 'quit' },
+      ],
     },
     { role: 'editMenu' },
     {
