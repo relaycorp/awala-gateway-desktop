@@ -6,6 +6,7 @@ import { Config } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { GatewayRegistrar } from '../../sync/publicGateway/GatewayRegistrar';
 import { NonExistingAddressError } from '../../sync/publicGateway/gscClient';
+import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { makeConfigTokenEphemeral } from '../../testUtils/config';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { getMockInstance, mockSpy } from '../../testUtils/jest';
@@ -14,6 +15,7 @@ import { PUBLIC_GATEWAY_ADDRESS } from '../../tokens';
 import { makeServer } from '../index';
 
 setUpTestDBConnection();
+useTemporaryAppDirs();
 
 makeConfigTokenEphemeral(PUBLIC_GATEWAY_ADDRESS);
 
