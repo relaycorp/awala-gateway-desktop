@@ -8,10 +8,9 @@ let mainWindow: BrowserWindow | null = null;
 let token: string | null = null;
 
 // Launch the daemon process and listen for a token via IPC
-const server = fork(
-  path.join(app.getAppPath(), 'daemon/build/bin/gateway-daemon.js'),
-  { cwd: path.join(app.getAppPath(), 'daemon/') }
-);
+const server = fork(path.join(app.getAppPath(), 'daemon/build/bin/gateway-daemon.js'), {
+  cwd: path.join(app.getAppPath(), 'daemon/'),
+});
 server.on('message', (message: ServerMessage) => {
   token = message.token;
   sendToken();
@@ -20,7 +19,7 @@ server.on('error', (_err: Error) => {
   app.quit();
 });
 
-app.on('ready', function () {
+app.on('ready', (): void => {
   // TODO: if auto-launch on startup, don't open the window?
   showMainWindow();
 
@@ -35,7 +34,6 @@ app.on('ready', function () {
     // User hit Cmd+Q or app.quit() was called.
     server.kill(); // Stops the child process
   });
-
 });
 
 function showMainWindow(): void {
@@ -59,20 +57,20 @@ function showMainWindow(): void {
   mainWindow.loadFile('app.html');
   sendToken();
 
-  mainWindow.on('closed', function () {
+  mainWindow.on('closed', (): void => {
     // Emitted when the window is closed. After you have received this event you should remove the
     // reference to the window and avoid using it any more.
     mainWindow = null;
   });
 }
 
-function sendToken() {
+function sendToken(): void {
   if (token && mainWindow) {
     mainWindow.webContents.send('token', token);
   }
 }
 
-function showSettings() {
+function showSettings(): void {
   showMainWindow();
   if (mainWindow) {
     mainWindow.webContents.send('show-public-gateway');
