@@ -1,9 +1,12 @@
 import { BrowserWindow, Menu } from 'electron';
-import logo from './assets/logo.png';
 
 const isMac = process.platform === 'darwin';
 
-export default function buildMenu(showMainWindow: () => void, showSettings: () => void): Menu {
+export default function buildMenu(
+  logo: string,
+  showMainWindow: () => void,
+  showSettings: () => void,
+): Menu {
   return Menu.buildFromTemplate([
     {
       label: 'Awala',

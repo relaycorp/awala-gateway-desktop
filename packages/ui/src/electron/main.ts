@@ -1,11 +1,14 @@
 import { fork } from 'child_process';
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, Menu, Tray } from 'electron';
 import path from 'path';
 import ServerMessage from '../ipc/message';
+import logo from './assets/logo.png';
 import buildMenu from './menu';
+import buildTray from './tray';
 
 let mainWindow: BrowserWindow | null = null;
 let token: string | null = null;
+let tray: Tray | null = null;
 
 // Launch the daemon process and listen for a token via IPC
 const server = fork(path.join(app.getAppPath(), 'daemon/build/bin/gateway-daemon.js'), {
@@ -23,7 +26,8 @@ app.on('ready', (): void => {
   // TODO: if auto-launch on startup, don't open the window?
   showMainWindow();
 
-  Menu.setApplicationMenu(buildMenu(showMainWindow, showSettings));
+  const logoPath = path.join(app.getAppPath(), logo);
+  Menu.setApplicationMenu(buildMenu(logoPath, showMainWindow, showSettings));
 
   app.on('window-all-closed', (event: Event) => {
     // Override the default behavior to quit the app,
@@ -34,6 +38,10 @@ app.on('ready', (): void => {
     // User hit Cmd+Q or app.quit() was called.
     server.kill(); // Stops the child process
   });
+
+  tray = buildTray(logoPath, showMainWindow);
+  tray.setToolTip('Connection Status...');
+  // TODO: getConnectionStatus and update tray tool tip
 });
 
 function showMainWindow(): void {
