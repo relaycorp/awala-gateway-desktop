@@ -3,7 +3,7 @@ import logo from './assets/logo.png';
 
 const isMac = process.platform === 'darwin';
 
-export default function buildMenuTemplate(mainWindow: BrowserWindow): Menu {
+export default function buildMenu(showSettings: () => void): Menu {
   return Menu.buildFromTemplate([
     {
       label: 'Awala',
@@ -15,12 +15,7 @@ export default function buildMenuTemplate(mainWindow: BrowserWindow): Menu {
       submenu: [
         {
           accelerator: isMac ? 'Cmd+,' : undefined,
-          click: () => {
-            if (mainWindow) {
-              mainWindow.webContents.send('show-public-gateway');
-              mainWindow.focus();
-            }
-          },
+          click: showSettings,
           label: 'Public Gateway...',
         },
       ],
@@ -33,6 +28,7 @@ export default function buildMenuTemplate(mainWindow: BrowserWindow): Menu {
             const win = new BrowserWindow({
               height: 320,
               icon: logo,
+              resizable: false,
               title: 'About Awala',
               webPreferences: {
                 contextIsolation: false,
