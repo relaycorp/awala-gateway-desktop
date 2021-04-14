@@ -8,8 +8,8 @@ beforeEach(() => {
 describe('getPublicGatewayAddress', () => {
   const publicAddress = 'braavos.relaycorp.cloud';
   const request = {
+    headers: { 'Content-Type': 'application/json; charset=UTF-8' },
     url: 'http://127.0.0.1:13276/_control/public-gateway',
-    headers: { 'Content-Type': 'application/json; charset=UTF-8' }
   };
   test('should fetch and return the publicAddress', async () => {
     fetchMock.get(request, {
@@ -38,12 +38,12 @@ describe('getPublicGatewayAddress', () => {
 
 describe('migratePublicGatewayAddress', () => {
   const request = {
+    headers: { 'Content-Type': 'application/json' },
     url: 'http://127.0.0.1:13276/_control/public-gateway',
-    headers: { 'Content-Type': 'application/json' }
   };
   test('should temporarily accept any address', async () => {
     fetchMock.put(request, {
-      status: 204
+      status: 204,
     });
     await migratePublicGatewayAddress('kings-landing.relaycorp.cloud', 'TOKEN');
     expect(fetchMock.lastUrl()).toEqual('http://127.0.0.1:13276/_control/public-gateway');
