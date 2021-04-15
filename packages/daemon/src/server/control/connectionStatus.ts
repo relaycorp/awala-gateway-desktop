@@ -9,6 +9,8 @@ import { Server } from 'ws';
 import { StatusMonitor } from '../../sync/StatusMonitor';
 import { makeWebSocketServer } from '../websocket';
 
+export const PATH = '/_control/sync-status';
+
 export default function makeConnectionStatusServer(logger: Logger): Server {
   const statusMonitor = Container.get(StatusMonitor);
 
@@ -27,5 +29,3 @@ export default function makeConnectionStatusServer(logger: Logger): Server {
     await pipe(abortableStatusStream, sink(connectionStream));
   }, logger);
 }
-
-export const PATH = '/_control/sync-status';
