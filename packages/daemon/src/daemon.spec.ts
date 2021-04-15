@@ -8,7 +8,7 @@ import runSync from './sync';
 import { mockSpy } from './testUtils/jest';
 import { makeMockLogging, MockLogging } from './testUtils/logging';
 import { mockToken } from './testUtils/tokens';
-import { APP_DIRS } from './tokens';
+import { APP_DIRS, LOGGER } from './tokens';
 import * as logging from './utils/logging';
 
 jest.mock('./server');
@@ -17,6 +17,7 @@ jest.mock('./sync');
 const mockCreateConnection = mockSpy(jest.spyOn(typeorm, 'createConnection'));
 
 mockToken(APP_DIRS);
+mockToken(LOGGER);
 
 let mockLogging: MockLogging;
 beforeEach(() => {
@@ -42,13 +43,23 @@ test('Sync should be run', async () => {
   expect(runSync).toBeCalled();
 });
 
-test('APP_DIRS token should be set', async () => {
-  expect(Container.has(APP_DIRS)).toBeFalse();
+describe('Token registration', () => {
+  test('APP_DIRS', async () => {
+    expect(Container.has(APP_DIRS)).toBeFalse();
 
-  await daemon();
+    await daemon();
 
-  const expectedPaths = envPaths('AwalaGateway', { suffix: '' });
-  expect(Container.get(APP_DIRS)).toEqual(expectedPaths);
+    const expectedPaths = envPaths('AwalaGateway', { suffix: '' });
+    expect(Container.get(APP_DIRS)).toEqual(expectedPaths);
+  });
+
+  test('LOGGER', async () => {
+    expect(Container.has(LOGGER)).toBeFalse();
+
+    await daemon();
+
+    expect(Container.get(LOGGER)).toBe(mockLogging.logger);
+  });
 });
 
 test('DB connection should be established', async () => {
