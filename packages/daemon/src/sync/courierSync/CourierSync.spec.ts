@@ -18,6 +18,66 @@ beforeEach(() => {
   getMockInstance(waitUntilUsedOnHost).mockRestore();
 });
 
+describe('sync', () => {
+  test.todo('Client should connect to port 21473 on the default gateway');
+
+  describe('Cargo collection', () => {
+    test.todo('COLLECTION stage should be yielded at the start');
+
+    describe('Cargo Collection Authorization', () => {
+      test.todo('Recipient should be paired public gateway if registered');
+
+      test.todo('Recipient should be default public gateway if unregistered');
+
+      test.todo('Start date should be 90 minutes in the past to tolerate clock drift');
+
+      test.todo('Expiry date should be 30 days in the future');
+
+      test.todo('Sender should be self-issued certificate for own key');
+
+      test.todo('Sender certificate chain should be empty');
+
+      describe('Cargo Collection Request', () => {
+        test.todo('CDA subject should be paired public gateway if registered');
+
+        test.todo('CDA subject should be default public gateway if unregistered');
+      });
+    });
+
+    test.todo('Cargo should be stored with no validation');
+
+    test.todo('Incoming cargo processor should be notified about new cargo');
+
+    test.todo('No more than 100 cargoes should be accepted');
+  });
+
+  describe('Wait period', () => {
+    test.todo('WAIT stage should be yielded at the start');
+
+    test.todo('Client should wait for 5 seconds before delivering cargo');
+  });
+
+  describe('Cargo delivery', () => {
+    test.todo('DELIVERY stage should be yielded at the start');
+
+    test.todo('Outgoing cargo generator should be started');
+
+    test.todo('Each generated cargo should be delivered');
+
+    test.todo('Delivery should end when outgoing cargo generator completes normally');
+
+    test.todo('Delivery should end when outgoing cargo generator errors out');
+  });
+
+  describe('Completion', () => {
+    test.todo('Iterator should end when sync completes successfully');
+
+    test.todo('CogRPC client should be closed when sync completes successfully');
+
+    test.todo('CogRPC client should be closed when sync fails');
+  });
+});
+
 describe('streamStatus', () => {
   describe('Default gateway', () => {
     test('Failure to get default gateway should be quietly ignored', async () => {
