@@ -7,15 +7,19 @@ import { Inject, Service } from 'typedi';
 
 import { Config } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
+import { FileStore } from '../../fileStore';
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
 import { PUBLIC_GATEWAY_ADDRESS } from '../../tokens';
 import { makeGSCClient } from './gscClient';
+
+const PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY = 'public-gateway-id-certificate.der';
 
 @Service()
 export class GatewayRegistrar {
   constructor(
     @Inject(() => DBPrivateKeyStore) private privateKeyStore: PrivateKeyStore,
     private config: Config,
+    @Inject() private fileStore: FileStore,
   ) {}
 
   /**
@@ -50,6 +54,10 @@ export class GatewayRegistrar {
     );
 
     await this.config.set(PUBLIC_GATEWAY_ADDRESS, publicGatewayAddress);
+    await this.fileStore.putObject(
+      Buffer.from(registration.gatewayCertificate.serialize()),
+      PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY,
+    );
   }
 
   public async registerIfUnregistered(): Promise<void> {

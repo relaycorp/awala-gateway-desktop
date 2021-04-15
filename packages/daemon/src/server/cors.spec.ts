@@ -1,8 +1,10 @@
+import { useTemporaryAppDirs } from '../testUtils/appDirs';
 import { setUpTestDBConnection } from '../testUtils/db';
 import { makeMockLogging, MockLogging } from '../testUtils/logging';
 import { makeServer } from './index';
 
 setUpTestDBConnection();
+useTemporaryAppDirs();
 
 let mockLogging: MockLogging;
 beforeEach(() => {
