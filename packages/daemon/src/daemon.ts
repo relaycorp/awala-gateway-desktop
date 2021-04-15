@@ -3,6 +3,7 @@ import { Container } from 'typedi';
 import { createConnection, getConnectionOptions } from 'typeorm';
 
 import { makeServer, runServer } from './server';
+import runSync from './sync';
 import { APP_DIRS } from './tokens';
 import { makeLogger } from './utils/logging';
 
@@ -11,18 +12,14 @@ const IS_TYPESCRIPT = __filename.endsWith('.ts');
 const APP_NAME = 'AwalaGateway';
 
 export default async function (): Promise<void> {
-  await setUpDependencyInjection();
+  await registerTokens();
+  await createDBConnection();
 
   const server = await makeServer(makeLogger());
-  await runServer(server);
+  await Promise.all([runServer(server), runSync()]);
 }
 
-async function setUpDependencyInjection(): Promise<void> {
-  setUpPaths();
-  await createDBConnection();
-}
-
-function setUpPaths(): void {
+async function registerTokens(): Promise<void> {
   const paths = envPaths(APP_NAME, { suffix: '' });
   Container.set(APP_DIRS, paths);
 }

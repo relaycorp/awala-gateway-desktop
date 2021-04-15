@@ -4,6 +4,7 @@ import * as typeorm from 'typeorm';
 import envPaths from 'env-paths';
 import daemon from './daemon';
 import { makeServer, runServer } from './server';
+import runSync from './sync';
 import { mockSpy } from './testUtils/jest';
 import { makeMockLogging, MockLogging } from './testUtils/logging';
 import { mockToken } from './testUtils/tokens';
@@ -11,6 +12,7 @@ import { APP_DIRS } from './tokens';
 import * as logging from './utils/logging';
 
 jest.mock('./server');
+jest.mock('./sync');
 
 const mockCreateConnection = mockSpy(jest.spyOn(typeorm, 'createConnection'));
 
@@ -32,6 +34,12 @@ test('Server should be run', async () => {
   await daemon();
 
   expect(runServer).toBeCalled();
+});
+
+test('Sync should be run', async () => {
+  await daemon();
+
+  expect(runSync).toBeCalled();
 });
 
 test('APP_DIRS token should be set', async () => {
