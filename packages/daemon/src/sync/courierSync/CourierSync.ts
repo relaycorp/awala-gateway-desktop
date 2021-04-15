@@ -34,13 +34,23 @@ export class CourierSync {
   //   throw new Error('implement!');
   // }
 
-  protected async getDefaultGatewayIPAddress(): Promise<string> {
-    const { gateway: gatewayIPAddress } = await getDefaultGateway();
-    return gatewayIPAddress;
+  /**
+   * Get the system's default gateway IPv4 address, if connected to a network.
+   */
+  protected async getDefaultGatewayIPAddress(): Promise<string | null> {
+    try {
+      const { gateway: gatewayIPAddress } = await getDefaultGateway();
+      return gatewayIPAddress;
+    } catch (_) {
+      return null;
+    }
   }
 
   protected async getCourierConnectionStatus(): Promise<CourierConnectionStatus> {
     const gatewayIPAddress = await this.getDefaultGatewayIPAddress();
+    if (!gatewayIPAddress) {
+      return CourierConnectionStatus.DISCONNECTED;
+    }
     try {
       await waitUntilUsedOnHost(
         COURIER_PORT,

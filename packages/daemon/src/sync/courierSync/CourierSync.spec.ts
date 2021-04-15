@@ -20,6 +20,15 @@ beforeEach(() => {
 
 describe('streamStatus', () => {
   describe('Default gateway', () => {
+    test('Failure to get default gateway should be quietly ignored', async () => {
+      const courierSync = new CourierSync();
+      getMockInstance(v4).mockRejectedValue(new Error('Device is not connected to any network'));
+
+      await pipe(courierSync.streamStatus(), iterableTake(1), asyncIterableToArray);
+
+      expect(waitUntilUsedOnHost).not.toBeCalled();
+    });
+
     test('Default gateway should be pinged on port 21473', async () => {
       const courierSync = new CourierSync();
 
@@ -30,6 +39,7 @@ describe('streamStatus', () => {
 
     test('Any change to the default gateway should be picked up', async () => {
       const courierSync = new CourierSync();
+      getMockInstance(v4).mockRestore();
       getMockInstance(v4).mockResolvedValueOnce({ gateway: mockGatewayIPAddr });
       const newGatewayIPAddr = `${mockGatewayIPAddr}1`;
       getMockInstance(v4).mockResolvedValueOnce({ gateway: newGatewayIPAddr });
