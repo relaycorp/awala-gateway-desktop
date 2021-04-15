@@ -18,6 +18,7 @@ interface Props {
 
 interface State {
   readonly status: Status
+  readonly token: string
 }
 
 class Index extends Component<Props, State> {
@@ -25,21 +26,23 @@ class Index extends Component<Props, State> {
     super(props);
     const onboarded = typeof localStorage.getItem('onboarded') === 'string';
     this.state = {
-      status: !onboarded ? Status.ONBOARDING : Status.HOME
+      status: !onboarded ? Status.ONBOARDING : Status.HOME,
+      token: ''
     };
     ipcRenderer.on('show-public-gateway', this.showSettings.bind(this));
+    ipcRenderer.on('token', this.setToken.bind(this));
   }
   public render() : JSX.Element {
     switch(this.state.status) {
       case Status.ONBOARDING:
         return <Onboarding onComplete={this.onOnboardingComplete.bind(this)} />;
       case Status.SYNCHRONIZE:
-        return <Synchronize onComplete={this.returnToHome.bind(this)} />;
+        return <Synchronize token={this.state.token} onComplete={this.returnToHome.bind(this)} />;
       case Status.SETTINGS:
-        return <Settings onComplete={this.returnToHome.bind(this)} />;
+        return <Settings token={this.state.token} onComplete={this.returnToHome.bind(this)} />;
       case Status.HOME:
       default:
-        return <Home onSynchronize={this.onSynchronize.bind(this)}/>;
+        return <Home token={this.state.token} onSynchronize={this.onSynchronize.bind(this)}/>;
     }
   }
   private onOnboardingComplete() : void {
@@ -54,6 +57,9 @@ class Index extends Component<Props, State> {
   }
   private showSettings() : void {
     this.setState({'status': Status.SETTINGS});
+  }
+  private setToken(_: Event, token: string) : void {
+    this.setState({token});
   }
 }
 
