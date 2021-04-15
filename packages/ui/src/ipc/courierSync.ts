@@ -41,26 +41,32 @@ export function synchronizeWithCourier(token: string): CourierSync {
  * @throws CourierSyncError if the synchronization fails at any point
  */
 async function* _synchronizeWithCourier(_token: string): AsyncIterable<CourierSyncStatus> {
-  // FIXME: using the connection status endpoint because courier status isn't there yet.
-  const WS_URL = 'ws://127.0.0.1:13276/_control/sync-status';
-  const stream = connect(WS_URL, { binary: true });
-  for await (const buffer of stream.source) {
-    const name = buffer.toString();
-    switch (name) {
-      case 'COLLECTING_CARGO':
-        yield CourierSyncStatus.COLLECTING_CARGO;
-        break;
-      case 'WAITING':
-        yield CourierSyncStatus.WAITING;
-        break;
-      case 'DELIVERING_CARGO':
-        yield CourierSyncStatus.DELIVERING_CARGO;
-        break;
-      case 'COMPLETE':
-        yield CourierSyncStatus.COMPLETE;
-        break;
+  try {
+    // FIXME: using the connection status endpoint because courier status isn't there yet.
+    const WS_URL = 'ws://127.0.0.1:13276/_control/sync-status';
+    const stream = connect(WS_URL, { binary: true });
+    for await (const buffer of stream.source) {
+      const name = buffer.toString();
+      switch (name) {
+        case 'COLLECTING_CARGO':
+          yield CourierSyncStatus.COLLECTING_CARGO;
+          break;
+        case 'WAITING':
+          yield CourierSyncStatus.WAITING;
+          break;
+        case 'DELIVERING_CARGO':
+          yield CourierSyncStatus.DELIVERING_CARGO;
+          break;
+        case 'COMPLETE':
+          yield CourierSyncStatus.COMPLETE;
+          break;
+        default:
+          throw new CourierSyncError(`Unknown status: ${name}`);
+      }
     }
+    // Server may not send this one, but the UI is waiting for it
+    yield CourierSyncStatus.COMPLETE;
+  } catch (err) {
+    throw new CourierSyncError(err);
   }
-  // Server may not send this one, but the UI is waiting for it
-  yield CourierSyncStatus.COMPLETE;
 }

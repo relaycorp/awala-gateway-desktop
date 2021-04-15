@@ -3,7 +3,7 @@ import * as itws from 'it-ws';
 import { sleep } from './_utils';
 
 import { asyncIterableToArray } from '../testUtils/iterables';
-import { CourierSyncStatus, synchronizeWithCourier } from './courierSync';
+import { CourierSyncError, CourierSyncStatus, synchronizeWithCourier } from './courierSync';
 
 jest.mock('it-ws', () => ({
   connect: jest.fn(),
@@ -21,8 +21,6 @@ describe('synchronizeWithCourier', () => {
 
         yield 'DELIVERING_CARGO';
         await sleep(1);
-
-        yield 'COMPLETE';
       })(),
     });
     jest.setTimeout(20_000);
@@ -35,5 +33,33 @@ describe('synchronizeWithCourier', () => {
       CourierSyncStatus.DELIVERING_CARGO,
       CourierSyncStatus.COMPLETE,
     ]);
+  });
+  test('should throw an error on unknown status', async () => {
+    (itws.connect as jest.Mock).mockReturnValue({
+      source: (async function* buggySource(): AsyncIterable<string> {
+        yield 'UNKNOWN_STATUS';
+      })(),
+    });
+    jest.setTimeout(20_000);
+
+    try {
+      await synchronizeWithCourier('TOKEN').promise;
+    } catch (err) {
+      expect(err).toBeInstanceOf(CourierSyncError);
+    }
+  });
+  test('should throw an error on promise rejection status', async () => {
+    (itws.connect as jest.Mock).mockReturnValue({
+      source: (async function* failingSource(): AsyncIterable<string> {
+        return Promise.reject('REJECTED');
+      })(),
+    });
+    jest.setTimeout(20_000);
+
+    try {
+      await synchronizeWithCourier('TOKEN').promise;
+    } catch (err) {
+      expect(err).toBeInstanceOf(CourierSyncError);
+    }
   });
 });

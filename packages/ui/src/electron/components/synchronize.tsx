@@ -23,9 +23,10 @@ class Synchronize extends Component<Props, State> {
   }
 
   public async componentDidMount() : Promise<void> {
-    const {promise, abort} = synchronizeWithCourier(this.props.token);
-    this.setState({ abort });
     try {
+      const {promise, abort} = synchronizeWithCourier(this.props.token);
+      this.setState({ abort });
+
       for await (const item of promise) {
         this.setState({status: item});
       }
