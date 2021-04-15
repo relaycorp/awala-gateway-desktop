@@ -1,3 +1,4 @@
+import AbortController from 'abort-controller';
 import abortable from 'abortable-iterator';
 import { connect } from 'it-ws';
 
