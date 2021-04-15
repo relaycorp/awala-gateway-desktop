@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { getPublicGatewayAddress, migratePublicGatewayAddress , SettingError } from '../../ipc/settings';
+import { getPublicGatewayAddress, migratePublicGatewayAddress, SettingError } from '../../ipc/settings';
 import migrated from '../assets/migrated.svg';
 import Gateway from './gateway';
 import GatewayEditor from './gatewayEditor';
@@ -12,6 +12,7 @@ enum Status {
 
 interface Props {
   readonly onComplete: () => void
+  readonly token: string
 }
 interface State {
   readonly status: Status
@@ -30,7 +31,7 @@ class Settings extends Component<Props, State> {
   }
 
   public async componentDidMount() : Promise<void> {
-    const gateway = await getPublicGatewayAddress();
+    const gateway = await getPublicGatewayAddress(this.props.token);
     this.setState({ gateway });
   }
 
@@ -84,7 +85,7 @@ class Settings extends Component<Props, State> {
 
   private async migrateGateway(newAddress : string) : Promise<void> {
     try {
-      await migratePublicGatewayAddress(newAddress);
+      await migratePublicGatewayAddress(newAddress, this.props.token);
       this.setState({status: Status.DONE, gateway: newAddress});
     } catch (error) {
       if (error instanceof SettingError) {
