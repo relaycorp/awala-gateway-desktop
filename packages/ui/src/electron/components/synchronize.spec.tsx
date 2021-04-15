@@ -7,7 +7,7 @@ describe('Synchronize', () => {
     function onComplete() : void {
       return;
     }
-    const el = render(<Synchronize onComplete={onComplete}/>);
+    const el = render(<Synchronize token={"TOKEN"} onComplete={onComplete}/>);
     expect(el.container.firstChild).toBeTruthy();
   });
 });

@@ -10,6 +10,8 @@ import { Container } from 'typedi';
 
 import { Config } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
+import { FileStore } from '../../fileStore';
+import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { arrayBufferFrom } from '../../testUtils/buffer';
 import { makeConfigTokenEphemeral } from '../../testUtils/config';
 import { setUpTestDBConnection } from '../../testUtils/db';
@@ -25,6 +27,8 @@ setUpTestDBConnection();
 
 const privateKeyStore = mockPrivateKeyStore();
 
+useTemporaryAppDirs();
+
 let registrar: GatewayRegistrar;
 beforeEach(() => {
   registrar = Container.get(GatewayRegistrar);
@@ -36,6 +40,8 @@ beforeEach(() => {
 });
 
 const mockMakeGSCClient = mockSpy(jest.spyOn(gscClient, 'makeGSCClient'), () => mockGSCClient);
+
+const mockFileStorePutObject = mockSpy(jest.spyOn(FileStore.prototype, 'putObject'));
 
 makeConfigTokenEphemeral(PUBLIC_GATEWAY_ADDRESS);
 
@@ -96,11 +102,20 @@ describe('register', () => {
     expect(registrationRequest.pnraSerialized).toEqual(registrationAuth);
   });
 
-  test('Certificate should be stored along with private key', async () => {
+  test('Private gateway certificate should be stored along with private key', async () => {
     await registrar.register(DEFAULT_PUBLIC_GATEWAY);
 
     const key = await privateKeyStore.fetchNodeKey(idCertificate.getSerialNumber());
     expect(key.certificate.isEqual(idCertificate)).toBeTruthy();
+  });
+
+  test('Public gateway certificate should be stored', async () => {
+    await registrar.register(DEFAULT_PUBLIC_GATEWAY);
+
+    expect(mockFileStorePutObject).toBeCalledWith(
+      Buffer.from(publicGatewayIdCertificate.serialize()),
+      'public-gateway-id-certificate.der',
+    );
   });
 
   test('Public gateway address should be stored in config', async () => {

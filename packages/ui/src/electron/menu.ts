@@ -1,21 +1,31 @@
 import { BrowserWindow, Menu } from 'electron';
-import logo from './assets/logo.png';
 
-export default function buildMenuTemplate(mainWindow: BrowserWindow): Menu {
+const isMac = process.platform === 'darwin';
+
+export default function buildMenu(
+  logo: string,
+  showMainWindow: () => void,
+  showSettings: () => void,
+): Menu {
   return Menu.buildFromTemplate([
-    { role: 'fileMenu' },
+    {
+      label: 'Awala',
+      submenu: [
+        {
+          click: showMainWindow,
+          label: 'Open Awala',
+        },
+        { role: 'close' },
+        { role: 'quit' },
+      ],
+    },
     { role: 'editMenu' },
     {
       label: 'Settings',
       submenu: [
         {
-          accelerator: process.platform === 'darwin' ? 'Cmd+,' : undefined,
-          click: () => {
-            if (mainWindow) {
-              mainWindow.webContents.send('show-public-gateway');
-              mainWindow.focus();
-            }
-          },
+          accelerator: isMac ? 'Cmd+,' : undefined,
+          click: showSettings,
           label: 'Public Gateway...',
         },
       ],
@@ -66,7 +76,7 @@ export default function buildMenuTemplate(mainWindow: BrowserWindow): Menu {
       label: 'Developer',
       submenu: [
         {
-          accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Alt+Shift+I',
+          accelerator: isMac ? 'Alt+Cmd+I' : 'Alt+Shift+I',
           click: async () => {
             const win = BrowserWindow.getFocusedWindow();
             if (win) {
@@ -76,7 +86,7 @@ export default function buildMenuTemplate(mainWindow: BrowserWindow): Menu {
           label: 'Open Dev Tools',
         },
         {
-          accelerator: process.platform === 'darwin' ? 'Cmd+R' : 'Ctrl+R',
+          accelerator: isMac ? 'Cmd+R' : 'Ctrl+R',
           click: async () => {
             const win = BrowserWindow.getFocusedWindow();
             if (win) {

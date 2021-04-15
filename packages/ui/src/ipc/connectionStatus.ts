@@ -1,5 +1,6 @@
+import AbortController from 'abort-controller';
 import abortable from 'abortable-iterator';
-import { sleep } from './_utils';
+import { connect } from 'it-ws';
 
 export enum ConnectionStatus {
   CONNECTED_TO_PUBLIC_GATEWAY,
@@ -17,9 +18,11 @@ export interface ConnectionStatusPoller {
  * Wrapper for status polling that exposes an abort method
  *
  */
-export function pollConnectionStatus(): ConnectionStatusPoller {
+export function pollConnectionStatus(token: string): ConnectionStatusPoller {
   const controller = new AbortController();
-  const promise = abortable(_pollConnectionStatus(), controller.signal, { returnOnAbort: true });
+  const promise = abortable(_pollConnectionStatus(token), controller.signal, {
+    returnOnAbort: true,
+  });
   return {
     abort: () => {
       controller.abort();
@@ -28,16 +31,24 @@ export function pollConnectionStatus(): ConnectionStatusPoller {
   };
 }
 
-async function* _pollConnectionStatus(): AsyncIterable<ConnectionStatus> {
-  yield ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY;
-  await sleep(3);
-
-  yield ConnectionStatus.CONNECTED_TO_COURIER;
-  await sleep(5);
-
-  yield ConnectionStatus.DISCONNECTED_FROM_PUBLIC_GATEWAY;
-  await sleep(5);
-
-  yield ConnectionStatus.DISCONNECTED_FROM_ALL;
-  await sleep(2);
+async function* _pollConnectionStatus(_token: string): AsyncIterable<ConnectionStatus> {
+  const WS_URL = 'ws://127.0.0.1:13276/_control/sync-status';
+  const stream = connect(WS_URL, { binary: true });
+  for await (const buffer of stream.source) {
+    const name = buffer.toString();
+    switch (name) {
+      case 'CONNECTED_TO_PUBLIC_GATEWAY':
+        yield ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY;
+        break;
+      case 'CONNECTED_TO_COURIER':
+        yield ConnectionStatus.CONNECTED_TO_COURIER;
+        break;
+      case 'DISCONNECTED_FROM_PUBLIC_GATEWAY':
+        yield ConnectionStatus.DISCONNECTED_FROM_PUBLIC_GATEWAY;
+        break;
+      case 'DISCONNECTED_FROM_ALL':
+        yield ConnectionStatus.DISCONNECTED_FROM_ALL;
+        break;
+    }
+  }
 }

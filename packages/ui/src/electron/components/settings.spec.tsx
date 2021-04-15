@@ -5,7 +5,7 @@ import Settings from './settings';
 describe('Settings', () => {
   test('edits the gateway', async () => {
     const onComplete = jest.fn();
-    render(<Settings onComplete={onComplete} />);
+    render(<Settings token={"TOKEN"} onComplete={onComplete} />);
     expect(screen.getByText("Public Gateway")).toBeInTheDocument();
     expect(screen.getByText("Return to home")).toBeInTheDocument();
 
@@ -31,7 +31,7 @@ describe('Settings', () => {
   });
   test('closes', async () => {
     const onComplete = jest.fn();
-    render(<Settings onComplete={onComplete} />);
+    render(<Settings token={"TOKEN"} onComplete={onComplete} />);
     fireEvent.click(screen.getByText("Return to home"));
 
     expect(onComplete).toHaveBeenCalledTimes(1)
