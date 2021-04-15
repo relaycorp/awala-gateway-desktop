@@ -61,4 +61,6 @@ async function* _synchronizeWithCourier(_token: string): AsyncIterable<CourierSy
         break;
     }
   }
+  // Server may not send this one, but the UI is waiting for it
+  yield CourierSyncStatus.COMPLETE;
 }
