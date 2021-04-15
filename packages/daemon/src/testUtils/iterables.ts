@@ -33,3 +33,9 @@ export function iterableTake<T>(max: number): (iterable: AsyncIterable<T>) => As
     }
   };
 }
+
+export async function* arrayToAsyncIterable<T>(array: readonly T[]): AsyncIterable<T> {
+  for (const item of array) {
+    yield item;
+  }
+}
