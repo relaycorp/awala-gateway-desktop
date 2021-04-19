@@ -14,7 +14,7 @@ This is a WebSocket endpoint. It doesn't take any input, and it outputs one of t
 
 - `CONNECTED_TO_PUBLIC_GATEWAY`: The device is connected to the Internet and we can communicate with the public gateway.
 - `CONNECTED_TO_COURIER`: The device is connected to the WiFi hotspot of a courier. The device may or may not have a sync in progress.
-- `DISCONNECTED_FROM_ALL`: The device is not connected to the public gateway via the Internet or a courier. This status is also used if the device is connected to the Internet but the public gateway is unreachable (e.g., it's been blocked using DPI).
+- `DISCONNECTED`: The device is not connected to the public gateway via the Internet or a courier. This status is also used if the device is connected to the Internet but the public gateway is unreachable (e.g., it's been blocked using DPI).
 
 As soon as the connection is established, it outputs the last known status.
 

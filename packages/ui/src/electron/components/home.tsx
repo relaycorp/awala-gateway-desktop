@@ -14,7 +14,7 @@ interface State {
 class Home extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { status: ConnectionStatus.DISCONNECTED_FROM_ALL };
+    this.state = { status: ConnectionStatus.DISCONNECTED };
   }
 
   public async componentDidMount() : Promise<void> {

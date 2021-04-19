@@ -5,7 +5,7 @@ import Status from './status';
 
 describe('Status', () => {
   test('renders disconnected', async () => {
-    render(<Status status={ConnectionStatus.DISCONNECTED_FROM_ALL}/>);
+    render(<Status status={ConnectionStatus.DISCONNECTED}/>);
     expect(screen.getByText("You're disconnected from Awala")).toBeInTheDocument();
   });
   test('renders connected to courier', async () => {

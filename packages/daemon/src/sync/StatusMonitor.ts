@@ -9,7 +9,7 @@ import { CourierConnectionStatus, CourierSync } from './courierSync/CourierSync'
 export enum ConnectionStatus {
   CONNECTED_TO_PUBLIC_GATEWAY = 'CONNECTED_TO_PUBLIC_GATEWAY',
   CONNECTED_TO_COURIER = 'CONNECTED_TO_COURIER',
-  DISCONNECTED_FROM_ALL = 'DISCONNECTED_FROM_ALL',
+  DISCONNECTED = 'DISCONNECTED',
 }
 
 @Service()
@@ -18,7 +18,7 @@ export class StatusMonitor {
   private started: boolean = false;
 
   // tslint:disable-next-line:readonly-keyword
-  private lastStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED_FROM_ALL;
+  private lastStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED;
 
   private readonly events = new EventEmitter();
 
@@ -53,7 +53,7 @@ export class StatusMonitor {
         const monitorStatus =
           status === CourierConnectionStatus.CONNECTED
             ? ConnectionStatus.CONNECTED_TO_COURIER
-            : ConnectionStatus.DISCONNECTED_FROM_ALL;
+            : ConnectionStatus.DISCONNECTED;
         monitor.setLastStatus(monitorStatus);
       }
     }

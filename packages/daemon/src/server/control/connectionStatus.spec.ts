@@ -22,7 +22,7 @@ describe('Stream', () => {
 
     await client.connect();
 
-    await expect(client.receive()).resolves.toEqual(ConnectionStatus.DISCONNECTED_FROM_ALL);
+    await expect(client.receive()).resolves.toEqual(ConnectionStatus.DISCONNECTED);
 
     const statusMonitor = Container.get(StatusMonitor);
     statusMonitor.setLastStatus(ConnectionStatus.CONNECTED_TO_COURIER);
@@ -36,7 +36,7 @@ describe('Stream', () => {
     const client = new MockClient(server);
 
     await client.connect();
-    await expect(client.receive()).resolves.toEqual(ConnectionStatus.DISCONNECTED_FROM_ALL);
+    await expect(client.receive()).resolves.toEqual(ConnectionStatus.DISCONNECTED);
 
     client.close();
     await expect(client.waitForPeerClosure()).resolves.toEqual({ code: 1000 });
