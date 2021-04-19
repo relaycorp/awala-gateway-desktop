@@ -150,3 +150,16 @@ describe('registerIfUnregistered', () => {
     expect(registerSpy).toBeCalledTimes(0);
   });
 });
+
+describe('isRegistered', () => {
+  test('True should be returned if gateway is registered', async () => {
+    const config = Container.get(Config);
+    await config.set(PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
+
+    await expect(registrar.isRegistered()).resolves.toBeTrue();
+  });
+
+  test('False should be returned if gateway is unregistered', async () => {
+    await expect(registrar.isRegistered()).resolves.toBeFalse();
+  });
+});

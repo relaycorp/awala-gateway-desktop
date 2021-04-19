@@ -61,10 +61,15 @@ export class GatewayRegistrar {
   }
 
   public async registerIfUnregistered(): Promise<void> {
-    const publicGatewayAddress = await this.getPublicGatewayAddress();
-    if (!publicGatewayAddress) {
+    const isRegistered = await this.isRegistered();
+    if (!isRegistered) {
       await this.register(DEFAULT_PUBLIC_GATEWAY);
     }
+  }
+
+  public async isRegistered(): Promise<boolean> {
+    const publicGatewayAddress = await this.getPublicGatewayAddress();
+    return publicGatewayAddress !== null;
   }
 
   private getPublicGatewayAddress(): Promise<string | null> {
