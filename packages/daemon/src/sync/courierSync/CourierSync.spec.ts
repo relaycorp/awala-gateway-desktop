@@ -14,9 +14,6 @@ beforeEach(() => {
 });
 
 jest.mock('tcp-port-used', () => ({ waitUntilUsedOnHost: jest.fn() }));
-beforeEach(() => {
-  getMockInstance(waitUntilUsedOnHost).mockRestore();
-});
 
 describe('sync', () => {
   test.todo('Client should connect to port 21473 on the default gateway');
@@ -79,6 +76,10 @@ describe('sync', () => {
 });
 
 describe('streamStatus', () => {
+  beforeEach(() => {
+    getMockInstance(waitUntilUsedOnHost).mockRestore();
+  });
+
   describe('Default gateway', () => {
     test('Failure to get default gateway should be quietly ignored', async () => {
       const courierSync = new CourierSync();
