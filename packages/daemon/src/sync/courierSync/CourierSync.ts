@@ -11,11 +11,11 @@ export enum CourierConnectionStatus {
   CONNECTED,
 }
 
-export enum CourierSyncStage {
-  COLLECTION = 'COLLECTION',
-  WAIT = 'WAIT',
-  DELIVERY = 'DELIVERY',
-}
+// export enum CourierSyncStage {
+//   COLLECTION = 'COLLECTION',
+//   WAIT = 'WAIT',
+//   DELIVERY = 'DELIVERY',
+// }
 
 @Service()
 export class CourierSync {
@@ -30,9 +30,9 @@ export class CourierSync {
     }
   }
 
-  public async *sync(): AsyncIterable<CourierSyncStage> {
-    throw new Error('implement!');
-  }
+  // public async *sync(): AsyncIterable<CourierSyncStage> {
+  //   throw new Error('implement!');
+  // }
 
   /**
    * Get the system's default gateway IPv4 address, if connected to a network.
