@@ -3,9 +3,8 @@ import { Container } from 'typedi';
 import { StatusMonitor } from '../sync/StatusMonitor';
 
 export function restoreStatusMonitor(): void {
-  const statusMonitor = Container.get(StatusMonitor);
-
   const restoreStatus = () => {
+    const statusMonitor = Container.get(StatusMonitor);
     statusMonitor._reset();
   };
   beforeEach(restoreStatus);
