@@ -41,19 +41,20 @@ beforeEach(() => {
 
 const mockMakeGSCClient = mockSpy(jest.spyOn(gscClient, 'makeGSCClient'), () => mockGSCClient);
 
+const mockFileStoreGetObject = mockSpy(jest.spyOn(FileStore.prototype, 'getObject'));
 const mockFileStorePutObject = mockSpy(jest.spyOn(FileStore.prototype, 'putObject'));
 
 makeConfigTokenEphemeral(PUBLIC_GATEWAY_ADDRESS);
 
-describe('register', () => {
-  let publicGatewayIdCertificate: Certificate;
-  let idCertificate: Certificate;
-  beforeAll(async () => {
-    const certPath = await generatePDACertificationPath(await generateNodeKeyPairSet());
-    publicGatewayIdCertificate = certPath.publicGateway;
-    idCertificate = certPath.privateGateway;
-  });
+let publicGatewayIdCertificate: Certificate;
+let idCertificate: Certificate;
+beforeAll(async () => {
+  const certPath = await generatePDACertificationPath(await generateNodeKeyPairSet());
+  publicGatewayIdCertificate = certPath.publicGateway;
+  idCertificate = certPath.privateGateway;
+});
 
+describe('register', () => {
   const registrationAuth = arrayBufferFrom('the auth');
   let preRegisterCall: PreRegisterNodeCall;
   let registration: PrivateNodeRegistration;
@@ -161,5 +162,31 @@ describe('isRegistered', () => {
 
   test('False should be returned if gateway is unregistered', async () => {
     await expect(registrar.isRegistered()).resolves.toBeFalse();
+  });
+});
+
+describe('getPublicGateway', () => {
+  test('Null should be returned if public gateway address cannot be found', async () => {
+    mockFileStoreGetObject.mockResolvedValue(Buffer.from(publicGatewayIdCertificate.serialize()));
+
+    await expect(registrar.getPublicGateway()).resolves.toBeNull();
+  });
+
+  test('Null should be returned if public gateway id certificate cannot be found', async () => {
+    const config = Container.get(Config);
+    await config.set(PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
+
+    await expect(registrar.getPublicGateway()).resolves.toBeNull();
+  });
+
+  test('Public gateway data should be returned if registered', async () => {
+    const config = Container.get(Config);
+    await config.set(PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
+    mockFileStoreGetObject.mockResolvedValue(Buffer.from(publicGatewayIdCertificate.serialize()));
+
+    const publicGateway = await registrar.getPublicGateway();
+
+    expect(publicGateway!.publicAddress).toEqual(DEFAULT_PUBLIC_GATEWAY);
+    expect(publicGateway!.identityCertificate.isEqual(publicGatewayIdCertificate)).toBeTrue();
   });
 });

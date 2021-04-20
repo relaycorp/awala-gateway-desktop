@@ -1,8 +1,10 @@
 import {
+  Certificate,
   generateRSAKeyPair,
   PrivateKeyStore,
   PrivateNodeRegistrationRequest,
 } from '@relaycorp/relaynet-core';
+import bufferToArray from 'buffer-to-arraybuffer';
 import { Inject, Service } from 'typedi';
 
 import { Config } from '../../Config';
@@ -11,6 +13,7 @@ import { FileStore } from '../../fileStore';
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
 import { PUBLIC_GATEWAY_ADDRESS } from '../../tokens';
 import { makeGSCClient } from './gscClient';
+import { PublicGateway } from './PublicGateway';
 
 const PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY = 'public-gateway-id-certificate.der';
 
@@ -70,6 +73,20 @@ export class GatewayRegistrar {
   public async isRegistered(): Promise<boolean> {
     const publicGatewayAddress = await this.getPublicGatewayAddress();
     return publicGatewayAddress !== null;
+  }
+
+  public async getPublicGateway(): Promise<PublicGateway | null> {
+    const publicAddress = await this.getPublicGatewayAddress();
+    const identityCertificateSerialized = await this.fileStore.getObject(
+      PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY,
+    );
+    if (!publicAddress || !identityCertificateSerialized) {
+      return null;
+    }
+    const identityCertificate = Certificate.deserialize(
+      bufferToArray(identityCertificateSerialized),
+    );
+    return { publicAddress, identityCertificate };
   }
 
   private getPublicGatewayAddress(): Promise<string | null> {
