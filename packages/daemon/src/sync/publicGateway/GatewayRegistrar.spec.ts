@@ -123,6 +123,15 @@ describe('register', () => {
       DEFAULT_PUBLIC_GATEWAY,
     );
   });
+
+  test('Node key serial number should be stored in config as hex', async () => {
+    await registrar.register(DEFAULT_PUBLIC_GATEWAY);
+
+    const config = Container.get(Config);
+    await expect(config.get(ConfigKey.NODE_KEY_SERIAL_NUMBER)).resolves.toEqual(
+      idCertificate.getSerialNumberHex(),
+    );
+  });
 });
 
 describe('registerIfUnregistered', () => {

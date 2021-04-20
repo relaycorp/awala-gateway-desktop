@@ -1,5 +1,3 @@
-// tslint:disable:max-classes-per-file
-
 import { Service } from 'typedi';
 import { Repository } from 'typeorm';
 import { InjectRepository } from 'typeorm-typedi-extensions';
@@ -7,6 +5,7 @@ import { InjectRepository } from 'typeorm-typedi-extensions';
 import { ConfigItem } from './entity/ConfigItem';
 
 export enum ConfigKey {
+  NODE_KEY_SERIAL_NUMBER = 'node_key_serial_number',
   PUBLIC_GATEWAY_ADDRESS = 'public_gateway_address',
 }
 

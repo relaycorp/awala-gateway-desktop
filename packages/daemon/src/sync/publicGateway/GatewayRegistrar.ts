@@ -89,9 +89,11 @@ export class GatewayRegistrar {
     identityKeyPair: CryptoKeyPair,
     publicGatewayAddress: string,
   ): Promise<void> {
-    await this.privateKeyStore.saveNodeKey(
-      identityKeyPair.privateKey,
-      registration.privateNodeCertificate,
+    const identityCertificate = registration.privateNodeCertificate;
+    await this.privateKeyStore.saveNodeKey(identityKeyPair.privateKey, identityCertificate);
+    await this.config.set(
+      ConfigKey.NODE_KEY_SERIAL_NUMBER,
+      identityCertificate.getSerialNumberHex(),
     );
 
     await this.config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, publicGatewayAddress);
