@@ -2,16 +2,16 @@ import {
   Certificate,
   generateRSAKeyPair,
   PrivateKeyStore,
+  PrivateNodeRegistration,
   PrivateNodeRegistrationRequest,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { Inject, Service } from 'typedi';
 
-import { Config } from '../../Config';
+import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { FileStore } from '../../fileStore';
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
-import { PUBLIC_GATEWAY_ADDRESS } from '../../tokens';
 import { makeGSCClient } from './gscClient';
 import { PublicGateway } from './PublicGateway';
 
@@ -51,16 +51,7 @@ export class GatewayRegistrar {
       await registrationRequest.serialize(identityKeyPair.privateKey),
     );
 
-    await this.privateKeyStore.saveNodeKey(
-      identityKeyPair.privateKey,
-      registration.privateNodeCertificate,
-    );
-
-    await this.config.set(PUBLIC_GATEWAY_ADDRESS, publicGatewayAddress);
-    await this.fileStore.putObject(
-      Buffer.from(registration.gatewayCertificate.serialize()),
-      PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY,
-    );
+    await this.saveRegistration(registration, identityKeyPair, publicGatewayAddress);
   }
 
   public async registerIfUnregistered(): Promise<void> {
@@ -90,6 +81,23 @@ export class GatewayRegistrar {
   }
 
   private getPublicGatewayAddress(): Promise<string | null> {
-    return this.config.get(PUBLIC_GATEWAY_ADDRESS);
+    return this.config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS);
+  }
+
+  private async saveRegistration(
+    registration: PrivateNodeRegistration,
+    identityKeyPair: CryptoKeyPair,
+    publicGatewayAddress: string,
+  ): Promise<void> {
+    await this.privateKeyStore.saveNodeKey(
+      identityKeyPair.privateKey,
+      registration.privateNodeCertificate,
+    );
+
+    await this.config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, publicGatewayAddress);
+    await this.fileStore.putObject(
+      Buffer.from(registration.gatewayCertificate.serialize()),
+      PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY,
+    );
   }
 }

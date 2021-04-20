@@ -8,18 +8,16 @@ import {
 import { generateNodeKeyPairSet, generatePDACertificationPath } from '@relaycorp/relaynet-testing';
 import { Container } from 'typedi';
 
-import { Config } from '../../Config';
+import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { FileStore } from '../../fileStore';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { arrayBufferFrom } from '../../testUtils/buffer';
-import { makeConfigTokenEphemeral } from '../../testUtils/config';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { PreRegisterNodeCall, RegisterNodeCall } from '../../testUtils/gscClient/methodCalls';
 import { MockGSCClient } from '../../testUtils/gscClient/MockGSCClient';
 import { mockSpy } from '../../testUtils/jest';
 import { mockPrivateKeyStore } from '../../testUtils/keystores';
-import { PUBLIC_GATEWAY_ADDRESS } from '../../tokens';
 import { GatewayRegistrar } from './GatewayRegistrar';
 import * as gscClient from './gscClient';
 
@@ -43,8 +41,6 @@ const mockMakeGSCClient = mockSpy(jest.spyOn(gscClient, 'makeGSCClient'), () => 
 
 const mockFileStoreGetObject = mockSpy(jest.spyOn(FileStore.prototype, 'getObject'));
 const mockFileStorePutObject = mockSpy(jest.spyOn(FileStore.prototype, 'putObject'));
-
-makeConfigTokenEphemeral(PUBLIC_GATEWAY_ADDRESS);
 
 let publicGatewayIdCertificate: Certificate;
 let idCertificate: Certificate;
@@ -70,7 +66,7 @@ describe('register', () => {
 
   test('Registration should be skipped if already registered with new gateway', async () => {
     const config = Container.get(Config);
-    await config.set(PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
+    await config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
 
     await registrar.register(DEFAULT_PUBLIC_GATEWAY);
 
@@ -123,7 +119,9 @@ describe('register', () => {
     await registrar.register(DEFAULT_PUBLIC_GATEWAY);
 
     const config = Container.get(Config);
-    await expect(config.get(PUBLIC_GATEWAY_ADDRESS)).resolves.toEqual(DEFAULT_PUBLIC_GATEWAY);
+    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS)).resolves.toEqual(
+      DEFAULT_PUBLIC_GATEWAY,
+    );
   });
 });
 
@@ -144,7 +142,7 @@ describe('registerIfUnregistered', () => {
 
   test('Registration should be skipped if already registered', async () => {
     const config = Container.get(Config);
-    await config.set(PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
+    await config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
 
     await registrar.registerIfUnregistered();
 
@@ -155,7 +153,7 @@ describe('registerIfUnregistered', () => {
 describe('isRegistered', () => {
   test('True should be returned if gateway is registered', async () => {
     const config = Container.get(Config);
-    await config.set(PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
+    await config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
 
     await expect(registrar.isRegistered()).resolves.toBeTrue();
   });
@@ -174,14 +172,14 @@ describe('getPublicGateway', () => {
 
   test('Null should be returned if public gateway id certificate cannot be found', async () => {
     const config = Container.get(Config);
-    await config.set(PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
+    await config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
 
     await expect(registrar.getPublicGateway()).resolves.toBeNull();
   });
 
   test('Public gateway data should be returned if registered', async () => {
     const config = Container.get(Config);
-    await config.set(PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
+    await config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
     mockFileStoreGetObject.mockResolvedValue(Buffer.from(publicGatewayIdCertificate.serialize()));
 
     const publicGateway = await registrar.getPublicGateway();

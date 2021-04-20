@@ -3,11 +3,10 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import isValidDomain from 'is-valid-domain';
 import { Container } from 'typedi';
 
-import { Config } from '../../Config';
+import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { GatewayRegistrar } from '../../sync/publicGateway/GatewayRegistrar';
 import { NonExistingAddressError } from '../../sync/publicGateway/gscClient';
-import { PUBLIC_GATEWAY_ADDRESS } from '../../tokens';
 
 enum ErrorCode {
   ADDRESS_RESOLUTION_FAILURE = 'ADDRESS_RESOLUTION_FAILURE',
@@ -26,7 +25,7 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
     method: 'GET',
     url: ENDPOINT_PATH,
     async handler(_request, reply): Promise<FastifyReply<any>> {
-      const registeredAddress = await config.get(PUBLIC_GATEWAY_ADDRESS);
+      const registeredAddress = await config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS);
       const publicAddress = registeredAddress ?? DEFAULT_PUBLIC_GATEWAY;
       return reply.header('Content-Type', 'application/json').code(200).send({ publicAddress });
     },
