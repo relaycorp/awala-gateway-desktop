@@ -20,35 +20,33 @@ beforeEach(() => {
   mockLogging = makeMockLogging();
 });
 
-describe('Stream', () => {
-  beforeEach(async () => {
-    const statusMonitor = Container.get(StatusMonitor);
-    statusMonitor.setLastStatus(ConnectionStatus.DISCONNECTED);
-  });
+beforeEach(async () => {
+  const statusMonitor = Container.get(StatusMonitor);
+  statusMonitor.setLastStatus(ConnectionStatus.DISCONNECTED);
+});
 
-  test('Status changes should be streamed', async () => {
-    const server = makeConnectionStatusServer(mockLogging.logger);
-    const client = new MockClient(server);
+test('Status changes should be streamed', async () => {
+  const server = makeConnectionStatusServer(mockLogging.logger);
+  const client = new MockClient(server);
 
-    await client.connect();
+  await client.connect();
 
-    await expect(client.receive()).resolves.toEqual(ConnectionStatus.DISCONNECTED);
+  await expect(client.receive()).resolves.toEqual(ConnectionStatus.DISCONNECTED);
 
-    const statusMonitor = Container.get(StatusMonitor);
-    statusMonitor.setLastStatus(ConnectionStatus.CONNECTED_TO_COURIER);
-    await expect(client.receive()).resolves.toEqual(ConnectionStatus.CONNECTED_TO_COURIER);
+  const statusMonitor = Container.get(StatusMonitor);
+  statusMonitor.setLastStatus(ConnectionStatus.CONNECTED_TO_COURIER);
+  await expect(client.receive()).resolves.toEqual(ConnectionStatus.CONNECTED_TO_COURIER);
 
-    client.close();
-  });
+  client.close();
+});
 
-  test('The connection should be closed when the client closes it', async () => {
-    const server = makeConnectionStatusServer(mockLogging.logger);
-    const client = new MockClient(server);
+test('The connection should be closed when the client closes it', async () => {
+  const server = makeConnectionStatusServer(mockLogging.logger);
+  const client = new MockClient(server);
 
-    await client.connect();
-    await expect(client.receive()).resolves.toEqual(ConnectionStatus.DISCONNECTED);
+  await client.connect();
+  await expect(client.receive()).resolves.toEqual(ConnectionStatus.DISCONNECTED);
 
-    client.close();
-    await expect(client.waitForPeerClosure()).resolves.toEqual({ code: 1000 });
-  });
+  client.close();
+  await expect(client.waitForPeerClosure()).resolves.toEqual({ code: 1000 });
 });
