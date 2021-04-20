@@ -6,10 +6,13 @@ import WebSocket from 'ws';
 import { getMockContext, getMockInstance, mockSpy } from '../testUtils/jest';
 import controlRoutes from './control';
 import makeConnectionStatusServer from './control/connectionStatus';
+import makeCourierSyncServer from './control/courierSync';
 import { disableCors } from './cors';
 import { makeServer, runServer } from './index';
+import { WebsocketServerFactory } from './websocket';
 
 jest.mock('./control/connectionStatus');
+jest.mock('./control/courierSync');
 
 const mockFastify: FastifyInstance = {
   addHook: mockSpy(jest.fn()),
@@ -116,10 +119,36 @@ describe('runServer', () => {
 
 describe('WebSocket servers', () => {
   test('Connection status should be mounted on /_control/sync-status', async () => {
+    await expectWebsocketServerToBeMounted(makeConnectionStatusServer, '/_control/sync-status');
+  });
+
+  test('Courier sync should be mounted on /_control/courier-sync', async () => {
+    await expectWebsocketServerToBeMounted(makeCourierSyncServer, '/_control/courier-sync');
+  });
+
+  test('Unrecognised paths should result in the socket destroyed', async () => {
     const mockWSServer = mockWebsocketServer();
     getMockInstance(makeConnectionStatusServer).mockReturnValue(mockWSServer);
     const fastifyInstance = await makeServer(customLogger);
-    const mockRequest = { url: '/_control/sync-status' };
+    const mockRequest = { url: '/non-existing' };
+    const mockSocket = { destroy: jest.fn() };
+
+    const upgradeHandler = getMockContext(fastifyInstance.server.on).calls[0][1];
+
+    upgradeHandler(mockRequest, mockSocket, {});
+
+    expect(mockSocket.destroy).toBeCalled();
+    expect(mockWSServer.handleUpgrade).not.toBeCalled();
+  });
+
+  async function expectWebsocketServerToBeMounted(
+    websocketServerFactory: WebsocketServerFactory,
+    websocketEndpointPath: string,
+  ): Promise<void> {
+    const mockWSServer = mockWebsocketServer();
+    getMockInstance(websocketServerFactory).mockReturnValue(mockWSServer);
+    const fastifyInstance = await makeServer(customLogger);
+    const mockRequest = { url: websocketEndpointPath };
     const mockSocket = { what: 'the socket' };
     const mockHeaders = { key: 'value' };
 
@@ -139,23 +168,8 @@ describe('WebSocket servers', () => {
     expect(mockWSServer.emit).toBeCalledWith('connection', mockSocket, mockRequest);
     expect(mockWSServer.handleUpgrade).toHaveBeenCalledBefore(mockWSServer.emit as any);
 
-    expect(makeConnectionStatusServer).toBeCalledWith(customLogger);
-  });
-
-  test('Unrecognised paths should result in the socket destroyed', async () => {
-    const mockWSServer = mockWebsocketServer();
-    getMockInstance(makeConnectionStatusServer).mockReturnValue(mockWSServer);
-    const fastifyInstance = await makeServer(customLogger);
-    const mockRequest = { url: '/non-existing' };
-    const mockSocket = { destroy: jest.fn() };
-
-    const upgradeHandler = getMockContext(fastifyInstance.server.on).calls[0][1];
-
-    upgradeHandler(mockRequest, mockSocket, {});
-
-    expect(mockSocket.destroy).toBeCalled();
-    expect(mockWSServer.handleUpgrade).not.toBeCalled();
-  });
+    expect(websocketServerFactory).toBeCalledWith(customLogger);
+  }
 });
 
 function mockWebsocketServer(): WebSocket.Server {

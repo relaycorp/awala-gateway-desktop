@@ -1,6 +1,8 @@
 import { Logger } from 'pino';
 import { Duplex } from 'stream';
-import WebSocket, { createWebSocketStream } from 'ws';
+import WebSocket, { createWebSocketStream, Server } from 'ws';
+
+export type WebsocketServerFactory = (logger: Logger) => Server;
 
 export function makeWebSocketServer(
   handler: (connectionStream: Duplex, socket: WebSocket) => void,
