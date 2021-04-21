@@ -131,6 +131,19 @@ describe('sync', () => {
     expect(syncError.cause()).toEqual(gatewayError);
   });
 
+  test('Error should be thrown if the CogRPC client cannot be initialised', async () => {
+    const gatewayError = new Error('TLS connection failure');
+    getMockInstance(CogRPCClient.init).mockRejectedValue(gatewayError);
+
+    const syncError = await getPromiseRejection(
+      asyncIterableToArray(courierSync.sync()),
+      DisconnectedFromCourierError,
+    );
+
+    expect(syncError.message).toMatch(/^Failed to initialize CogRPC client:/);
+    expect(syncError.cause()).toEqual(gatewayError);
+  });
+
   describe('Cargo collection', () => {
     test('COLLECTION stage should be yielded at the start', async () => {
       const stages = await asyncIterableToArray(courierSync.sync());

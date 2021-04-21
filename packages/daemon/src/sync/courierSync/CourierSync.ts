@@ -70,7 +70,12 @@ export class CourierSync {
     }
 
     const defaultGatewayIPAddress = await this.getDefaultGatewayIPAddress();
-    const client = await CogRPCClient.init(`https://${defaultGatewayIPAddress}:${COURIER_PORT}`);
+    let client: CogRPCClient;
+    try {
+      client = await CogRPCClient.init(`https://${defaultGatewayIPAddress}:${COURIER_PORT}`);
+    } catch (err) {
+      throw new DisconnectedFromCourierError(err, 'Failed to initialize CogRPC client');
+    }
     try {
       yield CourierSyncStage.COLLECTION;
       await this.collectCargo(client, publicGateway);
