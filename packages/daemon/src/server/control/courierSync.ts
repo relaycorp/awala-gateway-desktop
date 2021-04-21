@@ -1,5 +1,6 @@
 import pipe from 'it-pipe';
 import { Logger } from 'pino';
+import { PassThrough } from 'stream';
 import { sink } from 'stream-to-it';
 import { Container } from 'typedi';
 import { Server } from 'ws';
@@ -17,8 +18,18 @@ export default function makeCourierSyncServer(logger: Logger): Server {
   return makeWebSocketServer(async (connectionStream, socket) => {
     const courierSync = Container.get(CourierSync);
 
+    // Wrap the WS writable stream to prevent it from closing with a 1006:
+    // https://github.com/websockets/ws/issues/1811
+    const sinkWrapper = new PassThrough({
+      final(): void {
+        socket.close(1000);
+      },
+      objectMode: true,
+    });
+    sinkWrapper.pipe(connectionStream);
+
     try {
-      await pipe(courierSync.sync(), sink(connectionStream));
+      await pipe(courierSync.sync(), sink(sinkWrapper));
     } catch (err) {
       let closeCode: number;
       let closeReason: string;
@@ -39,6 +50,6 @@ export default function makeCourierSyncServer(logger: Logger): Server {
       return;
     }
 
-    socket.close(1000);
+    // socket.close(1000);
   }, logger);
 }

@@ -40,7 +40,7 @@ test('Stages should be streamed', async () => {
   client.close();
 });
 
-test('Connection should be closed when sync ends', async () => {
+test('Connection should be closed with 1000 when sync completes normally', async () => {
   mockSync.mockReturnValue(arrayToAsyncIterable([]));
   const server = makeCourierSyncServer(mockLogging.logger);
   const client = new MockClient(server);
