@@ -14,7 +14,7 @@ This is a WebSocket endpoint. It doesn't take any input, and it outputs one of t
 
 - `CONNECTED_TO_PUBLIC_GATEWAY`: The device is connected to the Internet and we can communicate with the public gateway.
 - `CONNECTED_TO_COURIER`: The device is connected to the WiFi hotspot of a courier. The device may or may not have a sync in progress.
-- `DISCONNECTED_FROM_ALL`: The device is not connected to the public gateway via the Internet or a courier. This status is also used if the device is connected to the Internet but the public gateway is unreachable (e.g., it's been blocked using DPI).
+- `DISCONNECTED`: The device is not connected to the public gateway via the Internet or a courier. This status is also used if the device is connected to the Internet but the public gateway is unreachable (e.g., it's been blocked using DPI).
 
 As soon as the connection is established, it outputs the last known status.
 
@@ -35,6 +35,47 @@ async function main(): Promise<void> {
 
 async function* streamStatuses(): AsyncIterable<string> {
   const client = new WebSocket('http://127.0.0.1:13276/_control/sync-status');
+  const socketStream = WebSocket.createWebSocketStream(client, { encoding: 'utf-8' });
+  yield* await source(socketStream);
+}
+
+main();
+```
+
+### Courier sync (`/courier-sync`)
+
+This is a WebSocket endpoint. It doesn't take any input, and it outputs one of the following string frames which correspond to the new status as soon as it changes:
+
+- `COLLECTION`: Cargo collection is about to start.
+- `WAIT`: The wait period before the cargo collection is about to start.
+- `DELIVERY`: Cargo delivery is about to start.
+
+The server will close the connection as soon as the sync completes. The following WebSocket status codes are used:
+
+- `1000` if the sync completed normally.
+- `1011` if there was an internal server error.
+- `4000` if this private gateway isn't yet registered with a public gateway. This is likely an error in the UI app, as it shouldn't have attempted a sync in this state.
+- `4001` if the device isn't connected to the WiFi network of a courier.
+
+This endpoint can be tested with the following client:
+
+```typescript
+import { source } from 'stream-to-it';
+import WebSocket from 'ws';
+
+async function main(): Promise<void> {
+  for await (const status of streamStatuses()) {
+    // tslint:disable-next-line:no-console
+    console.log('Got status', status);
+  }
+}
+
+async function* streamStatuses(): AsyncIterable<string> {
+  const client = new WebSocket('http://127.0.0.1:13276/_control/courier-sync');
+  client.once('close', (code, reason) => {
+    // tslint:disable-next-line:no-console
+    console.log('Closing connection', code, reason);
+  })
   const socketStream = WebSocket.createWebSocketStream(client, { encoding: 'utf-8' });
   yield* await source(socketStream);
 }

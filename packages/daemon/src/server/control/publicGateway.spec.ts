@@ -2,22 +2,18 @@ import { PublicAddressingError } from '@relaycorp/relaynet-core';
 import LightMyRequest from 'light-my-request';
 import { Container } from 'typedi';
 
-import { Config } from '../../Config';
+import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { GatewayRegistrar } from '../../sync/publicGateway/GatewayRegistrar';
 import { NonExistingAddressError } from '../../sync/publicGateway/gscClient';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
-import { makeConfigTokenEphemeral } from '../../testUtils/config';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { getMockInstance, mockSpy } from '../../testUtils/jest';
 import { makeMockLogging, MockLogging, partialPinoLog } from '../../testUtils/logging';
-import { PUBLIC_GATEWAY_ADDRESS } from '../../tokens';
 import { makeServer } from '../index';
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
-
-makeConfigTokenEphemeral(PUBLIC_GATEWAY_ADDRESS);
 
 let mockLogging: MockLogging;
 beforeEach(() => {
@@ -32,7 +28,7 @@ const ENDPOINT_PATH = '/_control/public-gateway';
 describe('Get public gateway', () => {
   test('The current gateway should be returned if registered', async () => {
     const config = Container.get(Config);
-    await config.set(PUBLIC_GATEWAY_ADDRESS, NEW_PUBLIC_ADDRESS);
+    await config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, NEW_PUBLIC_ADDRESS);
     const fastify = await makeServer(mockLogging.logger);
 
     const response = await fastify.inject({ method: 'GET', url: ENDPOINT_PATH });

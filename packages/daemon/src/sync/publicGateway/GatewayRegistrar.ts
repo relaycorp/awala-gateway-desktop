@@ -1,16 +1,19 @@
 import {
+  Certificate,
   generateRSAKeyPair,
   PrivateKeyStore,
+  PrivateNodeRegistration,
   PrivateNodeRegistrationRequest,
 } from '@relaycorp/relaynet-core';
+import bufferToArray from 'buffer-to-arraybuffer';
 import { Inject, Service } from 'typedi';
 
-import { Config } from '../../Config';
+import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { FileStore } from '../../fileStore';
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
-import { PUBLIC_GATEWAY_ADDRESS } from '../../tokens';
 import { makeGSCClient } from './gscClient';
+import { PublicGateway } from './PublicGateway';
 
 const PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY = 'public-gateway-id-certificate.der';
 
@@ -48,26 +51,55 @@ export class GatewayRegistrar {
       await registrationRequest.serialize(identityKeyPair.privateKey),
     );
 
-    await this.privateKeyStore.saveNodeKey(
-      identityKeyPair.privateKey,
-      registration.privateNodeCertificate,
-    );
-
-    await this.config.set(PUBLIC_GATEWAY_ADDRESS, publicGatewayAddress);
-    await this.fileStore.putObject(
-      Buffer.from(registration.gatewayCertificate.serialize()),
-      PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY,
-    );
+    await this.saveRegistration(registration, identityKeyPair, publicGatewayAddress);
   }
 
   public async registerIfUnregistered(): Promise<void> {
-    const publicGatewayAddress = await this.getPublicGatewayAddress();
-    if (!publicGatewayAddress) {
+    const isRegistered = await this.isRegistered();
+    if (!isRegistered) {
       await this.register(DEFAULT_PUBLIC_GATEWAY);
     }
   }
 
+  public async isRegistered(): Promise<boolean> {
+    const publicGatewayAddress = await this.getPublicGatewayAddress();
+    return publicGatewayAddress !== null;
+  }
+
+  public async getPublicGateway(): Promise<PublicGateway | null> {
+    const publicAddress = await this.getPublicGatewayAddress();
+    const identityCertificateSerialized = await this.fileStore.getObject(
+      PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY,
+    );
+    if (!publicAddress || !identityCertificateSerialized) {
+      return null;
+    }
+    const identityCertificate = Certificate.deserialize(
+      bufferToArray(identityCertificateSerialized),
+    );
+    return { publicAddress, identityCertificate };
+  }
+
   private getPublicGatewayAddress(): Promise<string | null> {
-    return this.config.get(PUBLIC_GATEWAY_ADDRESS);
+    return this.config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS);
+  }
+
+  private async saveRegistration(
+    registration: PrivateNodeRegistration,
+    identityKeyPair: CryptoKeyPair,
+    publicGatewayAddress: string,
+  ): Promise<void> {
+    const identityCertificate = registration.privateNodeCertificate;
+    await this.privateKeyStore.saveNodeKey(identityKeyPair.privateKey, identityCertificate);
+    await this.config.set(
+      ConfigKey.NODE_KEY_SERIAL_NUMBER,
+      identityCertificate.getSerialNumberHex(),
+    );
+
+    await this.config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, publicGatewayAddress);
+    await this.fileStore.putObject(
+      Buffer.from(registration.gatewayCertificate.serialize()),
+      PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY,
+    );
   }
 }

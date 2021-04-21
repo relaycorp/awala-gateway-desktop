@@ -22,7 +22,7 @@ describe('pollConnectionStatus', () => {
         yield 'DISCONNECTED_FROM_PUBLIC_GATEWAY';
         await sleep(1);
 
-        yield 'DISCONNECTED_FROM_ALL';
+        yield 'DISCONNECTED';
       })(),
     });
 
@@ -38,7 +38,7 @@ describe('pollConnectionStatus', () => {
       ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY,
       ConnectionStatus.CONNECTED_TO_COURIER,
       ConnectionStatus.DISCONNECTED_FROM_PUBLIC_GATEWAY,
-      ConnectionStatus.DISCONNECTED_FROM_ALL,
+      ConnectionStatus.DISCONNECTED,
     ]);
   });
 });

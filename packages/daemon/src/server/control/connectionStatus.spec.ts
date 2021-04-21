@@ -2,10 +2,15 @@ import { MockClient } from '@relaycorp/ws-mock';
 import { Container } from 'typedi';
 
 import { ConnectionStatus, StatusMonitor } from '../../sync/StatusMonitor';
+import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { restoreStatusMonitor } from '../../testUtils/connectionStatus';
+import { setUpTestDBConnection } from '../../testUtils/db';
 import { makeMockLogging, MockLogging } from '../../testUtils/logging';
 import { mockWebsocketStream } from '../../testUtils/websocket';
 import makeConnectionStatusServer from './connectionStatus';
+
+setUpTestDBConnection();
+useTemporaryAppDirs();
 
 mockWebsocketStream();
 restoreStatusMonitor();
@@ -15,30 +20,33 @@ beforeEach(() => {
   mockLogging = makeMockLogging();
 });
 
-describe('Stream', () => {
-  test('Status changes should be streamed', async () => {
-    const server = makeConnectionStatusServer(mockLogging.logger);
-    const client = new MockClient(server);
+beforeEach(async () => {
+  const statusMonitor = Container.get(StatusMonitor);
+  statusMonitor.setLastStatus(ConnectionStatus.DISCONNECTED);
+});
 
-    await client.connect();
+test('Status changes should be streamed', async () => {
+  const server = makeConnectionStatusServer(mockLogging.logger);
+  const client = new MockClient(server);
 
-    await expect(client.receive()).resolves.toEqual(ConnectionStatus.DISCONNECTED_FROM_ALL);
+  await client.connect();
 
-    const statusMonitor = Container.get(StatusMonitor);
-    statusMonitor.setLastStatus(ConnectionStatus.CONNECTED_TO_COURIER);
-    await expect(client.receive()).resolves.toEqual(ConnectionStatus.CONNECTED_TO_COURIER);
+  await expect(client.receive()).resolves.toEqual(ConnectionStatus.DISCONNECTED);
 
-    client.close();
-  });
+  const statusMonitor = Container.get(StatusMonitor);
+  statusMonitor.setLastStatus(ConnectionStatus.CONNECTED_TO_COURIER);
+  await expect(client.receive()).resolves.toEqual(ConnectionStatus.CONNECTED_TO_COURIER);
 
-  test('The connection should be closed when the client closes it', async () => {
-    const server = makeConnectionStatusServer(mockLogging.logger);
-    const client = new MockClient(server);
+  client.close();
+});
 
-    await client.connect();
-    await expect(client.receive()).resolves.toEqual(ConnectionStatus.DISCONNECTED_FROM_ALL);
+test('The connection should be closed when the client closes it', async () => {
+  const server = makeConnectionStatusServer(mockLogging.logger);
+  const client = new MockClient(server);
 
-    client.close();
-    await expect(client.waitForPeerClosure()).resolves.toEqual({ code: 1000 });
-  });
+  await client.connect();
+  await expect(client.receive()).resolves.toEqual(ConnectionStatus.DISCONNECTED);
+
+  client.close();
+  await expect(client.waitForPeerClosure()).resolves.toEqual({ code: 1000 });
 });

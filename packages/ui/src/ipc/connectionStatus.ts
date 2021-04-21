@@ -6,7 +6,7 @@ export enum ConnectionStatus {
   CONNECTED_TO_PUBLIC_GATEWAY,
   CONNECTED_TO_COURIER,
   DISCONNECTED_FROM_PUBLIC_GATEWAY,
-  DISCONNECTED_FROM_ALL,
+  DISCONNECTED,
 }
 
 export interface ConnectionStatusPoller {
@@ -46,8 +46,8 @@ async function* _pollConnectionStatus(_token: string): AsyncIterable<ConnectionS
       case 'DISCONNECTED_FROM_PUBLIC_GATEWAY':
         yield ConnectionStatus.DISCONNECTED_FROM_PUBLIC_GATEWAY;
         break;
-      case 'DISCONNECTED_FROM_ALL':
-        yield ConnectionStatus.DISCONNECTED_FROM_ALL;
+      case 'DISCONNECTED':
+        yield ConnectionStatus.DISCONNECTED;
         break;
     }
   }
