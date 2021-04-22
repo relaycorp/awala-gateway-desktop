@@ -6,6 +6,8 @@ import { Inject, Service } from 'typedi';
 
 import { CourierConnectionStatus, CourierSync } from './courierSync/CourierSync';
 import { GatewayRegistrar } from './publicGateway/GatewayRegistrar';
+import { ParcelCollectorManager } from './publicGateway/parcelCollection/ParcelCollectorManager';
+import { PublicGatewayCollectionStatus } from './publicGateway/PublicGatewayCollectionStatus';
 
 export enum ConnectionStatus {
   CONNECTED_TO_PUBLIC_GATEWAY = 'CONNECTED_TO_PUBLIC_GATEWAY',
@@ -26,15 +28,21 @@ export class StatusMonitor {
 
   constructor(
     @Inject() protected courierSync: CourierSync,
+    @Inject() protected parcelCollectorManager: ParcelCollectorManager,
     @Inject() protected registrar: GatewayRegistrar,
   ) {}
 
   public setLastStatus(status: ConnectionStatus): void {
     if (status !== this.lastStatus) {
+      // tslint:disable-next-line:no-console
+      console.log('Setting', status);
       // tslint:disable-next-line:no-object-mutation
       this.lastStatus = status;
 
       this.events.emit('change', status);
+    } else {
+      // tslint:disable-next-line:no-console
+      console.log('NOT Setting', status);
     }
   }
 
@@ -50,13 +58,18 @@ export class StatusMonitor {
       : ConnectionStatus.UNREGISTERED;
     this.setLastStatus(initialStatus);
 
-    const setMonitorStatus = async (statuses: AsyncIterable<ConnectionStatus>) => {
+    // tslint:disable-next-line:no-this-assignment
+    const monitor = this;
+    async function setMonitorStatus(statuses: AsyncIterable<ConnectionStatus>): Promise<void> {
       for await (const status of statuses) {
-        this.setLastStatus(status);
+        // tslint:disable-next-line:no-console
+        console.log('Got status 2', status);
+        monitor.setLastStatus(status);
       }
-    };
+    }
 
     const registrar = this.registrar;
+
     async function* reflectCourierConnectionStatus(
       statuses: AsyncIterable<CourierConnectionStatus>,
     ): AsyncIterable<ConnectionStatus> {
@@ -72,7 +85,30 @@ export class StatusMonitor {
         }
       }
     }
-    await pipe(this.courierSync.streamStatus(), reflectCourierConnectionStatus, setMonitorStatus);
+    async function* reflectPublicGatewayConnectionStatus(
+      statuses: AsyncIterable<PublicGatewayCollectionStatus>,
+    ): AsyncIterable<ConnectionStatus> {
+      for await (const status of statuses) {
+        // tslint:disable-next-line:no-console
+        console.log('Got status', status);
+        if (status === PublicGatewayCollectionStatus.CONNECTED) {
+          yield ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY;
+        } else {
+          const isRegistered = await registrar.isRegistered();
+          // tslint:disable-next-line:no-console
+          console.log('Got disconnected. Is reg?', isRegistered);
+          yield isRegistered ? ConnectionStatus.DISCONNECTED : ConnectionStatus.UNREGISTERED;
+        }
+      }
+    }
+    await Promise.all([
+      pipe(this.courierSync.streamStatus(), reflectCourierConnectionStatus, setMonitorStatus),
+      pipe(
+        this.parcelCollectorManager.streamStatus(),
+        reflectPublicGatewayConnectionStatus,
+        setMonitorStatus,
+      ),
+    ]);
   }
 
   public async *streamStatus(): AsyncIterable<ConnectionStatus> {
