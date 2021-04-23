@@ -34,15 +34,10 @@ export class StatusMonitor {
 
   public setLastStatus(status: ConnectionStatus): void {
     if (status !== this.lastStatus) {
-      // tslint:disable-next-line:no-console
-      console.log('Setting', status);
       // tslint:disable-next-line:no-object-mutation
       this.lastStatus = status;
 
       this.events.emit('change', status);
-    } else {
-      // tslint:disable-next-line:no-console
-      console.log('NOT Setting', status);
     }
   }
 
@@ -62,8 +57,6 @@ export class StatusMonitor {
     const monitor = this;
     async function setMonitorStatus(statuses: AsyncIterable<ConnectionStatus>): Promise<void> {
       for await (const status of statuses) {
-        // tslint:disable-next-line:no-console
-        console.log('Got status 2', status);
         monitor.setLastStatus(status);
       }
     }
@@ -89,14 +82,10 @@ export class StatusMonitor {
       statuses: AsyncIterable<PublicGatewayCollectionStatus>,
     ): AsyncIterable<ConnectionStatus> {
       for await (const status of statuses) {
-        // tslint:disable-next-line:no-console
-        console.log('Got status', status);
         if (status === PublicGatewayCollectionStatus.CONNECTED) {
           yield ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY;
         } else {
           const isRegistered = await registrar.isRegistered();
-          // tslint:disable-next-line:no-console
-          console.log('Got disconnected. Is reg?', isRegistered);
           yield isRegistered ? ConnectionStatus.DISCONNECTED : ConnectionStatus.UNREGISTERED;
         }
       }
