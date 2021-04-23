@@ -1,4 +1,4 @@
-import { v4 as getDefaultGateway } from 'default-gateway';
+import isOnline from 'is-online';
 import { Service } from 'typedi';
 
 import { PublicGatewayCollectionStatus } from '../PublicGatewayCollectionStatus';
@@ -15,12 +15,10 @@ export class ParcelCollectorManager {
 
   public async *streamStatus(): AsyncIterable<PublicGatewayCollectionStatus> {
     while (true) {
-      try {
-        await getDefaultGateway();
-        yield PublicGatewayCollectionStatus.CONNECTED;
-      } catch (_) {
-        yield PublicGatewayCollectionStatus.DISCONNECTED;
-      }
+      const onlineIsIt = await isOnline();
+      yield onlineIsIt
+        ? PublicGatewayCollectionStatus.CONNECTED
+        : PublicGatewayCollectionStatus.DISCONNECTED;
     }
   }
 }
