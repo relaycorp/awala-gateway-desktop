@@ -8,6 +8,8 @@ import { mockSpy } from '../testUtils/jest';
 import { setImmediateAsync } from '../testUtils/timers';
 import { CourierConnectionStatus, CourierSync } from './courierSync/CourierSync';
 import { GatewayRegistrar } from './publicGateway/GatewayRegistrar';
+import { ParcelCollectorManager } from './publicGateway/parcelCollection/ParcelCollectorManager';
+import { PublicGatewayCollectionStatus } from './publicGateway/PublicGatewayCollectionStatus';
 import { ConnectionStatus, StatusMonitor } from './StatusMonitor';
 
 setUpTestDBConnection();
@@ -15,7 +17,11 @@ useTemporaryAppDirs();
 
 let monitor: StatusMonitor;
 beforeEach(() => {
-  monitor = new StatusMonitor(Container.get(CourierSync), Container.get(GatewayRegistrar));
+  monitor = new StatusMonitor(
+    Container.get(CourierSync),
+    Container.get(ParcelCollectorManager),
+    Container.get(GatewayRegistrar),
+  );
 });
 
 describe('start', () => {
@@ -23,18 +29,117 @@ describe('start', () => {
     jest.spyOn(GatewayRegistrar.prototype, 'isRegistered'),
     () => true,
   );
-  const mockCourierStatusStream = mockSpy(jest.spyOn(CourierSync.prototype, 'streamStatus'));
+  const mockCourierStatusStream = mockSpy(jest.spyOn(CourierSync.prototype, 'streamStatus'), () =>
+    arrayToAsyncIterable([]),
+  );
+  const mockPubGatewayStatusStream = mockSpy(
+    jest.spyOn(ParcelCollectorManager.prototype, 'streamStatus'),
+    () => arrayToAsyncIterable([]),
+  );
 
-  describe('While gateway is unregistered', () => {
-    test('Initial status should be DISCONNECTED', async () => {
-      mockCourierStatusStream.mockReturnValue(arrayToAsyncIterable([]));
+  test('Subsequent start calls should be ignored', async () => {
+    await monitor.start();
 
+    await expect(monitor.start()).toReject();
+
+    expect(mockCourierStatusStream).toBeCalledTimes(1);
+  });
+
+  describe('Initial status', () => {
+    test('Status should be DISCONNECTED if registered', async () => {
       await monitor.start();
 
       const statuses = await pipe(monitor.streamStatus(), iterableTake(1), asyncIterableToArray);
       expect(statuses).toEqual([ConnectionStatus.DISCONNECTED]);
     });
 
+    test('Status should be UNREGISTERED if unregistered', async () => {
+      mockRegistrarIsRegistered.mockResolvedValue(false);
+
+      await monitor.start();
+
+      const statuses = await pipe(monitor.streamStatus(), iterableTake(1), asyncIterableToArray);
+      expect(statuses).toEqual([ConnectionStatus.UNREGISTERED]);
+    });
+  });
+
+  describe('Public gateway connection changes', () => {
+    test('Status should change to CONNECTED_TO_PUBLIC_GATEWAY if connected to peer', async () => {
+      mockPubGatewayStatusStream.mockReturnValue(
+        arrayToAsyncIterable([PublicGatewayCollectionStatus.CONNECTED]),
+      );
+
+      setImmediate(() => {
+        monitor.start();
+      });
+
+      const statuses = await pipe(monitor.streamStatus(), iterableTake(2), asyncIterableToArray);
+      expect(statuses).toEqual([expect.anything(), ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY]);
+    });
+
+    test('Status should change to DISCONNECTED if disconnected but registered', async () => {
+      mockPubGatewayStatusStream.mockReturnValue(
+        arrayToAsyncIterable([
+          PublicGatewayCollectionStatus.CONNECTED,
+          PublicGatewayCollectionStatus.DISCONNECTED,
+        ]),
+      );
+
+      setImmediate(() => {
+        monitor.start();
+      });
+
+      const statuses = await pipe(monitor.streamStatus(), iterableTake(3), asyncIterableToArray);
+      expect(statuses).toEqual([
+        expect.anything(),
+        expect.anything(),
+        ConnectionStatus.DISCONNECTED,
+      ]);
+    });
+
+    test('Status should change to UNREGISTERED if disconnected and unregistered', async () => {
+      mockRegistrarIsRegistered.mockResolvedValue(false);
+      mockPubGatewayStatusStream.mockReturnValue(
+        arrayToAsyncIterable([
+          PublicGatewayCollectionStatus.CONNECTED,
+          PublicGatewayCollectionStatus.DISCONNECTED,
+        ]),
+      );
+
+      setImmediate(() => {
+        monitor.start();
+      });
+
+      const statuses = await pipe(monitor.streamStatus(), iterableTake(3), asyncIterableToArray);
+      expect(statuses).toEqual([
+        expect.anything(),
+        expect.anything(),
+        ConnectionStatus.UNREGISTERED,
+      ]);
+    });
+
+    test('Subsequent changes should be reflected', async () => {
+      mockPubGatewayStatusStream.mockReturnValue(
+        arrayToAsyncIterable([
+          PublicGatewayCollectionStatus.CONNECTED,
+          PublicGatewayCollectionStatus.DISCONNECTED,
+        ]),
+      );
+
+      setImmediate(() => {
+        monitor.start();
+      });
+
+      const statuses = await pipe(monitor.streamStatus(), iterableTake(3), asyncIterableToArray);
+      expect(statuses).toEqual([
+        expect.anything(),
+        ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY,
+        ConnectionStatus.DISCONNECTED,
+      ]);
+    });
+  });
+
+  describe('Courier connection changes', () => {
     test('Status should change to CONNECTED_TO_COURIER when courier is reachable', async () => {
       mockCourierStatusStream.mockReturnValue(
         arrayToAsyncIterable([CourierConnectionStatus.CONNECTED]),
@@ -75,31 +180,8 @@ describe('start', () => {
       ]);
     });
 
-    test('Subsequent start calls should be ignored', async () => {
-      mockCourierStatusStream.mockReturnValue(arrayToAsyncIterable([]));
-
-      await monitor.start();
-      await expect(monitor.start()).toReject();
-
-      expect(mockCourierStatusStream).toBeCalledTimes(1);
-    });
-  });
-
-  describe('While gateway is unregistered', () => {
-    beforeEach(() => {
+    test('Status should remain UNREGISTERED if unregistered regardless of changes', async () => {
       mockRegistrarIsRegistered.mockResolvedValue(false);
-    });
-
-    test('Initial status should be UNREGISTERED', async () => {
-      mockCourierStatusStream.mockReturnValue(arrayToAsyncIterable([]));
-
-      await monitor.start();
-
-      const statuses = await pipe(monitor.streamStatus(), iterableTake(1), asyncIterableToArray);
-      expect(statuses).toEqual([ConnectionStatus.UNREGISTERED]);
-    });
-
-    test('Status should remain UNREGISTERED regardless of courier connection changes', async () => {
       mockCourierStatusStream.mockReturnValue(
         arrayToAsyncIterable([
           CourierConnectionStatus.CONNECTED,
