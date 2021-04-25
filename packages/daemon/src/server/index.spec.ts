@@ -4,7 +4,7 @@ import pino from 'pino';
 import WebSocket from 'ws';
 
 import { getMockContext, getMockInstance, mockSpy } from '../testUtils/jest';
-import controlRoutes from './control';
+import controlRoutes, { CONTROL_API_PREFIX } from './control';
 import makeConnectionStatusServer from './control/connectionStatus';
 import makeCourierSyncServer from './control/courierSync';
 import { disableCors } from './cors';
@@ -119,11 +119,17 @@ describe('runServer', () => {
 
 describe('WebSocket servers', () => {
   test('Connection status should be mounted on /_control/sync-status', async () => {
-    await expectWebsocketServerToBeMounted(makeConnectionStatusServer, '/_control/sync-status');
+    await expectWebsocketServerToBeMounted(
+      makeConnectionStatusServer,
+      `${CONTROL_API_PREFIX}/sync-status`,
+    );
   });
 
   test('Courier sync should be mounted on /_control/courier-sync', async () => {
-    await expectWebsocketServerToBeMounted(makeCourierSyncServer, '/_control/courier-sync');
+    await expectWebsocketServerToBeMounted(
+      makeCourierSyncServer,
+      `${CONTROL_API_PREFIX}/courier-sync`,
+    );
   });
 
   test('Unrecognised paths should result in the socket destroyed', async () => {
