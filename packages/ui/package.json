@@ -10,7 +10,9 @@
   ],
   "main": "app/main.js",
   "scripts": {
-    "postinstall": "npm link ../daemon",
+    "postinstall": "run-s electron-rebuild link-daemon",
+    "link-daemon": "npm link --force ../daemon",
+    "electron-rebuild": "electron-rebuild",
     "license-report": "node ./license-report.js",
     "build": "run-s license-report tsc webpack",
     "webpack": "webpack --config ./webpack.config.js",
@@ -47,6 +49,7 @@
     "css-loader": "^5.2.2",
     "electron": "^12.0.4",
     "electron-builder": "^22.10.5",
+    "electron-rebuild": "^2.3.5",
     "fetch-mock-jest": "^1.5.1",
     "html-webpack-plugin": "^5.2.0",
     "is-valid-domain": "0.0.19",

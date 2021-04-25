@@ -6,7 +6,10 @@ macOS is not currently supported, although it _might_ work with some minimal cha
 
 ### System dependencies
 
-You only need Node.js 12+ installed.
+You need the following:
+
+- Node.js 12+.
+- [node-gyp's system dependencies](https://github.com/nodejs/node-gyp#installation) (e.g., Python 3).
 
 ### Setup
 
