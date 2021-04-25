@@ -29,7 +29,7 @@ describe('WebSocket server configuration', () => {
     expect(wsServer.options.noServer).toBeTruthy();
   });
 
-  test('CORS requests should be blocked', async () => {
+  test('CORS requests should be blocked by default', async () => {
     const mockHandler = jest.fn();
     const wsServer = makeWebSocketServer(mockHandler, mockLogging.logger);
     const mockClient = new MockClient(wsServer, { origin: 'https://example.com' });
@@ -40,6 +40,19 @@ describe('WebSocket server configuration', () => {
       reason: 'CORS requests are disabled',
     });
     expect(mockLogging.logs).toContainEqual(partialPinoLog('info', 'Refusing CORS request'));
+  });
+
+  test('CORS requests should be allowed if requested', async () => {
+    const mockHandler = (_: Duplex, socket: WebSocket) => {
+      socket.close(1000);
+    };
+    const wsServer = makeWebSocketServer(mockHandler, mockLogging.logger, true);
+    const mockClient = new MockClient(wsServer, { origin: 'https://example.com' });
+
+    await mockClient.connect();
+    await expect(mockClient.waitForPeerClosure()).resolves.toEqual({
+      code: 1000,
+    });
   });
 
   test('Specified handler should be called when connection is established', async () => {
