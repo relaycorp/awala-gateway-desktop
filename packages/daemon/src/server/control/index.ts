@@ -9,3 +9,5 @@ export default async function registerRoutes(
 ): Promise<void> {
   await fastify.register(publicGatewayRoutes, { ...options, prefix: '/_control' });
 }
+
+export const CONTROL_API_PREFIX = '/_control';
