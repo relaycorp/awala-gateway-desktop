@@ -50,3 +50,13 @@ test('The connection should be closed when the client closes it', async () => {
   client.close();
   await expect(client.waitForPeerClosure()).resolves.toEqual({ code: 1000 });
 });
+
+test('CORS should be allowed', async () => {
+  const server = makeConnectionStatusServer(mockLogging.logger);
+  const client = new MockClient(server, { origin: 'https://example.com' });
+
+  await client.connect();
+
+  client.close();
+  await expect(client.waitForPeerClosure()).resolves.toEqual({ code: 1000 });
+});

@@ -7,6 +7,7 @@ export type WebsocketServerFactory = (logger: Logger) => Server;
 export function makeWebSocketServer(
   handler: (connectionStream: Duplex, socket: WebSocket) => void,
   logger: Logger,
+  allowCORS = false,
 ): WebSocket.Server {
   const wsServer = new WebSocket.Server({
     clientTracking: false,
@@ -14,7 +15,7 @@ export function makeWebSocketServer(
   });
 
   wsServer.on('connection', (socket, request) => {
-    if (request.headers.origin) {
+    if (!allowCORS && request.headers.origin) {
       logger.info('Refusing CORS request');
       socket.close(1008, 'CORS requests are disabled');
       return;
