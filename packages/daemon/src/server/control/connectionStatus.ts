@@ -14,18 +14,22 @@ export const PATH = '/_control/sync-status';
 export default function makeConnectionStatusServer(logger: Logger): Server {
   const statusMonitor = Container.get(StatusMonitor);
 
-  return makeWebSocketServer(async (connectionStream, socket) => {
-    const peerClosureController = new AbortController();
-    socket.once('close', () => {
-      peerClosureController.abort();
-      socket.close(1000);
-    });
+  return makeWebSocketServer(
+    async (connectionStream, socket) => {
+      const peerClosureController = new AbortController();
+      socket.once('close', () => {
+        peerClosureController.abort();
+        socket.close(1000);
+      });
 
-    const abortableStatusStream = makeSourceAbortable(
-      statusMonitor.streamStatus(),
-      peerClosureController.signal,
-      { returnOnAbort: true },
-    );
-    await pipe(abortableStatusStream, sink(connectionStream));
-  }, logger);
+      const abortableStatusStream = makeSourceAbortable(
+        statusMonitor.streamStatus(),
+        peerClosureController.signal,
+        { returnOnAbort: true },
+      );
+      await pipe(abortableStatusStream, sink(connectionStream));
+    },
+    logger,
+    true,
+  );
 }

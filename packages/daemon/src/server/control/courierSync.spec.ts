@@ -108,3 +108,13 @@ test('Connection should be closed with 1011 when an unexpected error occurs', as
     }),
   );
 });
+
+test('CORS should be allowed', async () => {
+  mockSync.mockReturnValue(arrayToAsyncIterable([]));
+  const server = makeCourierSyncServer(mockLogging.logger);
+  const client = new MockClient(server, { origin: 'https://example.com' });
+
+  await client.connect();
+
+  await expect(client.waitForPeerClosure()).resolves.toEqual({ code: 1000 });
+});
