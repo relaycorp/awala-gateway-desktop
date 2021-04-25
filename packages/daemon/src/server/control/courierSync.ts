@@ -11,8 +11,9 @@ import {
   UnregisteredGatewayError,
 } from '../../sync/courierSync/errors';
 import { makeWebSocketServer } from '../websocket';
+import { CONTROL_API_PREFIX } from './index';
 
-export const PATH = '/_control/courier-sync';
+export const PATH = `${CONTROL_API_PREFIX}/courier-sync`;
 
 export default function makeCourierSyncServer(logger: Logger): Server {
   return makeWebSocketServer(
