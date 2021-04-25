@@ -9,6 +9,7 @@ import makeConnectionStatusServer, {
   PATH as CONNECTION_STATUS_PATH,
 } from './control/connectionStatus';
 import makeCourierSyncServer, { PATH as COURIER_SYNC_PATH } from './control/courierSync';
+import { disableCors } from './cors';
 import RouteOptions from './RouteOptions';
 import { WebsocketServerFactory } from './websocket';
 
@@ -27,6 +28,8 @@ export async function makeServer(logger: Logger): Promise<FastifyInstance> {
     bodyLimit: MAX_RAMF_MESSAGE_LENGTH,
     logger,
   });
+
+  await server.addHook('onRequest', disableCors);
 
   await Promise.all(ROUTES.map((route) => server.register(route)));
 

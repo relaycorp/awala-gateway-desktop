@@ -7,6 +7,7 @@ import { getMockContext, getMockInstance, mockSpy } from '../testUtils/jest';
 import controlRoutes from './control';
 import makeConnectionStatusServer from './control/connectionStatus';
 import makeCourierSyncServer from './control/courierSync';
+import { disableCors } from './cors';
 import { makeServer, runServer } from './index';
 import { WebsocketServerFactory } from './websocket';
 
@@ -48,6 +49,12 @@ describe('makeServer', () => {
 
     const fastifyCallArgs = getMockContext(fastify).calls[0];
     expect(fastifyCallArgs[0]).toHaveProperty('bodyLimit', MAX_RAMF_MESSAGE_LENGTH);
+  });
+
+  test('CORS should be disabled', async () => {
+    await makeServer(customLogger);
+
+    expect(mockFastify.addHook).toBeCalledWith('onRequest', disableCors);
   });
 
   test('Control routes should be loaded', async () => {
