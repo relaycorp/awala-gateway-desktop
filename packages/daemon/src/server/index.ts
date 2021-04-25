@@ -2,6 +2,7 @@ import { MAX_RAMF_MESSAGE_LENGTH } from '@relaycorp/relaynet-core';
 import { fastify, FastifyInstance, FastifyPluginCallback } from 'fastify';
 import { Server } from 'http';
 import { Logger } from 'pino';
+import uuid from 'uuid-random';
 import { Server as WSServer } from 'ws';
 
 import controlRoutes from './control';
@@ -31,9 +32,15 @@ export async function makeServer(logger: Logger): Promise<FastifyInstance> {
 
   await server.addHook('onRequest', disableCors);
 
-  await Promise.all(ROUTES.map((route) => server.register(route)));
+  const controlAuthToken = uuid();
+  if (process.send) {
+    process.send({ type: 'controlAuthToken', value: controlAuthToken });
+  }
 
-  registerWebsocketEndpoints(logger, server);
+  const options: RouteOptions = { controlAuthToken };
+  await Promise.all(ROUTES.map((route) => server.register(route, options)));
+
+  registerWebsocketEndpoints(server, logger, controlAuthToken);
 
   await server.ready();
 
@@ -44,10 +51,14 @@ export async function runServer(fastifyInstance: FastifyInstance): Promise<void>
   await fastifyInstance.listen({ host: SERVER_HOST, port: SERVER_PORT });
 }
 
-function registerWebsocketEndpoints(logger: Logger, server: FastifyInstance<Server>): void {
+function registerWebsocketEndpoints(
+  server: FastifyInstance<Server>,
+  logger: Logger,
+  controlAuthToken: string,
+): void {
   const serversByPath: { readonly [k: string]: WSServer } = Object.entries(
     WS_SERVER_BY_PATH,
-  ).reduce((acc, [path, factory]) => ({ ...acc, [path]: factory(logger) }), {});
+  ).reduce((acc, [path, factory]) => ({ ...acc, [path]: factory(logger, controlAuthToken) }), {});
 
   server.server.on('upgrade', (request, socket, headers) => {
     const wsServer: WSServer | undefined = serversByPath[request.url];
