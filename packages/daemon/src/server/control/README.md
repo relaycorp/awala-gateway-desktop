@@ -6,6 +6,25 @@ The request and response content type should always be `application/json`, excep
 
 `4XX` and `5XX` responses may include a `code` field to explain the reason for the failure, unless it's unambiguous from the HTTP status code. Either way, the daemon logs will include the exact failure reason, including any tracebacks.
 
+## Authentication
+
+When the daemon starts as a `fork`ed process, it will send the authentication token that the parent process should use when making requests to the Control API. This message has the following structure:
+
+```json
+{
+  "type": "controlAuthToken",
+  "value": "s3cr3t"
+}
+```
+
+Requests to Control endpoints should include the `value` as a Bearer token in the `Authorization` header. For example:
+
+```
+Authorization: Bearer s3cr3t
+```
+
+When authentication fails, HTTP requests would result in `401` responses and WebSocket requests would be closed with the `1008` status code.
+
 ## Endpoints
 
 ### Sync status (`/sync-status`)
@@ -15,6 +34,7 @@ This is a WebSocket endpoint. It doesn't take any input, and it outputs one of t
 - `CONNECTED_TO_PUBLIC_GATEWAY`: The device is connected to the Internet and we can communicate with the public gateway.
 - `CONNECTED_TO_COURIER`: The device is connected to the WiFi hotspot of a courier. The device may or may not have a sync in progress.
 - `DISCONNECTED`: The device is not connected to the public gateway via the Internet or a courier. This status is also used if the device is connected to the Internet but the public gateway is unreachable (e.g., it's been blocked using DPI).
+- `UNREGISTERED`: This gateway hasn't yet registered with its public gateway. This typically means that the device has never connected to the Internet since the app was installed.
 
 As soon as the connection is established, it outputs the last known status.
 
@@ -34,7 +54,9 @@ async function main(): Promise<void> {
 }
 
 async function* streamStatuses(): AsyncIterable<string> {
-  const client = new WebSocket('http://127.0.0.1:13276/_control/sync-status');
+  const client = new WebSocket('http://127.0.0.1:13276/_control/sync-status', {
+    authorization: 'Bearer s3cr3t',
+  });
   const socketStream = WebSocket.createWebSocketStream(client, { encoding: 'utf-8' });
   yield* await source(socketStream);
 }
@@ -71,7 +93,9 @@ async function main(): Promise<void> {
 }
 
 async function* streamStatuses(): AsyncIterable<string> {
-  const client = new WebSocket('http://127.0.0.1:13276/_control/courier-sync');
+  const client = new WebSocket('http://127.0.0.1:13276/_control/courier-sync', {
+    authorization: 'Bearer s3cr3t',
+  });
   client.once('close', (code, reason) => {
     // tslint:disable-next-line:no-console
     console.log('Closing connection', code, reason);
