@@ -53,7 +53,9 @@ async function main(): Promise<void> {
 }
 
 async function* streamStatuses(): AsyncIterable<string> {
-  const client = new WebSocket('http://127.0.0.1:13276/_control/sync-status');
+  const client = new WebSocket('http://127.0.0.1:13276/_control/sync-status', {
+    authorization: 'Bearer s3cr3t',
+  });
   const socketStream = WebSocket.createWebSocketStream(client, { encoding: 'utf-8' });
   yield* await source(socketStream);
 }
@@ -90,7 +92,9 @@ async function main(): Promise<void> {
 }
 
 async function* streamStatuses(): AsyncIterable<string> {
-  const client = new WebSocket('http://127.0.0.1:13276/_control/courier-sync');
+  const client = new WebSocket('http://127.0.0.1:13276/_control/courier-sync', {
+    authorization: 'Bearer s3cr3t',
+  });
   client.once('close', (code, reason) => {
     // tslint:disable-next-line:no-console
     console.log('Closing connection', code, reason);
