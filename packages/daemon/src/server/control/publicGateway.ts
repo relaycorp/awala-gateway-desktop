@@ -7,6 +7,8 @@ import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { GatewayRegistrar } from '../../sync/publicGateway/GatewayRegistrar';
 import { NonExistingAddressError } from '../../sync/publicGateway/gscClient';
+import { getBearerTokenFromAuthHeader } from '../../utils/auth';
+import RouteOptions from '../RouteOptions';
 
 enum ErrorCode {
   ADDRESS_RESOLUTION_FAILURE = 'ADDRESS_RESOLUTION_FAILURE',
@@ -17,12 +19,16 @@ enum ErrorCode {
 
 const ENDPOINT_PATH = '/public-gateway';
 
-export default async function registerRoutes(fastify: FastifyInstance): Promise<void> {
+export default async function registerRoutes(
+  fastify: FastifyInstance,
+  options: RouteOptions,
+): Promise<void> {
   const config = Container.get(Config);
   const registrar = Container.get(GatewayRegistrar);
 
   fastify.route<{ readonly Body: string }>({
     method: 'GET',
+    onRequest: makeAuthEnforcementHook(options.controlAuthToken),
     url: ENDPOINT_PATH,
     async handler(_request, reply): Promise<FastifyReply<any>> {
       const registeredAddress = await config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS);
@@ -33,6 +39,7 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
 
   fastify.route<{ readonly Body: string }>({
     method: 'PUT',
+    onRequest: makeAuthEnforcementHook(options.controlAuthToken),
     url: ENDPOINT_PATH,
     async handler(request, reply): Promise<FastifyReply<any>> {
       if (request.headers['content-type'] !== 'application/json') {
@@ -85,4 +92,22 @@ function abortFailedMigration(
     .header('Content-Type', 'application/json')
     .code(500)
     .send({ code: ErrorCode.REGISTRATION_FAILURE });
+}
+
+function makeAuthEnforcementHook(
+  authToken: string,
+): (
+  request: FastifyRequest<{ readonly Body: string }>,
+  reply: FastifyReply<any>,
+  done: () => void,
+) => void {
+  return (request, reply, done): void => {
+    const bearerToken = getBearerTokenFromAuthHeader(request.headers.authorization);
+    if (bearerToken !== authToken) {
+      request.log.warn('Refusing unauthenticated request');
+      reply.code(401).send({});
+    }
+
+    done();
+  };
 }

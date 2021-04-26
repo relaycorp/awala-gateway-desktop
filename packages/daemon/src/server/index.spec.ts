@@ -1,6 +1,7 @@
 import { MAX_RAMF_MESSAGE_LENGTH } from '@relaycorp/relaynet-core';
 import { fastify, FastifyInstance } from 'fastify';
 import pino from 'pino';
+import uuid from 'uuid-random';
 import WebSocket from 'ws';
 
 import { getMockContext, getMockInstance, mockSpy } from '../testUtils/jest';
@@ -9,6 +10,7 @@ import makeConnectionStatusServer from './control/connectionStatus';
 import makeCourierSyncServer from './control/courierSync';
 import { disableCors } from './cors';
 import { makeServer, runServer } from './index';
+import RouteOptions from './RouteOptions';
 import { WebsocketServerFactory } from './websocket';
 
 jest.mock('./control/connectionStatus');
@@ -32,6 +34,19 @@ afterAll(() => {
 });
 
 const customLogger = pino();
+
+let originalProcessSend: any;
+beforeAll(() => {
+  originalProcessSend = process.send;
+});
+beforeEach(() => {
+  // tslint:disable-next-line:no-object-mutation
+  process.send = undefined;
+});
+afterAll(async () => {
+  // tslint:disable-next-line:no-object-mutation
+  process.send = originalProcessSend;
+});
 
 describe('makeServer', () => {
   test('Logger should be honoured', async () => {
@@ -60,7 +75,10 @@ describe('makeServer', () => {
   test('Control routes should be loaded', async () => {
     await makeServer(customLogger);
 
-    expect(mockFastify.register).toBeCalledWith(controlRoutes);
+    expect(mockFastify.register).toBeCalledWith(
+      controlRoutes,
+      expect.toSatisfy((options: RouteOptions) => uuid.test(options.controlAuthToken)),
+    );
   });
 
   test('Routes should be "awaited" for', async () => {
@@ -84,6 +102,45 @@ describe('makeServer', () => {
     const serverInstance = await makeServer(customLogger);
 
     expect(serverInstance).toBe(mockFastify);
+  });
+
+  describe('Control auth token', () => {
+    test('Token should be shared with parent if process was forked', async () => {
+      let passedMessage: any;
+      // tslint:disable-next-line:no-object-mutation
+      process.send = (message: any) => {
+        passedMessage = message;
+        return true;
+      };
+
+      await makeServer(customLogger);
+
+      expect(passedMessage).toBeTruthy();
+      expect(passedMessage).toHaveProperty('type', 'controlAuthToken');
+      expect(passedMessage).toHaveProperty(
+        'value',
+        expect.toSatisfy((t) => uuid.test(t)),
+      );
+    });
+
+    test('Any explicit token should be honoured', async () => {
+      const token = 'the-auth-token';
+      let passedMessage: any;
+      // tslint:disable-next-line:no-object-mutation
+      process.send = (message: any) => {
+        passedMessage = message;
+        return true;
+      };
+
+      await makeServer(customLogger, token);
+
+      expect(passedMessage).toBeTruthy();
+      expect(passedMessage).toHaveProperty('value', token);
+    });
+
+    test('Token should not be shared if process was not forked', async () => {
+      await makeServer(customLogger);
+    });
   });
 });
 
@@ -174,7 +231,10 @@ describe('WebSocket servers', () => {
     expect(mockWSServer.emit).toBeCalledWith('connection', mockSocket, mockRequest);
     expect(mockWSServer.handleUpgrade).toHaveBeenCalledBefore(mockWSServer.emit as any);
 
-    expect(websocketServerFactory).toBeCalledWith(customLogger);
+    expect(websocketServerFactory).toBeCalledWith(
+      customLogger,
+      expect.toSatisfy((token) => uuid.test(token)),
+    );
   }
 });
 
