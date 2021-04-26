@@ -11,7 +11,7 @@ import { makeWebSocketServer } from '../websocket';
 
 export const PATH = '/_control/sync-status';
 
-export default function makeConnectionStatusServer(logger: Logger): Server {
+export default function makeConnectionStatusServer(logger: Logger, authToken: string): Server {
   const statusMonitor = Container.get(StatusMonitor);
 
   return makeWebSocketServer(
@@ -30,6 +30,6 @@ export default function makeConnectionStatusServer(logger: Logger): Server {
       await pipe(abortableStatusStream, sink(connectionStream));
     },
     logger,
-    true,
+    authToken,
   );
 }

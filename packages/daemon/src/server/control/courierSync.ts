@@ -14,7 +14,7 @@ import { makeWebSocketServer } from '../websocket';
 
 export const PATH = '/_control/courier-sync';
 
-export default function makeCourierSyncServer(logger: Logger): Server {
+export default function makeCourierSyncServer(logger: Logger, authToken: string): Server {
   return makeWebSocketServer(
     async (connectionStream, socket) => {
       const courierSync = Container.get(CourierSync);
@@ -52,6 +52,6 @@ export default function makeCourierSyncServer(logger: Logger): Server {
       }
     },
     logger,
-    true,
+    authToken,
   );
 }
