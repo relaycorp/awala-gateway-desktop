@@ -26,34 +26,53 @@ const mockRegister = mockSpy(jest.spyOn(GatewayRegistrar.prototype, 'register'))
 const NEW_PUBLIC_ADDRESS = `new.${DEFAULT_PUBLIC_GATEWAY}`;
 const ENDPOINT_PATH = `${CONTROL_API_PREFIX}/public-gateway`;
 
+const AUTH_TOKEN = 'the-auth-token';
+const BASE_HEADERS = { authorization: `Bearer ${AUTH_TOKEN}` };
+
 describe('Get public gateway', () => {
   test('The current gateway should be returned if registered', async () => {
     const config = Container.get(Config);
     await config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, NEW_PUBLIC_ADDRESS);
-    const fastify = await makeServer(mockLogging.logger);
+    const fastify = await makeServer(mockLogging.logger, AUTH_TOKEN);
 
-    const response = await fastify.inject({ method: 'GET', url: ENDPOINT_PATH });
+    const response = await fastify.inject({
+      headers: BASE_HEADERS,
+      method: 'GET',
+      url: ENDPOINT_PATH,
+    });
 
     expect(response.statusCode).toEqual(200);
     expect(JSON.parse(response.body)).toHaveProperty('publicAddress', NEW_PUBLIC_ADDRESS);
   });
 
   test('The default gateway should be returned if unregistered', async () => {
-    const fastify = await makeServer(mockLogging.logger);
+    const fastify = await makeServer(mockLogging.logger, AUTH_TOKEN);
 
-    const response = await fastify.inject({ method: 'GET', url: ENDPOINT_PATH });
+    const response = await fastify.inject({
+      headers: BASE_HEADERS,
+      method: 'GET',
+      url: ENDPOINT_PATH,
+    });
 
     expect(response.statusCode).toEqual(200);
     expect(JSON.parse(response.body)).toHaveProperty('publicAddress', DEFAULT_PUBLIC_GATEWAY);
+  });
+
+  test('Request should be refused if auth fails', async () => {
+    const fastify = await makeServer(mockLogging.logger, AUTH_TOKEN);
+
+    const response = await fastify.inject({ method: 'GET', url: ENDPOINT_PATH });
+
+    expect(response.statusCode).toEqual(401);
   });
 });
 
 describe('Set public gateway', () => {
   test('Request should be refused if content type is not JSON', async () => {
-    const fastify = await makeServer(mockLogging.logger);
+    const fastify = await makeServer(mockLogging.logger, AUTH_TOKEN);
 
     const response = await fastify.inject({
-      headers: { 'content-type': 'text/plain' },
+      headers: { ...BASE_HEADERS, 'content-type': 'text/plain' },
       method: 'PUT',
       payload: { publicAddress: NEW_PUBLIC_ADDRESS },
       url: ENDPOINT_PATH,
@@ -160,12 +179,28 @@ describe('Set public gateway', () => {
     );
   });
 
+  test('Request should be refused if authentication fails', async () => {
+    const fastify = await makeServer(mockLogging.logger, AUTH_TOKEN);
+
+    const response = await fastify.inject({
+      method: 'PUT',
+      payload: { publicAddress: NEW_PUBLIC_ADDRESS },
+      url: ENDPOINT_PATH,
+    });
+
+    expect(response.statusCode).toEqual(401);
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('warn', 'Refusing unauthenticated request'),
+    );
+    expect(mockRegister).not.toBeCalled();
+  });
+
   async function requestPublicAddressChange(
     publicAddress?: string,
   ): Promise<LightMyRequest.Response> {
-    const fastify = await makeServer(mockLogging.logger);
+    const fastify = await makeServer(mockLogging.logger, AUTH_TOKEN);
     return fastify.inject({
-      headers: { 'content-type': 'application/json' },
+      headers: { ...BASE_HEADERS, 'content-type': 'application/json' },
       method: 'PUT',
       payload: { publicAddress },
       url: ENDPOINT_PATH,
