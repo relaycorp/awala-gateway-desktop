@@ -123,6 +123,21 @@ describe('makeServer', () => {
       );
     });
 
+    test('Any explicit token should be honoured', async () => {
+      const token = 'the-auth-token';
+      let passedMessage: any;
+      // tslint:disable-next-line:no-object-mutation
+      process.send = (message: any) => {
+        passedMessage = message;
+        return true;
+      };
+
+      await makeServer(customLogger, token);
+
+      expect(passedMessage).toBeTruthy();
+      expect(passedMessage).toHaveProperty('value', token);
+    });
+
     test('Token should not be shared if process was not forked', async () => {
       await makeServer(customLogger);
     });

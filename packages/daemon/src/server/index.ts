@@ -24,7 +24,7 @@ const WS_SERVER_BY_PATH: { readonly [key: string]: WebsocketServerFactory } = {
   [COURIER_SYNC_PATH]: makeCourierSyncServer,
 };
 
-export async function makeServer(logger: Logger): Promise<FastifyInstance> {
+export async function makeServer(logger: Logger, authToken?: string): Promise<FastifyInstance> {
   const server = fastify({
     bodyLimit: MAX_RAMF_MESSAGE_LENGTH,
     logger,
@@ -32,7 +32,7 @@ export async function makeServer(logger: Logger): Promise<FastifyInstance> {
 
   await server.addHook('onRequest', disableCors);
 
-  const controlAuthToken = uuid();
+  const controlAuthToken = authToken ?? uuid();
   if (process.send) {
     process.send({ type: 'controlAuthToken', value: controlAuthToken });
   }
