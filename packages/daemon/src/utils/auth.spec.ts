@@ -13,6 +13,10 @@ describe('getBearerTokenFromAuthHeader', () => {
     expect(getBearerTokenFromAuthHeader('token')).toEqual(null);
   });
 
+  test('Missing Bearer value should return null', () => {
+    expect(getBearerTokenFromAuthHeader('Bearer')).toEqual(null);
+  });
+
   test('Well-formed Bearer token should be returned', () => {
     const token = 'the-token';
     expect(getBearerTokenFromAuthHeader(`Bearer ${token}`)).toEqual(token);
