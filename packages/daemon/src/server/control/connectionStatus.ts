@@ -12,7 +12,7 @@ import { CONTROL_API_PREFIX } from './index';
 
 export const PATH = `${CONTROL_API_PREFIX}/sync-status`;
 
-export default function makeConnectionStatusServer(logger: Logger): Server {
+export default function makeConnectionStatusServer(logger: Logger, authToken: string): Server {
   const statusMonitor = Container.get(StatusMonitor);
 
   return makeWebSocketServer(
@@ -31,6 +31,6 @@ export default function makeConnectionStatusServer(logger: Logger): Server {
       await pipe(abortableStatusStream, sink(connectionStream));
     },
     logger,
-    true,
+    authToken,
   );
 }
