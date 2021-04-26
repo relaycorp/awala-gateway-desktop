@@ -8,8 +8,9 @@ import { Server } from 'ws';
 
 import { StatusMonitor } from '../../sync/StatusMonitor';
 import { makeWebSocketServer } from '../websocket';
+import { CONTROL_API_PREFIX } from './index';
 
-export const PATH = '/_control/sync-status';
+export const PATH = `${CONTROL_API_PREFIX}/sync-status`;
 
 export default function makeConnectionStatusServer(logger: Logger, authToken: string): Server {
   const statusMonitor = Container.get(StatusMonitor);

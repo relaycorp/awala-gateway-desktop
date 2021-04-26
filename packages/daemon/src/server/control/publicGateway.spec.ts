@@ -11,6 +11,7 @@ import { setUpTestDBConnection } from '../../testUtils/db';
 import { getMockInstance, mockSpy } from '../../testUtils/jest';
 import { makeMockLogging, MockLogging, partialPinoLog } from '../../testUtils/logging';
 import { makeServer } from '../index';
+import { CONTROL_API_PREFIX } from './index';
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
@@ -23,7 +24,7 @@ beforeEach(() => {
 const mockRegister = mockSpy(jest.spyOn(GatewayRegistrar.prototype, 'register'));
 
 const NEW_PUBLIC_ADDRESS = `new.${DEFAULT_PUBLIC_GATEWAY}`;
-const ENDPOINT_PATH = '/_control/public-gateway';
+const ENDPOINT_PATH = `${CONTROL_API_PREFIX}/public-gateway`;
 
 const AUTH_TOKEN = 'the-auth-token';
 const BASE_HEADERS = { authorization: `Bearer ${AUTH_TOKEN}` };
