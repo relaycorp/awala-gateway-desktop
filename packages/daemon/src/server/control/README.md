@@ -6,6 +6,25 @@ The request and response content type should always be `application/json`, excep
 
 `4XX` and `5XX` responses may include a `code` field to explain the reason for the failure, unless it's unambiguous from the HTTP status code. Either way, the daemon logs will include the exact failure reason, including any tracebacks.
 
+## Authentication
+
+When the daemon starts as a `fork`ed process, it will send the authentication token that the parent process should use when making requests to the Control API. This message has the following structure:
+
+```json
+{
+  "type": "controlAuthToken",
+  "value": "s3cr3t"
+}
+```
+
+Requests to Control endpoints should include the `value` as a Bearer token in the `Authorization` header. For example:
+
+```
+Authorization: Bearer s3cr3t
+```
+
+When authentication fails, HTTP requests would result in `401` responses and WebSocket requests would be closed with the `1008` status code.
+
 ## Endpoints
 
 ### Sync status (`/sync-status`)
