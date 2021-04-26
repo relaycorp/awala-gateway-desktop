@@ -6,7 +6,7 @@ import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { restoreStatusMonitor } from '../../testUtils/connectionStatus';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { makeMockLogging, MockLogging } from '../../testUtils/logging';
-import { mockWebsocketStream } from '../../testUtils/websocket';
+import { MockAuthClient, mockWebsocketStream } from '../../testUtils/websocket';
 import makeConnectionStatusServer from './connectionStatus';
 
 setUpTestDBConnection();
@@ -25,9 +25,11 @@ beforeEach(async () => {
   statusMonitor.setLastStatus(ConnectionStatus.DISCONNECTED);
 });
 
+const AUTH_TOKEN = 'token';
+
 test('Status changes should be streamed', async () => {
-  const server = makeConnectionStatusServer(mockLogging.logger);
-  const client = new MockClient(server);
+  const server = makeConnectionStatusServer(mockLogging.logger, AUTH_TOKEN);
+  const client = new MockAuthClient(server, AUTH_TOKEN);
 
   await client.connect();
 
@@ -41,8 +43,8 @@ test('Status changes should be streamed', async () => {
 });
 
 test('The connection should be closed when the client closes it', async () => {
-  const server = makeConnectionStatusServer(mockLogging.logger);
-  const client = new MockClient(server);
+  const server = makeConnectionStatusServer(mockLogging.logger, AUTH_TOKEN);
+  const client = new MockAuthClient(server, AUTH_TOKEN);
 
   await client.connect();
   await expect(client.receive()).resolves.toEqual(ConnectionStatus.DISCONNECTED);
@@ -51,9 +53,19 @@ test('The connection should be closed when the client closes it', async () => {
   await expect(client.waitForPeerClosure()).resolves.toEqual({ code: 1000 });
 });
 
+test('Auth should be required', async () => {
+  const server = makeConnectionStatusServer(mockLogging.logger, AUTH_TOKEN);
+  const client = new MockClient(server);
+
+  await client.connect();
+
+  client.close();
+  await expect(client.waitForPeerClosure()).resolves.toHaveProperty('code', 1008);
+});
+
 test('CORS should be allowed', async () => {
-  const server = makeConnectionStatusServer(mockLogging.logger);
-  const client = new MockClient(server, { origin: 'https://example.com' });
+  const server = makeConnectionStatusServer(mockLogging.logger, AUTH_TOKEN);
+  const client = new MockAuthClient(server, AUTH_TOKEN, { origin: 'https://example.com' });
 
   await client.connect();
 

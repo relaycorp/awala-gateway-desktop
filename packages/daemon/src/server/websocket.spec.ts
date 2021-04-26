@@ -29,7 +29,7 @@ describe('WebSocket server configuration', () => {
     expect(wsServer.options.noServer).toBeTruthy();
   });
 
-  test('CORS requests should be blocked by default', async () => {
+  test('CORS request should be blocked if auth is not required', async () => {
     const mockHandler = jest.fn();
     const wsServer = makeWebSocketServer(mockHandler, mockLogging.logger);
     const mockClient = new MockClient(wsServer, { origin: 'https://example.com' });
@@ -40,19 +40,43 @@ describe('WebSocket server configuration', () => {
       reason: 'CORS requests are disabled',
     });
     expect(mockLogging.logs).toContainEqual(partialPinoLog('info', 'Refusing CORS request'));
+    expect(mockHandler).not.toBeCalled();
   });
 
-  test('CORS requests should be allowed if requested', async () => {
+  test('Request should be allowed if auth is required and succeeds', async () => {
     const mockHandler = (_: Duplex, socket: WebSocket) => {
       socket.close(1000);
     };
-    const wsServer = makeWebSocketServer(mockHandler, mockLogging.logger, true);
-    const mockClient = new MockClient(wsServer, { origin: 'https://example.com' });
+    const authToken = 'auth-token';
+    const wsServer = makeWebSocketServer(mockHandler, mockLogging.logger, authToken);
+    const mockClient = new MockClient(wsServer, {
+      authorization: `Bearer ${authToken}`,
+      origin: 'https://example.com',
+    });
 
     await mockClient.connect();
     await expect(mockClient.waitForPeerClosure()).resolves.toEqual({
       code: 1000,
     });
+  });
+
+  test('Request should be refused if auth is required and invalid token is passed', async () => {
+    const mockHandler = jest.fn();
+    const wsServer = makeWebSocketServer(mockHandler, mockLogging.logger, 'auth-token');
+    const mockClient = new MockClient(wsServer, {
+      authorization: 'not the auth token',
+      origin: 'https://example.com',
+    });
+
+    await mockClient.connect();
+    await expect(mockClient.waitForPeerClosure()).resolves.toEqual({
+      code: 1008,
+      reason: 'Authentication is required',
+    });
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('info', 'Refusing unauthenticated request'),
+    );
+    expect(mockHandler).not.toBeCalled();
   });
 
   test('Specified handler should be called when connection is established', async () => {
