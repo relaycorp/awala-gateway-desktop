@@ -39,7 +39,7 @@
     "typeorm-typedi-extensions": "^0.4.1",
     "utf-8-validate": "^5.0.4",
     "verror": "^1.10.0",
-    "ws": "^7.4.4"
+    "ws": "^7.4.5"
   },
   "devDependencies": {
     "@relaycorp/relaynet-testing": "^1.1.5",
