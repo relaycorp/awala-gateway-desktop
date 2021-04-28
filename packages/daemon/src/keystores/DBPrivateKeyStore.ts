@@ -2,22 +2,32 @@ import {
   BoundPrivateKeyData,
   PrivateKeyData,
   PrivateKeyStore,
+  UnboundKeyPair,
   UnboundPrivateKeyData,
 } from '@relaycorp/relaynet-core';
-import { Service } from 'typedi';
+import { Inject, Service } from 'typedi';
 import { Connection, Repository } from 'typeorm';
 import { InjectConnection } from 'typeorm-typedi-extensions';
 
+import { Config, ConfigKey } from '../Config';
 import { PrivateKey, PrivateKeyType } from '../entity/PrivateKey';
 
 @Service()
 export class DBPrivateKeyStore extends PrivateKeyStore {
   private readonly repository: Repository<PrivateKey>;
 
-  constructor(@InjectConnection() connection: Connection) {
+  constructor(@InjectConnection() connection: Connection, @Inject() protected config: Config) {
     super();
 
     this.repository = connection.getRepository(PrivateKey);
+  }
+
+  public async getCurrentKey(): Promise<UnboundKeyPair | null> {
+    const keyId = await this.config.get(ConfigKey.NODE_KEY_SERIAL_NUMBER);
+    if (!keyId) {
+      return null;
+    }
+    return this.fetchNodeKey(Buffer.from(keyId, 'hex'));
   }
 
   protected async fetchKey(keyId: string): Promise<PrivateKeyData | null> {
@@ -48,5 +58,9 @@ export class DBPrivateKeyStore extends PrivateKeyStore {
       type: privateKeyData.type as PrivateKeyType,
     });
     await this.repository.save(privateKey);
+
+    if (privateKeyData.type === 'node') {
+      await this.config.set(ConfigKey.NODE_KEY_SERIAL_NUMBER, keyId);
+    }
   }
 }

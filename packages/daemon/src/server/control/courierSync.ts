@@ -5,11 +5,9 @@ import { sink } from 'stream-to-it';
 import { Container } from 'typedi';
 import { Server } from 'ws';
 
+import { UnregisteredGatewayError } from '../../errors';
 import { CourierSync } from '../../sync/courierSync/CourierSync';
-import {
-  DisconnectedFromCourierError,
-  UnregisteredGatewayError,
-} from '../../sync/courierSync/errors';
+import { DisconnectedFromCourierError } from '../../sync/courierSync/errors';
 import { makeWebSocketServer } from '../websocket';
 import { CONTROL_API_PREFIX } from './index';
 

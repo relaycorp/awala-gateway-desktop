@@ -17,10 +17,10 @@ When the daemon starts as a `fork`ed process, it will send the authentication to
 }
 ```
 
-Requests to Control endpoints should include the `value` as a Bearer token in the `Authorization` header. For example:
+Requests to Control endpoints should include the `value` in the query string parameter `auth`. For example:
 
 ```
-Authorization: Bearer s3cr3t
+http://127.0.0.1:13276/_control/sub-path?auth=s3cr3t
 ```
 
 When authentication fails, HTTP requests would result in `401` responses and WebSocket requests would be closed with the `1008` status code.

@@ -10,6 +10,7 @@ import makeConnectionStatusServer from './control/connectionStatus';
 import makeCourierSyncServer from './control/courierSync';
 import { disableCors } from './cors';
 import { makeServer, runServer } from './index';
+import powebRoutes from './poweb';
 import RouteOptions from './RouteOptions';
 import { WebsocketServerFactory } from './websocket';
 
@@ -79,6 +80,12 @@ describe('makeServer', () => {
       controlRoutes,
       expect.toSatisfy((options: RouteOptions) => uuid.test(options.controlAuthToken)),
     );
+  });
+
+  test('PoWeb routes should be loaded', async () => {
+    await makeServer(customLogger);
+
+    expect(mockFastify.register).toBeCalledWith(powebRoutes, expect.anything());
   });
 
   test('Routes should be "awaited" for', async () => {
