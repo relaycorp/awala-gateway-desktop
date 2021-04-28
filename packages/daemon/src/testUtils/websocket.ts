@@ -13,6 +13,6 @@ export function mockWebsocketStream(): void {
 
 export class MockAuthClient extends MockClient {
   constructor(wsServer: WSServer, authToken: string, headers?: { readonly [key: string]: string }) {
-    super(wsServer, { ...(headers ?? {}), authorization: `Bearer ${authToken}` });
+    super(wsServer, headers, `/?auth=${authToken}`);
   }
 }
