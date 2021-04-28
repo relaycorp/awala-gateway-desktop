@@ -56,14 +56,11 @@ async function* _synchronizeWithCourier(token: string): AsyncIterable<CourierSyn
         case 'DELIVERING_CARGO':
           yield CourierSyncStatus.DELIVERING_CARGO;
           break;
-        case 'COMPLETE':
-          yield CourierSyncStatus.COMPLETE;
-          break;
         default:
           throw new CourierSyncError(`Unknown status: ${name}`);
       }
     }
-    // Server may not send this one, but the UI is waiting for it
+    // Server does not send this one, but the UI is waiting for it
     yield CourierSyncStatus.COMPLETE;
   } catch (err) {
     throw new CourierSyncError(err);
