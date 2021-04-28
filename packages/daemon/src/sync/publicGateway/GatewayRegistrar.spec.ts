@@ -19,6 +19,7 @@ import { PreRegisterNodeCall, RegisterNodeCall } from '../../testUtils/gscClient
 import { MockGSCClient } from '../../testUtils/gscClient/MockGSCClient';
 import { mockSpy } from '../../testUtils/jest';
 import { mockPrivateKeyStore } from '../../testUtils/keystores';
+import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
 import { mockSleepSeconds } from '../../testUtils/timing';
 import { GatewayRegistrar } from './GatewayRegistrar';
 import * as gscClient from './gscClient';
@@ -28,6 +29,8 @@ setUpTestDBConnection();
 const privateKeyStore = mockPrivateKeyStore();
 
 useTemporaryAppDirs();
+
+const getLogs = mockLoggerToken();
 
 let registrar: GatewayRegistrar;
 beforeEach(() => {
@@ -189,6 +192,12 @@ describe('registerIfUnregistered', () => {
     expect(mockRegister).toBeCalledTimes(2);
     expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
     expect(sleepSeconds).toBeCalledWith(5);
+    expect(getLogs()).toContainEqual(
+      partialPinoLog(
+        'info',
+        'Failed to register with public gateway due to DNS failure; will retry later',
+      ),
+    );
   });
 
   test('Registration should not be reattempted if public address does not exist', async () => {
@@ -200,6 +209,11 @@ describe('registerIfUnregistered', () => {
     expect(mockRegister).toBeCalledTimes(1);
     expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
     expect(sleepSeconds).not.toBeCalled();
+    expect(getLogs()).toContainEqual(
+      partialPinoLog('warn', 'Failed to register with public gateway', {
+        err: expect.objectContaining({ type: gscClient.NonExistingAddressError.name }),
+      }),
+    );
   });
 
   test('Registration should not be reattempted if unexpected error happens', async () => {
@@ -211,6 +225,11 @@ describe('registerIfUnregistered', () => {
     expect(mockRegister).toBeCalledTimes(1);
     expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
     expect(sleepSeconds).not.toBeCalled();
+    expect(getLogs()).toContainEqual(
+      partialPinoLog('warn', 'Failed to register with public gateway', {
+        err: expect.objectContaining({ type: 'Error' }),
+      }),
+    );
   });
 });
 
