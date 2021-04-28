@@ -13,7 +13,7 @@ export class EndpointRegistrar {
 
   public async preRegister(endpointPublicKeyDigest: string): Promise<Buffer> {
     if (endpointPublicKeyDigest.length !== 64) {
-      throw new MalformedEndpointKeyDigest(
+      throw new MalformedEndpointKeyDigestError(
         `Expected digest to have 64 chars (got ${endpointPublicKeyDigest.length})`,
       );
     }
@@ -35,4 +35,4 @@ export class EndpointRegistrar {
   }
 }
 
-export class MalformedEndpointKeyDigest extends PrivateGatewayError {}
+export class MalformedEndpointKeyDigestError extends PrivateGatewayError {}

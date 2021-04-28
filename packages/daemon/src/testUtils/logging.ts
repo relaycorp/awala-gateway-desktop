@@ -13,6 +13,9 @@ export interface MockLogging {
   readonly logs: MockLogSet;
 }
 
+/**
+ * @deprecated Use makeMockLoggingFixture() instead
+ */
 export function makeMockLogging(): MockLogging {
   // tslint:disable-next-line:readonly-array
   const logs: object[] = [];
@@ -23,13 +26,22 @@ export function makeMockLogging(): MockLogging {
   return { logger, logs };
 }
 
-export function mockLoggerToken(): MockLogSet {
+export function makeMockLoggingFixture(): MockLogging {
   const mockLogging = makeMockLogging();
+
+  beforeEach(() => {
+    mockLogging.logs.splice(0, mockLogging.logs.length);
+  });
+
+  return mockLogging;
+}
+
+export function mockLoggerToken(): MockLogSet {
+  const mockLogging = makeMockLoggingFixture();
 
   mockToken(LOGGER);
 
   beforeEach(() => {
-    mockLogging.logs.splice(0, mockLogging.logs.length);
     Container.set(LOGGER, mockLogging.logger);
   });
 

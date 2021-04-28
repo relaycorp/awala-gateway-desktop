@@ -6,7 +6,7 @@ import { Container } from 'typedi';
 import { UnregisteredGatewayError } from '../errors';
 import { DBPrivateKeyStore } from '../keystores/DBPrivateKeyStore';
 import { setUpTestDBConnection } from '../testUtils/db';
-import { EndpointRegistrar, MalformedEndpointKeyDigest } from './registration';
+import { EndpointRegistrar, MalformedEndpointKeyDigestError } from './registration';
 
 setUpTestDBConnection();
 
@@ -26,7 +26,7 @@ describe('EndpointRegistration', () => {
       const registrar = Container.get(EndpointRegistrar);
 
       await expect(registrar.preRegister('a'.repeat(63))).rejects.toBeInstanceOf(
-        MalformedEndpointKeyDigest,
+        MalformedEndpointKeyDigestError,
       );
     });
 
@@ -34,7 +34,7 @@ describe('EndpointRegistration', () => {
       const registrar = Container.get(EndpointRegistrar);
 
       await expect(registrar.preRegister('a'.repeat(65))).rejects.toBeInstanceOf(
-        MalformedEndpointKeyDigest,
+        MalformedEndpointKeyDigestError,
       );
     });
 
