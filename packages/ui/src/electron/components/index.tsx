@@ -24,13 +24,16 @@ interface State {
 class Index extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token") || '';
+
     const onboarded = typeof localStorage.getItem('onboarded') === 'string';
     this.state = {
       status: !onboarded ? Status.ONBOARDING : Status.HOME,
-      token: ''
+      token
     };
     ipcRenderer.on('show-public-gateway', this.showSettings.bind(this));
-    ipcRenderer.on('token', this.setToken.bind(this));
+
   }
   public render() : JSX.Element {
     switch(this.state.status) {
@@ -57,9 +60,6 @@ class Index extends Component<Props, State> {
   }
   private showSettings() : void {
     this.setState({'status': Status.SETTINGS});
-  }
-  private setToken(_: Event, token: string) : void {
-    this.setState({token});
   }
 }
 

@@ -9,7 +9,7 @@ import buildMenu from './menu';
 import buildTray from './tray';
 
 let mainWindow: BrowserWindow | null = null;
-let token: string | null = null;
+let token: string = 'TOKEN';
 let tray: Tray | null = null;
 let closeWebSocket: (() => void) | null = null;
 
@@ -17,14 +17,19 @@ let closeWebSocket: (() => void) | null = null;
 const server = fork(path.join(app.getAppPath(), 'daemon/build/bin/gateway-daemon.js'), {
   cwd: path.join(app.getAppPath(), 'daemon/'),
 });
-server.on('message', setToken);
 server.on('error', (_err: Error) => {
   app.quit();
 });
+server.on('message', function (message: ServerMessage): void {
+  if (message.type === ServerMessageType.TOKEN_MESSAGE) {
+    token = message.value;
+    startApp();
+  }
+});
 
-app.on('ready', (): void => {
+async function startApp(): Promise<void> {
+  await app.whenReady();
   // TODO: if auto-launch on startup, don't open the window?
-  // TODO: wait for the server to be ready. if too early, the websocket is refused.
   showMainWindow();
 
   const logoPath = path.join(app.getAppPath(), logo);
@@ -46,7 +51,7 @@ app.on('ready', (): void => {
   tray = buildTray(logoPath, showMainWindow);
   tray.setToolTip('Connection status...');
   updateToolTip();
-});
+}
 
 function showMainWindow(): void {
   if (mainWindow) {
@@ -66,20 +71,13 @@ function showMainWindow(): void {
   });
 
   // and load the index.html of the app.
-  mainWindow.loadFile('app.html');
-  sendToken();
+  mainWindow.loadFile('app.html', { query: { token } });
 
   mainWindow.on('closed', (): void => {
     // Emitted when the window is closed. After you have received this event you should remove the
     // reference to the window and avoid using it any more.
     mainWindow = null;
   });
-}
-
-function sendToken(): void {
-  if (token && mainWindow) {
-    mainWindow.webContents.send('token', token);
-  }
 }
 
 function showSettings(): void {
@@ -104,15 +102,5 @@ async function updateToolTip(): Promise<void> {
       }
     }
     closeWebSocket = abort;
-  }
-}
-
-function setToken(message: ServerMessage): void {
-  if (message.type === ServerMessageType.TOKEN_MESSAGE) {
-    token = message.value;
-    sendToken();
-    if (tray && !closeWebSocket) {
-      updateToolTip();
-    }
   }
 }
