@@ -32,7 +32,8 @@
     "daemon": "file:../daemon",
     "pino": "^6.11.3",
     "utf-8-validate": "^5.0.4",
-    "verror": "^1.10.0"
+    "verror": "^1.10.0",
+    "ws": "^7.4.5"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^5.12.0",
