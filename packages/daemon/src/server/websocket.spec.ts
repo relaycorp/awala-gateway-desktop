@@ -43,16 +43,17 @@ describe('WebSocket server configuration', () => {
     expect(mockHandler).not.toBeCalled();
   });
 
-  test('Request should be allowed if auth is required and succeeds', async () => {
+  test('CORS request should be allowed if auth is required and succeeds', async () => {
     const mockHandler = (_: Duplex, socket: WebSocket) => {
       socket.close(1000);
     };
     const authToken = 'auth-token';
     const wsServer = makeWebSocketServer(mockHandler, mockLogging.logger, authToken);
-    const mockClient = new MockClient(wsServer, {
-      authorization: `Bearer ${authToken}`,
-      origin: 'https://example.com',
-    });
+    const mockClient = new MockClient(
+      wsServer,
+      { origin: 'https://example.com' },
+      `/?auth=${authToken}`,
+    );
 
     await mockClient.connect();
     await expect(mockClient.waitForPeerClosure()).resolves.toEqual({
@@ -60,13 +61,30 @@ describe('WebSocket server configuration', () => {
     });
   });
 
+  test('Request should be refused if auth is required and invalid token is unset', async () => {
+    const mockHandler = jest.fn();
+    const wsServer = makeWebSocketServer(mockHandler, mockLogging.logger, 'auth-token');
+    const mockClient = new MockClient(wsServer);
+
+    await mockClient.connect();
+    await expect(mockClient.waitForPeerClosure()).resolves.toEqual({
+      code: 1008,
+      reason: 'Authentication is required',
+    });
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('info', 'Refusing unauthenticated request'),
+    );
+    expect(mockHandler).not.toBeCalled();
+  });
+
   test('Request should be refused if auth is required and invalid token is passed', async () => {
     const mockHandler = jest.fn();
     const wsServer = makeWebSocketServer(mockHandler, mockLogging.logger, 'auth-token');
-    const mockClient = new MockClient(wsServer, {
-      authorization: 'not the auth token',
-      origin: 'https://example.com',
-    });
+    const mockClient = new MockClient(
+      wsServer,
+      { authorization: 'not the auth token' },
+      '/?auth=invalid',
+    );
 
     await mockClient.connect();
     await expect(mockClient.waitForPeerClosure()).resolves.toEqual({
