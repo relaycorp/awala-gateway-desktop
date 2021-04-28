@@ -62,7 +62,8 @@ function registerWebsocketEndpoints(
   ).reduce((acc, [path, factory]) => ({ ...acc, [path]: factory(logger, controlAuthToken) }), {});
 
   server.server.on('upgrade', (request, socket, headers) => {
-    const wsServer: WSServer | undefined = serversByPath[request.url];
+    const url = new URL(request.url, 'https://127.0.0.0.1');
+    const wsServer: WSServer | undefined = serversByPath[url.pathname];
     if (wsServer) {
       wsServer.handleUpgrade(request, socket, headers, (websocket) => {
         wsServer.emit('connection', websocket, request);
