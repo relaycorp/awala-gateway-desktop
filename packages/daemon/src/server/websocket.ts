@@ -1,7 +1,6 @@
 import { Logger } from 'pino';
 import { Duplex } from 'stream';
 import WebSocket, { createWebSocketStream, Server } from 'ws';
-import { getBearerTokenFromAuthHeader } from '../utils/auth';
 
 export type WebsocketServerFactory = (logger: Logger, controlAuthToken: string) => Server;
 
@@ -18,8 +17,9 @@ export function makeWebSocketServer(
   const isAuthRequired = !!authToken;
 
   wsServer.on('connection', (socket, request) => {
-    const bearerToken = getBearerTokenFromAuthHeader(request.headers.authorization);
-    if (isAuthRequired && authToken !== bearerToken) {
+    const url = new URL(request.url!!, 'http://127.0.0.1');
+    const requestToken = url.searchParams.get('auth');
+    if (isAuthRequired && authToken !== requestToken) {
       logger.info('Refusing unauthenticated request');
       socket.close(1008, 'Authentication is required');
       return;
