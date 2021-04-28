@@ -4,14 +4,17 @@ import {
   PrivateKeyStore,
   PrivateNodeRegistration,
   PrivateNodeRegistrationRequest,
+  PublicAddressingError,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { Inject, Service } from 'typedi';
+import { Container, Inject, Service } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { FileStore } from '../../fileStore';
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
+import { LOGGER } from '../../tokens';
+import { sleepSeconds } from '../../utils/timing';
 import { makeGSCClient } from './gscClient';
 import { PublicGateway } from './PublicGateway';
 
@@ -55,9 +58,21 @@ export class GatewayRegistrar {
   }
 
   public async registerIfUnregistered(): Promise<void> {
-    const isRegistered = await this.isRegistered();
-    if (!isRegistered) {
-      await this.register(DEFAULT_PUBLIC_GATEWAY);
+    const logger = Container.get(LOGGER);
+    while (!(await this.isRegistered())) {
+      try {
+        await this.register(DEFAULT_PUBLIC_GATEWAY);
+      } catch (err) {
+        if (err instanceof PublicAddressingError) {
+          logger.info(
+            'Failed to register with public gateway due to DNS failure; will retry later',
+          );
+          await sleepSeconds(5);
+        } else {
+          logger.warn({ err }, 'Failed to register with public gateway');
+          break;
+        }
+      }
     }
   }
 

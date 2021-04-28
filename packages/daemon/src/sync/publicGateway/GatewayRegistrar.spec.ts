@@ -4,6 +4,7 @@ import {
   GSCClient,
   PrivateNodeRegistration,
   PrivateNodeRegistrationRequest,
+  PublicAddressingError,
 } from '@relaycorp/relaynet-core';
 import { generateNodeKeyPairSet, generatePDACertificationPath } from '@relaycorp/relaynet-testing';
 import { Container } from 'typedi';
@@ -18,6 +19,8 @@ import { PreRegisterNodeCall, RegisterNodeCall } from '../../testUtils/gscClient
 import { MockGSCClient } from '../../testUtils/gscClient/MockGSCClient';
 import { mockSpy } from '../../testUtils/jest';
 import { mockPrivateKeyStore } from '../../testUtils/keystores';
+import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
+import { mockSleepSeconds } from '../../testUtils/timing';
 import { GatewayRegistrar } from './GatewayRegistrar';
 import * as gscClient from './gscClient';
 
@@ -26,6 +29,8 @@ setUpTestDBConnection();
 const privateKeyStore = mockPrivateKeyStore();
 
 useTemporaryAppDirs();
+
+const logs = mockLoggerToken();
 
 let registrar: GatewayRegistrar;
 beforeEach(() => {
@@ -135,27 +140,96 @@ describe('register', () => {
 });
 
 describe('registerIfUnregistered', () => {
-  let registerSpy: jest.SpyInstance;
+  let mockRegister: jest.SpyInstance;
   beforeEach(() => {
-    registerSpy = jest.spyOn(registrar, 'register').mockResolvedValue();
+    mockRegister = jest.spyOn(registrar, 'register');
   });
   afterEach(() => {
-    registerSpy.mockRestore();
+    mockRegister.mockRestore();
   });
 
+  let mockIsRegistered: jest.SpyInstance;
+  beforeEach(() => {
+    mockIsRegistered = jest.spyOn(registrar, 'isRegistered');
+  });
+  afterEach(() => {
+    mockIsRegistered.mockRestore();
+  });
+
+  const sleepSeconds = mockSleepSeconds();
+
   test('Registration should proceed if unregistered', async () => {
+    mockIsRegistered.mockResolvedValueOnce(false);
+    mockIsRegistered.mockResolvedValueOnce(true);
+    mockRegister.mockResolvedValueOnce(undefined);
+
     await registrar.registerIfUnregistered();
 
-    expect(registerSpy).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
+    expect(mockRegister).toBeCalledTimes(1);
+    expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
+    expect(sleepSeconds).not.toBeCalled();
   });
 
   test('Registration should be skipped if already registered', async () => {
-    const config = Container.get(Config);
-    await config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
+    mockIsRegistered.mockResolvedValueOnce(true);
+    mockRegister.mockResolvedValueOnce(undefined);
 
     await registrar.registerIfUnregistered();
 
-    expect(registerSpy).toBeCalledTimes(0);
+    expect(mockRegister).toBeCalledTimes(0);
+    expect(sleepSeconds).not.toBeCalled();
+  });
+
+  test('Registration should be reattempted if DNS resolution failed', async () => {
+    mockIsRegistered.mockResolvedValueOnce(false);
+    mockIsRegistered.mockResolvedValueOnce(false);
+    mockIsRegistered.mockResolvedValueOnce(true);
+    mockRegister.mockRejectedValueOnce(new PublicAddressingError());
+    mockRegister.mockResolvedValueOnce(undefined);
+
+    await registrar.registerIfUnregistered();
+
+    expect(mockRegister).toBeCalledTimes(2);
+    expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
+    expect(sleepSeconds).toBeCalledWith(5);
+    expect(logs).toContainEqual(
+      partialPinoLog(
+        'info',
+        'Failed to register with public gateway due to DNS failure; will retry later',
+      ),
+    );
+  });
+
+  test('Registration should not be reattempted if public address does not exist', async () => {
+    mockIsRegistered.mockResolvedValueOnce(false);
+    mockRegister.mockRejectedValueOnce(new gscClient.NonExistingAddressError());
+
+    await registrar.registerIfUnregistered();
+
+    expect(mockRegister).toBeCalledTimes(1);
+    expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
+    expect(sleepSeconds).not.toBeCalled();
+    expect(logs).toContainEqual(
+      partialPinoLog('warn', 'Failed to register with public gateway', {
+        err: expect.objectContaining({ type: gscClient.NonExistingAddressError.name }),
+      }),
+    );
+  });
+
+  test('Registration should not be reattempted if unexpected error happens', async () => {
+    mockIsRegistered.mockResolvedValueOnce(false);
+    mockRegister.mockRejectedValueOnce(new Error());
+
+    await registrar.registerIfUnregistered();
+
+    expect(mockRegister).toBeCalledTimes(1);
+    expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
+    expect(sleepSeconds).not.toBeCalled();
+    expect(logs).toContainEqual(
+      partialPinoLog('warn', 'Failed to register with public gateway', {
+        err: expect.objectContaining({ type: 'Error' }),
+      }),
+    );
   });
 });
 

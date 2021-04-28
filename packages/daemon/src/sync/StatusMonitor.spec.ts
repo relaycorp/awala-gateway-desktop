@@ -5,7 +5,7 @@ import { useTemporaryAppDirs } from '../testUtils/appDirs';
 import { setUpTestDBConnection } from '../testUtils/db';
 import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../testUtils/iterables';
 import { mockSpy } from '../testUtils/jest';
-import { setImmediateAsync } from '../testUtils/timers';
+import { setImmediateAsync } from '../testUtils/timing';
 import { CourierConnectionStatus, CourierSync } from './courierSync/CourierSync';
 import { GatewayRegistrar } from './publicGateway/GatewayRegistrar';
 import { ParcelCollectorManager } from './publicGateway/parcelCollection/ParcelCollectorManager';

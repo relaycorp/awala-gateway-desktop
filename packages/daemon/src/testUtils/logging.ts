@@ -1,5 +1,9 @@
 import pino from 'pino';
 import split2 from 'split2';
+import { Container } from 'typedi';
+
+import { LOGGER } from '../tokens';
+import { mockToken } from './tokens';
 
 // tslint:disable-next-line:readonly-array
 export type MockLogSet = object[];
@@ -17,6 +21,19 @@ export function makeMockLogging(): MockLogging {
   });
   const logger = pino({ level: 'debug' }, stream);
   return { logger, logs };
+}
+
+export function mockLoggerToken(): MockLogSet {
+  const mockLogging = makeMockLogging();
+
+  mockToken(LOGGER);
+
+  beforeEach(() => {
+    mockLogging.logs.splice(0, mockLogging.logs.length);
+    Container.set(LOGGER, mockLogging.logger);
+  });
+
+  return mockLogging.logs;
 }
 
 export function partialPinoLog(level: pino.Level, message: string, extraAttributes?: any): object {
