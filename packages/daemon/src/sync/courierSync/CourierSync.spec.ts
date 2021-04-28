@@ -14,6 +14,7 @@ import { Container } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
+import { UnregisteredGatewayError } from '../../errors';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import {
@@ -32,7 +33,7 @@ import {
   CourierSync,
   CourierSyncStage,
 } from './CourierSync';
-import { DisconnectedFromCourierError, UnregisteredGatewayError } from './errors';
+import { DisconnectedFromCourierError } from './errors';
 
 jest.mock('default-gateway', () => ({ v4: jest.fn() }));
 const mockGatewayIPAddr = '192.168.0.12';

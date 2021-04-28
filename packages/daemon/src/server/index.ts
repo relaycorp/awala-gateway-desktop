@@ -11,10 +11,11 @@ import makeConnectionStatusServer, {
 } from './control/connectionStatus';
 import makeCourierSyncServer, { PATH as COURIER_SYNC_PATH } from './control/courierSync';
 import { disableCors } from './cors';
+import poWebRoutes from './poweb';
 import RouteOptions from './RouteOptions';
 import { WebsocketServerFactory } from './websocket';
 
-const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [controlRoutes];
+const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [controlRoutes, poWebRoutes];
 
 const SERVER_PORT = 13276;
 const SERVER_HOST = '127.0.0.1';
