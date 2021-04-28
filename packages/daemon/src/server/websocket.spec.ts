@@ -80,11 +80,7 @@ describe('WebSocket server configuration', () => {
   test('Request should be refused if auth is required and invalid token is passed', async () => {
     const mockHandler = jest.fn();
     const wsServer = makeWebSocketServer(mockHandler, mockLogging.logger, 'auth-token');
-    const mockClient = new MockClient(
-      wsServer,
-      { authorization: 'not the auth token' },
-      '/?auth=invalid',
-    );
+    const mockClient = new MockClient(wsServer, {}, '/?auth=invalid');
 
     await mockClient.connect();
     await expect(mockClient.waitForPeerClosure()).resolves.toEqual({
