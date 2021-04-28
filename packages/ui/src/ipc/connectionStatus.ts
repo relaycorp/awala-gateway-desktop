@@ -31,9 +31,9 @@ export function pollConnectionStatus(token: string): ConnectionStatusPoller {
   };
 }
 
-async function* _pollConnectionStatus(_token: string): AsyncIterable<ConnectionStatus> {
-  const WS_URL = 'ws://127.0.0.1:13276/_control/sync-status';
-  const stream = connect(WS_URL, { binary: true });
+async function* _pollConnectionStatus(token: string): AsyncIterable<ConnectionStatus> {
+  const WS_URL = 'ws://127.0.0.1:13276/_control/sync-status?authorization=Bearer%20' + token;
+  const stream = connect( WS_URL, { binary: true });
   for await (const buffer of stream.source) {
     const name = buffer.toString();
     switch (name) {
