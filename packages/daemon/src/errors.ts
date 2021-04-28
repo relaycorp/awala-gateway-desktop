@@ -1,3 +1,5 @@
+// tslint:disable:max-classes-per-file
+
 import VError from 'verror';
 
 export abstract class PrivateGatewayError extends VError {
@@ -5,3 +7,5 @@ export abstract class PrivateGatewayError extends VError {
     return this.constructor.name;
   }
 }
+
+export class UnregisteredGatewayError extends PrivateGatewayError {}

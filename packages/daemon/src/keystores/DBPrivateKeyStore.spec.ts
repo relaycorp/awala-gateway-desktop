@@ -8,8 +8,10 @@ import {
   UnknownKeyError,
 } from '@relaycorp/relaynet-core';
 import { generateNodeKeyPairSet, generatePDACertificationPath } from '@relaycorp/relaynet-testing';
+import { Container } from 'typedi';
 import { getConnection, Repository } from 'typeorm';
 
+import { Config, ConfigKey } from '../Config';
 import { PrivateKey, PrivateKeyType } from '../entity/PrivateKey';
 import { sha256Hex } from '../testUtils/crypto';
 import { setUpTestDBConnection } from '../testUtils/db';
@@ -21,7 +23,7 @@ let keystore: DBPrivateKeyStore;
 let privateKeyRepository: Repository<PrivateKey>;
 beforeEach(() => {
   const connection = getConnection();
-  keystore = new DBPrivateKeyStore(connection);
+  keystore = new DBPrivateKeyStore(connection, Container.get(Config));
   privateKeyRepository = connection.getRepository(PrivateKey);
 });
 
@@ -119,6 +121,10 @@ describe('saveKey', () => {
       recipientPublicKeyDigest: null,
       type: PrivateKeyType.NODE,
     });
+    const config = Container.get(Config);
+    await expect(config.get(ConfigKey.NODE_KEY_SERIAL_NUMBER)).resolves.toEqual(
+      nodeCertificate.getSerialNumberHex(),
+    );
   });
 
   test('Initial session key should have all its attributes stored', async () => {
@@ -133,6 +139,8 @@ describe('saveKey', () => {
       recipientPublicKeyDigest: null,
       type: PrivateKeyType.SESSION_INITIAL,
     });
+    const config = Container.get(Config);
+    await expect(config.get(ConfigKey.NODE_KEY_SERIAL_NUMBER)).resolves.toBeNull();
   });
 
   test('Subsequent session key should have all its attributes stored', async () => {
@@ -152,6 +160,8 @@ describe('saveKey', () => {
       recipientPublicKeyDigest: sha256Hex(recipientPublicKeyDer),
       type: PrivateKeyType.SESSION_SUBSEQUENT,
     });
+    const config = Container.get(Config);
+    await expect(config.get(ConfigKey.NODE_KEY_SERIAL_NUMBER)).resolves.toBeNull();
   });
 
   test('Key should be updated if it already exists', async () => {
@@ -161,5 +171,23 @@ describe('saveKey', () => {
 
     const key = await privateKeyRepository.findOne(nodeCertificate.getSerialNumberHex());
     expect(key!.derSerialization).toEqual(await derSerializePrivateKey(newPrivateKey));
+  });
+});
+
+describe('getCurrentIdKey', () => {
+  test('Null should be returned if no current key has been set', async () => {
+    await expect(keystore.getCurrentKey()).resolves.toBeNull();
+  });
+
+  test('Current key should be returned if found', async () => {
+    await keystore.saveNodeKey(nodeKeyPair.privateKey, nodeCertificate);
+
+    const key = await keystore.getCurrentKey();
+
+    expect(key).toBeTruthy();
+    expect(key!.certificate.isEqual(nodeCertificate));
+    await expect(derSerializePrivateKey(key!.privateKey)).resolves.toEqual(
+      await derSerializePrivateKey(nodeKeyPair.privateKey),
+    );
   });
 });
