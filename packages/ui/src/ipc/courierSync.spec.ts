@@ -23,7 +23,7 @@ describe('synchronizeWithCourier', () => {
         await sleep(1);
       })(),
     });
-    jest.setTimeout(20_000);
+    jest.setTimeout(5_000);
 
     const statuses = await pipe(synchronizeWithCourier('TOKEN').promise, asyncIterableToArray);
 
@@ -40,12 +40,13 @@ describe('synchronizeWithCourier', () => {
         yield 'UNKNOWN_STATUS';
       })(),
     });
-    jest.setTimeout(20_000);
+    jest.setTimeout(3_000);
 
     try {
       await synchronizeWithCourier('TOKEN').promise;
     } catch (err) {
       expect(err).toBeInstanceOf(CourierSyncError);
+      expect(err.message).toEqual('Unknown status: UNKNOWN_STATUS');
     }
   });
   test('should throw an error on promise rejection status', async () => {
@@ -54,12 +55,25 @@ describe('synchronizeWithCourier', () => {
         return Promise.reject('REJECTED');
       })(),
     });
-    jest.setTimeout(20_000);
+    jest.setTimeout(3_000);
 
     try {
       await synchronizeWithCourier('TOKEN').promise;
     } catch (err) {
       expect(err).toBeInstanceOf(CourierSyncError);
     }
+  });
+  test('should be abortable', async () => {
+    (itws.connect as jest.Mock).mockReturnValue({
+      source: (async function* fakeSource(): AsyncIterable<string> {
+        await sleep(5);
+        yield 'COLLECTING_CARGO';
+      })(),
+    });
+    jest.setTimeout(1_000);
+
+    const { promise, abort } = synchronizeWithCourier('TOKEN');
+    abort();
+    await promise;
   });
 });
