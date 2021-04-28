@@ -52,7 +52,7 @@ app.on('ready', (): void => {
 
 function showMainWindow(): void {
   if (mainWindow) {
-    mainWindow.focus();
+    mainWindow.show();
     return;
   }
 
