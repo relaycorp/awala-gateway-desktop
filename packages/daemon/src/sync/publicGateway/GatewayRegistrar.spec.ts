@@ -30,7 +30,7 @@ const privateKeyStore = mockPrivateKeyStore();
 
 useTemporaryAppDirs();
 
-const getLogs = mockLoggerToken();
+const logs = mockLoggerToken();
 
 let registrar: GatewayRegistrar;
 beforeEach(() => {
@@ -192,7 +192,7 @@ describe('registerIfUnregistered', () => {
     expect(mockRegister).toBeCalledTimes(2);
     expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
     expect(sleepSeconds).toBeCalledWith(5);
-    expect(getLogs()).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog(
         'info',
         'Failed to register with public gateway due to DNS failure; will retry later',
@@ -209,7 +209,7 @@ describe('registerIfUnregistered', () => {
     expect(mockRegister).toBeCalledTimes(1);
     expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
     expect(sleepSeconds).not.toBeCalled();
-    expect(getLogs()).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('warn', 'Failed to register with public gateway', {
         err: expect.objectContaining({ type: gscClient.NonExistingAddressError.name }),
       }),
@@ -225,7 +225,7 @@ describe('registerIfUnregistered', () => {
     expect(mockRegister).toBeCalledTimes(1);
     expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
     expect(sleepSeconds).not.toBeCalled();
-    expect(getLogs()).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('warn', 'Failed to register with public gateway', {
         err: expect.objectContaining({ type: 'Error' }),
       }),

@@ -23,17 +23,17 @@ export function makeMockLogging(): MockLogging {
   return { logger, logs };
 }
 
-export function mockLoggerToken(): () => MockLogSet {
-  let mockLogging: MockLogging;
+export function mockLoggerToken(): MockLogSet {
+  const mockLogging = makeMockLogging();
 
   mockToken(LOGGER);
 
   beforeEach(() => {
-    mockLogging = makeMockLogging();
+    mockLogging.logs.splice(0, mockLogging.logs.length);
     Container.set(LOGGER, mockLogging.logger);
   });
 
-  return () => mockLogging.logs;
+  return mockLogging.logs;
 }
 
 export function partialPinoLog(level: pino.Level, message: string, extraAttributes?: any): object {
