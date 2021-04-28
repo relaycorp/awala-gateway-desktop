@@ -42,7 +42,7 @@ export function synchronizeWithCourier(token: string): CourierSync {
  */
 async function* _synchronizeWithCourier(token: string): AsyncIterable<CourierSyncStatus> {
   try {
-    const WS_URL = 'ws://127.0.0.1:13276/_control/courier-sync?authorization=Bearer%20' + token;
+    const WS_URL = 'ws://127.0.0.1:13276/_control/courier-sync?auth=' + token;
     const stream = connect(WS_URL, { binary: true });
     for await (const buffer of stream.source) {
       const name = buffer.toString();
