@@ -43,7 +43,7 @@ export function synchronizeWithCourier(token: string): CourierSync {
 async function* _synchronizeWithCourier(_token: string): AsyncIterable<CourierSyncStatus> {
   try {
     // FIXME: using the connection status endpoint because courier status isn't there yet.
-    const WS_URL = 'ws://127.0.0.1:13276/_control/sync-status';
+    const WS_URL = 'ws://127.0.0.1:13276/_control/courier-sync';
     const stream = connect(WS_URL, { binary: true });
     for await (const buffer of stream.source) {
       const name = buffer.toString();
