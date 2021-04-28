@@ -218,7 +218,7 @@ describe('WebSocket servers', () => {
     const mockWSServer = mockWebsocketServer();
     getMockInstance(websocketServerFactory).mockReturnValue(mockWSServer);
     const fastifyInstance = await makeServer(customLogger);
-    const mockRequest = { url: websocketEndpointPath };
+    const mockRequest = { url: `${websocketEndpointPath}?auth=secret` };
     const mockSocket = { what: 'the socket' };
     const mockHeaders = { key: 'value' };
 
