@@ -181,12 +181,8 @@ describe('registerIfUnregistered', () => {
     mockIsRegistered.mockResolvedValueOnce(false);
     mockIsRegistered.mockResolvedValueOnce(false);
     mockIsRegistered.mockResolvedValueOnce(true);
-    mockRegister.mockImplementationOnce(() => {
-      throw new PublicAddressingError();
-    });
-    mockRegister.mockImplementationOnce(() => {
-      // Do nothing
-    });
+    mockRegister.mockRejectedValueOnce(new PublicAddressingError());
+    mockRegister.mockResolvedValueOnce(undefined);
 
     await registrar.registerIfUnregistered();
 
