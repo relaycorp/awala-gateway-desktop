@@ -4,6 +4,7 @@ import {
   PrivateKeyStore,
   PrivateNodeRegistration,
   PrivateNodeRegistrationRequest,
+  PublicAddressingError,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { Inject, Service } from 'typedi';
@@ -12,6 +13,7 @@ import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { FileStore } from '../../fileStore';
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
+import { sleepSeconds } from '../../utils/timing';
 import { makeGSCClient } from './gscClient';
 import { PublicGateway } from './PublicGateway';
 
@@ -55,9 +57,17 @@ export class GatewayRegistrar {
   }
 
   public async registerIfUnregistered(): Promise<void> {
-    const isRegistered = await this.isRegistered();
-    if (!isRegistered) {
-      await this.register(DEFAULT_PUBLIC_GATEWAY);
+    while (!(await this.isRegistered())) {
+      try {
+        await this.register(DEFAULT_PUBLIC_GATEWAY);
+      } catch (err) {
+        if (err instanceof PublicAddressingError) {
+          // The device is disconnected from the Internet. Retry later.
+          await sleepSeconds(5);
+        } else {
+          break;
+        }
+      }
     }
   }
 
