@@ -1,6 +1,7 @@
 import { fork } from 'child_process';
 import { app, BrowserWindow, Menu, Tray } from 'electron';
 import path from 'path';
+import WebSocket from 'ws';
 import { ConnectionStatus, pollConnectionStatus } from '../ipc/connectionStatus';
 import { ServerMessageType, ServerMessage } from '../ipc/message';
 import logo from './assets/logo.png';
