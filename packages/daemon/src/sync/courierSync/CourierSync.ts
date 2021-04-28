@@ -12,11 +12,12 @@ import { waitUntilUsedOnHost } from 'tcp-port-used';
 import { Inject, Service } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
+import { UnregisteredGatewayError } from '../../errors';
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
 import { sleepSeconds } from '../../utils/timing';
 import { GatewayRegistrar } from '../publicGateway/GatewayRegistrar';
 import { PublicGateway } from '../publicGateway/PublicGateway';
-import { DisconnectedFromCourierError, UnregisteredGatewayError } from './errors';
+import { DisconnectedFromCourierError } from './errors';
 
 export const COURIER_PORT = 21473;
 const COURIER_CHECK_TIMEOUT_MS = 3_000;
