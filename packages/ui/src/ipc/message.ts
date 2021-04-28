@@ -1,3 +1,7 @@
-export default interface ServerMessage {
-  readonly token: string;
+export enum ServerMessageType {
+  TOKEN_MESSAGE = 'controlAuthToken',
+};
+export interface ServerMessage {
+  readonly type: ServerMessageType;
+  readonly value: string;
 }

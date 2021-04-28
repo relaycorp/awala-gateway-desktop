@@ -2,7 +2,7 @@ import { fork } from 'child_process';
 import { app, BrowserWindow, Menu, Tray } from 'electron';
 import path from 'path';
 import { ConnectionStatus, pollConnectionStatus } from '../ipc/connectionStatus';
-import ServerMessage from '../ipc/message';
+import { ServerMessageType, ServerMessage } from '../ipc/message';
 import logo from './assets/logo.png';
 import buildMenu from './menu';
 import buildTray from './tray';
@@ -20,9 +20,6 @@ server.on('message', setToken);
 server.on('error', (_err: Error) => {
   app.quit();
 });
-
-// FIXME Workaround for server not sending the token yet.
-setTimeout(setToken.bind(null, { token: 'TOKEN' }), 5000);
 
 app.on('ready', (): void => {
   // TODO: if auto-launch on startup, don't open the window?
@@ -110,9 +107,11 @@ async function updateToolTip(): Promise<void> {
 }
 
 function setToken(message: ServerMessage): void {
-  token = message.token;
-  sendToken();
-  if (tray && !closeWebSocket) {
-    updateToolTip();
+  if (message.type === ServerMessageType.TOKEN_MESSAGE) {
+    token = message.value;
+    sendToken();
+    if (tray && !closeWebSocket) {
+      updateToolTip();
+    }
   }
 }
