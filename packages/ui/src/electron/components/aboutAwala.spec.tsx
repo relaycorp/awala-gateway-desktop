@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { shell } from 'electron';
 import React from 'react';
 import AboutAwala from './aboutAwala';
-import { shell } from 'electron';
 
 describe('AboutAwala', () => {
   test('renders', async () => {
