@@ -47,13 +47,13 @@ async function* _synchronizeWithCourier(token: string): AsyncIterable<CourierSyn
     for await (const buffer of stream.source) {
       const name = buffer.toString();
       switch (name) {
-        case 'COLLECTING_CARGO':
+        case 'COLLECTION':
           yield CourierSyncStatus.COLLECTING_CARGO;
           break;
-        case 'WAITING':
+        case 'WAIT':
           yield CourierSyncStatus.WAITING;
           break;
-        case 'DELIVERING_CARGO':
+        case 'DELIVERY':
           yield CourierSyncStatus.DELIVERING_CARGO;
           break;
         default:

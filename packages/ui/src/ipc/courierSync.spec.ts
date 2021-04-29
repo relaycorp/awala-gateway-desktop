@@ -13,13 +13,13 @@ describe('synchronizeWithCourier', () => {
   test('should temporarily cycle through all the possible statuses', async () => {
     (itws.connect as jest.Mock).mockReturnValue({
       source: (async function* fakeSource(): AsyncIterable<string> {
-        yield 'COLLECTING_CARGO';
+        yield 'COLLECTION';
         await sleep(1);
 
-        yield 'WAITING';
+        yield 'WAIT';
         await sleep(1);
 
-        yield 'DELIVERING_CARGO';
+        yield 'DELIVERY';
         await sleep(1);
       })(),
     });
