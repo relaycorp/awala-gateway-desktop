@@ -1,6 +1,6 @@
 declare module 'it-ws' {
   import { Duplex } from 'stream';
-  import { WebSocket } from 'ws';
+  import WebSocket from 'ws';
   interface Options {
     readonly binary: boolean;
   }
