@@ -34,19 +34,23 @@ describe('synchronizeWithCourier', () => {
       CourierSyncStatus.COMPLETE,
     ]);
   });
-  test('should throw an error on unknown status', async () => {
+  test('should throw an error and not yield an unknown status', async () => {
     (itws.connect as jest.Mock).mockReturnValue({
       source: (async function* buggySource(): AsyncIterable<string> {
         yield 'UNKNOWN_STATUS';
+        await sleep(1);
       })(),
     });
-    jest.setTimeout(3_000);
 
+    const handleStatus = jest.fn();
     try {
-      await synchronizeWithCourier('TOKEN').promise;
+      for await (const item of synchronizeWithCourier('TOKEN').promise) {
+        handleStatus(item);
+      }
     } catch (err) {
       expect(err).toBeInstanceOf(CourierSyncError);
-      expect(err.message).toEqual('Unknown status: UNKNOWN_STATUS');
+      expect(err.message).toMatch(/Unknown status/i);
+      expect(handleStatus).toHaveBeenCalledTimes(0);
     }
   });
   test('should throw an error on promise rejection status', async () => {
@@ -55,25 +59,31 @@ describe('synchronizeWithCourier', () => {
         return Promise.reject('REJECTED');
       })(),
     });
-    jest.setTimeout(3_000);
 
+    const handleStatus = jest.fn();
     try {
-      await synchronizeWithCourier('TOKEN').promise;
+      for await (const item of synchronizeWithCourier('TOKEN').promise) {
+        handleStatus(item);
+      }
     } catch (err) {
       expect(err).toBeInstanceOf(CourierSyncError);
+      expect(handleStatus).toHaveBeenCalledTimes(0);
     }
   });
   test('should be abortable', async () => {
     (itws.connect as jest.Mock).mockReturnValue({
       source: (async function* fakeSource(): AsyncIterable<string> {
-        await sleep(5);
+        await sleep(1);
         yield 'COLLECTING_CARGO';
       })(),
     });
-    jest.setTimeout(1_000);
 
     const { promise, abort } = synchronizeWithCourier('TOKEN');
     abort();
-    await promise;
+    const handleStatus = jest.fn();
+    for await (const item of promise) {
+      handleStatus(item);
+    }
+    expect(handleStatus).toHaveBeenCalledTimes(0);
   });
 });
