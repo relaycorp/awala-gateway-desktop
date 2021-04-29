@@ -4,6 +4,7 @@ import SynchronizeStatus from './synchronizeStatus';
 
 interface Props {
   readonly onComplete: () => void
+  readonly onReset: () => void
   readonly token: string
 }
 interface State {
@@ -46,7 +47,8 @@ class Synchronize extends Component<Props, State> {
       <SynchronizeStatus
         status={this.state.status}
         error={this.state.error}
-        onComplete={this.props.onComplete} />
+        onComplete={this.props.onComplete}
+        onReset={this.props.onReset} />
     );
   }
 }

@@ -18,6 +18,7 @@ interface Props {
 
 interface State {
   readonly status: Status
+  readonly syncKey: number
   readonly token: string
 }
 
@@ -30,6 +31,7 @@ class Index extends Component<Props, State> {
     const onboarded = typeof localStorage.getItem('onboarded') === 'string';
     this.state = {
       status: !onboarded ? Status.ONBOARDING : Status.HOME,
+      syncKey: 0,
       token
     };
     ipcRenderer.on('show-public-gateway', this.showSettings.bind(this));
@@ -40,7 +42,8 @@ class Index extends Component<Props, State> {
       case Status.ONBOARDING:
         return <Onboarding onComplete={this.onOnboardingComplete.bind(this)} />;
       case Status.SYNCHRONIZE:
-        return <Synchronize token={this.state.token} onComplete={this.returnToHome.bind(this)} />;
+      return <Synchronize token={this.state.token} onComplete={this.returnToHome.bind(this)}
+          key={this.state.syncKey} onReset={this.onSynchronize.bind(this)} />;
       case Status.SETTINGS:
         return <Settings token={this.state.token} onComplete={this.returnToHome.bind(this)} />;
       case Status.HOME:
@@ -53,7 +56,7 @@ class Index extends Component<Props, State> {
     this.setState({'status': Status.HOME});
   }
   private onSynchronize() : void {
-    this.setState({'status': Status.SYNCHRONIZE});
+    this.setState({'status': Status.SYNCHRONIZE, syncKey: Date.now()});
   }
   private returnToHome() : void {
     this.setState({'status': Status.HOME});

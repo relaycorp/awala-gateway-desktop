@@ -8,6 +8,7 @@ import SyncContent from './syncContent';
 interface Props {
   readonly error: boolean
   readonly onComplete: () => void
+  readonly onReset: () => void
   readonly status: CourierSyncStatus
 }
 
@@ -23,7 +24,7 @@ class SynchronizeStatus extends Component<Props> {
         <SyncContent image={syncingError} title="Something went wrong"
           text="You may try again. ">
           <button onClick={this.props.onComplete}> Close </button>
-          <button className="yellow" > Try Again </button>
+          <button onClick={this.props.onReset} className="yellow"> Try Again </button>
         </SyncContent>
       );
     }
