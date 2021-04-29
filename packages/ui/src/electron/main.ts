@@ -22,7 +22,7 @@ server.on('close', (code: number, _signal: string) => {
     app.exit(code);
   }
 });
-server.on('message', function (message: ServerMessage): void {
+server.on('message', (message: ServerMessage) => {
   if (message.type === ServerMessageType.TOKEN_MESSAGE) {
     token = message.value;
     startApp();
@@ -31,11 +31,6 @@ server.on('message', function (message: ServerMessage): void {
 
 async function startApp(): Promise<void> {
   await app.whenReady();
-  // TODO: if auto-launch on startup, don't open the window?
-  showMainWindow();
-
-  const logoPath = path.join(app.getAppPath(), logo);
-  Menu.setApplicationMenu(buildMenu(logoPath, showMainWindow, showSettings));
 
   app.on('window-all-closed', (event: Event) => {
     // Override the default behavior to quit the app,
@@ -50,6 +45,15 @@ async function startApp(): Promise<void> {
     server.kill(); // Stops the child process
   });
 
+  // TODO: if auto-launch on startup, don't open the window?
+  showMainWindow();
+
+  // Configure the application menu
+  const logoPath = path.join(app.getAppPath(), logo);
+  const template = buildMenu(logoPath, showMainWindow, showSettings);
+  Menu.setApplicationMenu(template);
+
+  // Configure the task bar icon
   tray = buildTray(logoPath, showMainWindow);
   tray.setToolTip('Connection status...');
   updateToolTip();
@@ -72,7 +76,7 @@ function showMainWindow(): void {
     width: 900,
   });
 
-  // and load the index.html of the app.
+  // and load the html of the app, pass the token via query param
   mainWindow.loadFile('app.html', { query: { token } });
 
   mainWindow.on('closed', (): void => {
