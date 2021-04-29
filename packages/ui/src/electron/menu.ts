@@ -34,7 +34,7 @@ export default function buildMenu(
       role: 'help',
       submenu: [
         {
-          click: async () => {
+          click: () => {
             const win = new BrowserWindow({
               height: 320,
               icon: logo,
@@ -53,7 +53,7 @@ export default function buildMenu(
           label: 'About Awala',
         },
         {
-          click: async () => {
+          click: () => {
             const win = new BrowserWindow({
               height: 500,
               icon: logo,
@@ -77,7 +77,7 @@ export default function buildMenu(
       submenu: [
         {
           accelerator: isMac ? 'Alt+Cmd+I' : 'Alt+Shift+I',
-          click: async () => {
+          click: () => {
             const win = BrowserWindow.getFocusedWindow();
             if (win) {
               win.webContents.toggleDevTools();
@@ -87,7 +87,7 @@ export default function buildMenu(
         },
         {
           accelerator: isMac ? 'Cmd+R' : 'Ctrl+R',
-          click: async () => {
+          click: () => {
             const win = BrowserWindow.getFocusedWindow();
             if (win) {
               win.webContents.reload();

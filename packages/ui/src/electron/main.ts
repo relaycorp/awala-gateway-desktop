@@ -29,6 +29,11 @@ server.on('message', (message: ServerMessage) => {
   }
 });
 
+/*
+ * startApp
+ * Configure the electron app and open the UI.
+ * Called after the daemon has started and generated an auth token.
+ */
 async function startApp(): Promise<void> {
   await app.whenReady();
 
@@ -50,15 +55,18 @@ async function startApp(): Promise<void> {
 
   // Configure the application menu
   const logoPath = path.join(app.getAppPath(), logo);
-  const template = buildMenu(logoPath, showMainWindow, showSettings);
-  Menu.setApplicationMenu(template);
+  const menu = buildMenu(logoPath, showMainWindow, showSettings);
+  Menu.setApplicationMenu(menu);
 
   // Configure the task bar icon
   tray = buildTray(logoPath, showMainWindow);
-  tray.setToolTip('Connection status...');
-  updateToolTip();
+  updateTray();
 }
 
+/*
+ * showMainWindow
+ * Shows the main window if it exists, otherwise create a new one
+ */
 function showMainWindow(): void {
   if (mainWindow) {
     mainWindow.show();
@@ -76,7 +84,7 @@ function showMainWindow(): void {
     width: 900,
   });
 
-  // and load the html of the app, pass the token via query param
+  // load the html of the app, pass the token via query param
   mainWindow.loadFile('app.html', { query: { token } });
 
   mainWindow.on('closed', (): void => {
@@ -86,6 +94,10 @@ function showMainWindow(): void {
   });
 }
 
+/*
+ * showSettings
+ * Shows the main window and sends a signal to open the settings UI
+ */
 function showSettings(): void {
   showMainWindow();
   if (mainWindow) {
@@ -93,8 +105,14 @@ function showSettings(): void {
   }
 }
 
-async function updateToolTip(): Promise<void> {
+/*
+ * updateTray
+ * Opens a websocket to the daemon and streams the connection status,
+ * then sets it as the tool tip text for the task bar icon.
+ */
+async function updateTray(): Promise<void> {
   if (token && tray) {
+    tray.setToolTip('Connection status...');
     const { promise, abort } = pollConnectionStatus(token);
     try {
       for await (const item of promise) {
