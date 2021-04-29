@@ -29,10 +29,7 @@ describe('pollConnectionStatus', () => {
 
     jest.setTimeout(10_000);
 
-    const statuses = await pipe(
-      pollConnectionStatus('TOKEN').promise,
-      asyncIterableToArray,
-    );
+    const statuses = await pipe(pollConnectionStatus('TOKEN').promise, asyncIterableToArray);
 
     expect(statuses).toEqual([
       ConnectionStatus.UNREGISTERED,

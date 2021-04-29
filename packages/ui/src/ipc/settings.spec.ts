@@ -24,7 +24,7 @@ describe('getPublicGatewayAddress', () => {
   });
   test('should throw SettingError on a server error message', async () => {
     fetchMock.get(request, {
-      body: {message: 'error message'},
+      body: { message: 'error message' },
       status: 500,
     });
     try {
