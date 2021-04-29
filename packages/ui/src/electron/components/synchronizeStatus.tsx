@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { CourierSyncStatus } from '../../ipc/courierSync';
 import syncingDone from '../assets/syncingDone.svg';
 import syncingError from '../assets/syncingError.svg';
+import LoadingAnimation from './loading';
 import SyncContent from './syncContent';
 
 interface Props {
@@ -30,12 +31,14 @@ class SynchronizeStatus extends Component<Props> {
       case CourierSyncStatus.COLLECTING_CARGO:
         return (
           <SyncContent text="Collecting data...">
+            <LoadingAnimation />
             <button onClick={this.props.onComplete}> Stop </button>
           </SyncContent>
         );
       case CourierSyncStatus.DELIVERING_CARGO:
         return (
           <SyncContent text="Delivering data...">
+            <LoadingAnimation />
             <button onClick={this.props.onComplete}> Stop </button>
           </SyncContent>
         );
@@ -49,6 +52,7 @@ class SynchronizeStatus extends Component<Props> {
       default:
         return (
           <SyncContent text="Waiting for the incoming data to become available ...">
+            <LoadingAnimation />
             <button onClick={this.props.onComplete}> Stop </button>
           </SyncContent>
         );

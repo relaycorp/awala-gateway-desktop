@@ -18,7 +18,6 @@ class SyncContent extends Component<Props> {
         <h2>{this.props.title}</h2>
         <img src={this.props.image} />
         <p>{this.props.text}</p>
-        <div className="progress">animation placeholder</div>
         <div> {this.props.children} </div>
       </div>
     );
