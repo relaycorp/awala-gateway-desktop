@@ -4,10 +4,9 @@ import Synchronize from './synchronize';
 
 describe('Synchronize', () => {
   test('renders', async () => {
-    function onComplete() : void {
-      return;
-    }
-    const el = render(<Synchronize token={"TOKEN"} onComplete={onComplete}/>);
+    const onComplete = jest.fn();
+    const onReset = jest.fn();
+    const el = render(<Synchronize token={"TOKEN"} onComplete={onComplete} onReset={onReset}/>);
     expect(el.container.firstChild).toBeTruthy();
   });
 });

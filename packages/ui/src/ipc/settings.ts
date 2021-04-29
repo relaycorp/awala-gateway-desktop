@@ -8,7 +8,7 @@ export class SettingError extends PrivateGatewayError {}
 export async function getPublicGatewayAddress(token: string): Promise<string> {
   const response = await fetch('http://127.0.0.1:13276/_control/public-gateway', {
     headers: {
-      Authentication: token,
+      Authorization: 'Bearer ' + token,
       'Content-Type': 'application/json; charset=UTF-8',
     },
   });
@@ -35,7 +35,7 @@ export async function migratePublicGatewayAddress(
   const response = await fetch('http://127.0.0.1:13276/_control/public-gateway', {
     body: JSON.stringify({ publicAddress: newAddress }),
     headers: {
-      Authentication: token,
+      Authorization: 'Bearer ' + token,
       'Content-Type': 'application/json',
     },
     method: 'PUT',

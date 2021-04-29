@@ -16,4 +16,8 @@ describe('Status', () => {
     render(<Status status={ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY}/>);
     expect(screen.getByText("You are connected to Awala via the Internet")).toBeInTheDocument();
   });
+  test('renders unregistered', async () => {
+    render(<Status status={ConnectionStatus.UNREGISTERED}/>);
+    expect(screen.getByText("Awala needs an Internet connection the first time ever")).toBeInTheDocument();
+  });
 });

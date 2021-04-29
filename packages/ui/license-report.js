@@ -35,7 +35,17 @@ async function getData() {
     return matched === undefined;
   });
 
-  return [...uiLibs, ...filtered];
+  return [...uiLibs, ...filtered].sort((lib1, lib2) => {
+    if (lib1.name < lib2.name) {
+       return -1;
+    }
+
+    if (lib1.name > lib2.name) {
+      return 1;
+    }
+
+    return 0;
+  });
 }
 
 getData().then(function(result) {

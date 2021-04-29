@@ -3,9 +3,10 @@ import { BrowserWindow, Menu } from 'electron';
 const isMac = process.platform === 'darwin';
 
 export default function buildMenu(
-  logo: string,
   showMainWindow: () => void,
   showSettings: () => void,
+  showAbout: () => void,
+  showLibraries: () => void,
 ): Menu {
   return Menu.buildFromTemplate([
     {
@@ -34,40 +35,11 @@ export default function buildMenu(
       role: 'help',
       submenu: [
         {
-          click: async () => {
-            const win = new BrowserWindow({
-              height: 320,
-              icon: logo,
-              resizable: false,
-              title: 'About Awala',
-              webPreferences: {
-                contextIsolation: false,
-                nodeIntegration: true,
-              },
-              width: 400,
-            });
-
-            // and load the index.html of the app.
-            win.loadFile('about.html');
-          },
+          click: showAbout,
           label: 'About Awala',
         },
         {
-          click: async () => {
-            const win = new BrowserWindow({
-              height: 500,
-              icon: logo,
-              title: 'Open Source Libraries',
-              webPreferences: {
-                contextIsolation: false,
-                nodeIntegration: true,
-              },
-              width: 500,
-            });
-
-            // and load the index.html of the app.
-            win.loadFile('libraries.html');
-          },
+          click: showLibraries,
           label: 'Open Source Libraries',
         },
       ],
@@ -77,7 +49,7 @@ export default function buildMenu(
       submenu: [
         {
           accelerator: isMac ? 'Alt+Cmd+I' : 'Alt+Shift+I',
-          click: async () => {
+          click: () => {
             const win = BrowserWindow.getFocusedWindow();
             if (win) {
               win.webContents.toggleDevTools();
@@ -87,7 +59,7 @@ export default function buildMenu(
         },
         {
           accelerator: isMac ? 'Cmd+R' : 'Ctrl+R',
-          click: async () => {
+          click: () => {
             const win = BrowserWindow.getFocusedWindow();
             if (win) {
               win.webContents.reload();
