@@ -23,8 +23,10 @@ class SynchronizeStatus extends Component<Props> {
       return (
         <SyncContent image={syncingError} title="Something went wrong"
           text="You may try again. ">
-          <button onClick={this.props.onComplete}> Close </button>
-          <button onClick={this.props.onReset} className="yellow"> Try Again </button>
+          <div className="buttonRow">
+            <button onClick={this.props.onComplete}> Close </button>
+            <button onClick={this.props.onReset} className="yellow"> Try Again </button>
+          </div>
         </SyncContent>
       );
     }

@@ -354,7 +354,7 @@ ol>li:before {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  top: 88px;
+  top: 20;
   animation: ldio 1s cubic-bezier(0.3,0,0.7,1) infinite;
 }
 
@@ -380,8 +380,8 @@ ol>li:before {
 }
 .loadingio-spinner-message {
   width: 200px;
-  height: 200px;
-  display: inline-block;
+  height: 100px;
+  display: block;
   overflow: hidden;
   background: rgba(NaN, NaN, NaN, 0);
 }
@@ -394,3 +394,7 @@ ol>li:before {
   transform-origin: 0 0; /* see note above */
 }
 .ldio div { box-sizing: content-box; }
+
+.buttonRow button + button {
+  margin-left: 20px;
+}
