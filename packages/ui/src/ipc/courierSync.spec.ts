@@ -12,6 +12,11 @@ jest.mock('it-ws', () => ({
 describe('synchronizeWithCourier', () => {
   test('should temporarily cycle through all the possible statuses', async () => {
     (itws.connect as jest.Mock).mockReturnValue({
+      socket: {
+        addEventListener: (_name: string, callback: (event: CloseEvent) => void) => {
+          callback(new CloseEvent('close', { code: 1000 }));
+        },
+      },
       source: (async function* fakeSource(): AsyncIterable<string> {
         yield 'COLLECTION';
         await sleep(1);
@@ -36,6 +41,11 @@ describe('synchronizeWithCourier', () => {
   });
   test('should throw an error and not yield an unknown status', async () => {
     (itws.connect as jest.Mock).mockReturnValue({
+      socket: {
+        addEventListener: (_name: string, callback: (event: CloseEvent) => void) => {
+          callback(new CloseEvent('close', { code: 1000 }));
+        },
+      },
       source: (async function* buggySource(): AsyncIterable<string> {
         yield 'UNKNOWN_STATUS';
         await sleep(1);
@@ -55,6 +65,11 @@ describe('synchronizeWithCourier', () => {
   });
   test('should throw an error on promise rejection status', async () => {
     (itws.connect as jest.Mock).mockReturnValue({
+      socket: {
+        addEventListener: (_name: string, callback: (event: CloseEvent) => void) => {
+          callback(new CloseEvent('close', { code: 1000 }));
+        },
+      },
       source: (async function* failingSource(): AsyncIterable<string> {
         return Promise.reject('REJECTED');
       })(),
@@ -72,9 +87,14 @@ describe('synchronizeWithCourier', () => {
   });
   test('should be abortable', async () => {
     (itws.connect as jest.Mock).mockReturnValue({
+      socket: {
+        addEventListener: (_name: string, callback: (event: CloseEvent) => void) => {
+          callback(new CloseEvent('close', { code: 1000 }));
+        },
+      },
       source: (async function* fakeSource(): AsyncIterable<string> {
         await sleep(1);
-        yield 'COLLECTING_CARGO';
+        yield 'COLLECTION';
       })(),
     });
 
@@ -85,5 +105,29 @@ describe('synchronizeWithCourier', () => {
       handleStatus(item);
     }
     expect(handleStatus).toHaveBeenCalledTimes(0);
+  });
+  test('should throw an exception on a closing error code', async () => {
+    (itws.connect as jest.Mock).mockReturnValue({
+      socket: {
+        addEventListener: (_name: string, callback: (event: CloseEvent) => void) => {
+          callback(new CloseEvent('close', { code: 1011 }));
+        },
+      },
+      source: (async function* fakeSource(): AsyncIterable<string> {
+        await sleep(1);
+        yield 'COLLECTION';
+      })(),
+    });
+
+    const { promise } = synchronizeWithCourier('TOKEN');
+    const handleStatus = jest.fn();
+    try {
+      for await (const item of promise) {
+        handleStatus(item);
+      }
+    } catch (err) {
+      expect(err).toBeInstanceOf(CourierSyncError);
+      expect(err.message).toMatch(/1011/i);
+    }
   });
 });
