@@ -72,7 +72,11 @@
   "build": {
     "appId": "tech.relaycorp.gateway",
     "linux": {
-      "target": "rpm"
+      "category": "Network",
+      "icon": "src/electron/assets/logo.png",
+      "target": [
+        "AppImage"
+      ]
     },
     "win": {
       "target": "nsis"
