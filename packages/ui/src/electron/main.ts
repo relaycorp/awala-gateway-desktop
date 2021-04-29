@@ -17,8 +17,10 @@ let closeWebSocket: (() => void) | null = null;
 const server = fork(path.join(app.getAppPath(), 'daemon/build/bin/gateway-daemon.js'), {
   cwd: path.join(app.getAppPath(), 'daemon/'),
 });
-server.on('error', (_err: Error) => {
-  app.quit();
+server.on('close', (code: number, _signal: string) => {
+  if (code !== null) {
+    app.exit(code);
+  }
 });
 server.on('message', function (message: ServerMessage): void {
   if (message.type === ServerMessageType.TOKEN_MESSAGE) {
