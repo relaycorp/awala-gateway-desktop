@@ -22,10 +22,22 @@ describe('getPublicGatewayAddress', () => {
 
     expect(fetchMock.lastUrl()).toEqual('http://127.0.0.1:13276/_control/public-gateway');
   });
+  test('should throw SettingError on a server error message', async () => {
+    fetchMock.get(request, {
+      body: {message: 'error message'},
+      status: 500,
+    });
+    try {
+      await getPublicGatewayAddress('TOKEN');
+    } catch (error) {
+      expect(error).toBeInstanceOf(SettingError);
+      expect(error.message).toEqual('error message');
+    }
+  });
   test('should throw SettingError on a random response', async () => {
     fetchMock.get(request, {
+      body: {},
       status: 404,
-      statusText: 'Unknown',
     });
     try {
       await getPublicGatewayAddress('TOKEN');
@@ -74,8 +86,19 @@ describe('migratePublicGatewayAddress', () => {
   });
   test('should throw SettingError on a random response', async () => {
     fetchMock.put(request, {
+      body: {},
+      status: 400,
+    });
+    try {
+      await migratePublicGatewayAddress('kings-landing.relaycorp.cloud', 'TOKEN');
+    } catch (error) {
+      expect(error).toBeInstanceOf(SettingError);
+      expect(fetchMock.lastUrl()).toEqual('http://127.0.0.1:13276/_control/public-gateway');
+    }
+  });
+  test('should throw SettingError on a random response', async () => {
+    fetchMock.put(request, {
       status: 404,
-      statusText: 'Unknown',
     });
     try {
       await migratePublicGatewayAddress('kings-landing.relaycorp.cloud', 'TOKEN');
