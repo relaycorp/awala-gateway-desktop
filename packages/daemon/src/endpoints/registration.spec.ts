@@ -68,4 +68,13 @@ describe('EndpointRegistration', () => {
       ).toBeTruthy();
     });
   });
+
+  describe('completeRegistration', () => {
+    // TODO: REPLACE WITH ACTUAL TESTS
+    test('TODO', async () => {
+      const registrar = Container.get(EndpointRegistrar);
+
+      await expect(registrar.completeRegistration(null as any)).toReject();
+    });
+  });
 });
