@@ -8,6 +8,8 @@ import logo from './assets/logo.png';
 import buildMenu from './menu';
 import buildTray from './tray';
 
+const logoPath = path.join(app.getAppPath(), logo);
+
 let mainWindow: BrowserWindow | null = null;
 let token: string = 'TOKEN';
 let tray: Tray | null = null;
@@ -54,8 +56,7 @@ async function startApp(): Promise<void> {
   showMainWindow();
 
   // Configure the application menu
-  const logoPath = path.join(app.getAppPath(), logo);
-  const menu = buildMenu(logoPath, showMainWindow, showSettings);
+  const menu = buildMenu(showMainWindow, showSettings, showAbout, showLibraries);
   Menu.setApplicationMenu(menu);
 
   // Configure the task bar icon
@@ -103,6 +104,45 @@ function showSettings(): void {
   if (mainWindow) {
     mainWindow.webContents.send('show-public-gateway');
   }
+}
+
+/*
+ * showAbout
+ * Shows the about page in its own window
+ */
+function showAbout(): void {
+  const win = new BrowserWindow({
+    height: 320,
+    icon: logoPath,
+    resizable: false,
+    title: 'About Awala',
+    webPreferences: {
+      contextIsolation: false,
+      nodeIntegration: true,
+    },
+    width: 400,
+  });
+
+  win.loadFile('about.html');
+}
+
+/*
+ * showLibraries
+ * Shows the list of libraries in its own window
+ */
+function showLibraries(): void {
+  const win = new BrowserWindow({
+    height: 500,
+    icon: logoPath,
+    title: 'Open Source Libraries',
+    webPreferences: {
+      contextIsolation: false,
+      nodeIntegration: true,
+    },
+    width: 500,
+  });
+
+  win.loadFile('libraries.html');
 }
 
 /*
