@@ -71,9 +71,17 @@
   },
   "build": {
     "appId": "tech.relaycorp.gateway",
+    "asar": false,
     "directories": {
       "buildResources": "./buildResources"
     },
+    "extraResources": [
+      {
+        "from": "app/daemon/node_modules",
+        "to": "app/daemon/node_modules/",
+        "filter": ["**/*"]
+      }
+    ],
     "linux": {
       "category": "Network",
       "icon": "src/electron/assets/logo.png",
