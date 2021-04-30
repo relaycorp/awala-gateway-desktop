@@ -70,7 +70,8 @@ module.exports = [
       new CopyPlugin({
         patterns: [
           { from: './src/electron/template.package.json', to: 'package.json' },
-          { from: './node_modules/daemon/', to: 'daemon' }
+          { from: './node_modules/daemon/**/*', to: '.' },
+          { from: './node_modules/daemon/ormconfig.json', to: '.' }
         ],
       }),
     ]
