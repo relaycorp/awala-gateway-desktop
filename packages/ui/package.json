@@ -26,6 +26,7 @@
     "abortable-iterator": "^3.0.0",
     "bufferutil": "^4.0.3",
     "daemon": "file:../daemon",
+    "env-paths": "^2.2.1",
     "pino": "^6.11.3",
     "pino-pretty": "^4.7.1",
     "utf-8-validate": "^5.0.4",

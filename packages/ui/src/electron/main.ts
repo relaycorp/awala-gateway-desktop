@@ -1,5 +1,6 @@
 import { fork } from 'child_process';
 import { app, BrowserWindow, Menu, Tray } from 'electron';
+import envPaths from 'env-paths';
 import path from 'path';
 import pino from 'pino';
 import WebSocket from 'ws';
@@ -16,6 +17,7 @@ let token: string = 'TOKEN';
 let tray: Tray | null = null;
 let closeWebSocket: (() => void) | null = null;
 
+const paths = envPaths('AwalaGateway', { suffix: '' });
 const logger = pino(
   {
     level: 'debug',
@@ -24,7 +26,7 @@ const logger = pino(
       translateTime: 'yyyy-dd-mm, h:MM:ss TT',
     },
   },
-  pino.destination('awala.log'),
+  pino.destination(path.join(paths.log, 'awala.log')),
 );
 logger.info('Starting...');
 
