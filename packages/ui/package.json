@@ -90,6 +90,7 @@
     },
     "mac": {
       "target": "dmg"
-    }
+    },
+    "npmRebuild": false
   }
 }
