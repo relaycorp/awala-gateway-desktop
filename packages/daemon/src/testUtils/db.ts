@@ -10,13 +10,11 @@ export function setUpTestDBConnection(): void {
     const entityDirPath = join(dirname(__dirname), 'entity', '**', IS_TYPESCRIPT ? '*.ts' : '*.js');
     const connectionOptions = {
       ...originalConnectionOptions,
-      entities: [entityDirPath],
-    };
-    connection = await createConnection({
-      ...(connectionOptions as any),
       database: ':memory:',
       dropSchema: true,
-    });
+      entities: [entityDirPath],
+    };
+    connection = await createConnection(connectionOptions as any);
   });
 
   let connection: Connection;
