@@ -1,3 +1,4 @@
+import { join } from 'path';
 import { Container } from 'typedi';
 import * as typeorm from 'typeorm';
 
@@ -67,10 +68,15 @@ test('DB connection should be established', async () => {
 
   await daemon();
 
-  const isTypescript = __filename.endsWith('.ts');
+  const expectedPaths = envPaths('AwalaGateway', { suffix: '' });
+  const entitiesDir = __filename.endsWith('.ts')
+    ? join(__dirname, 'entity', '**', '*.ts')
+    : join(__dirname, 'entity', '**', '*.js');
+  const dbPath = join(expectedPaths.data, 'db.sqlite')
   expect(mockCreateConnection).toBeCalledWith({
     ...originalConnectionOptions,
-    ...(!isTypescript && { entities: ['build/entity/**/*.js'] }),
+    database: dbPath,
+    entities: [entitiesDir],
   });
   expect(mockCreateConnection).toHaveBeenCalledBefore(makeServer as any);
 });
