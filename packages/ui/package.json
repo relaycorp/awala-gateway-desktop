@@ -67,7 +67,6 @@
   },
   "build": {
     "appId": "tech.relaycorp.gateway",
-    "asar": false,
     "directories": {
       "buildResources": "./buildResources"
     },
