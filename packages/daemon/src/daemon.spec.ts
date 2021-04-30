@@ -72,7 +72,7 @@ test('DB connection should be established', async () => {
   const entitiesDir = __filename.endsWith('.ts')
     ? join(__dirname, 'entity', '**', '*.ts')
     : join(__dirname, 'entity', '**', '*.js');
-  const dbPath = join(expectedPaths.data, 'db.sqlite')
+  const dbPath = join(expectedPaths.data, 'db.sqlite');
   expect(mockCreateConnection).toBeCalledWith({
     ...originalConnectionOptions,
     database: dbPath,
