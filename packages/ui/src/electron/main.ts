@@ -123,6 +123,7 @@ function showAbout(): void {
     width: 400,
   });
 
+  win.setMenuBarVisibility(false);
   win.loadFile('about.html');
 }
 
@@ -142,6 +143,7 @@ function showLibraries(): void {
     width: 500,
   });
 
+  win.setMenuBarVisibility(false);
   win.loadFile('libraries.html');
 }
 

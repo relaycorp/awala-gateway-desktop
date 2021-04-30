@@ -1,5 +1,6 @@
 import abortable from 'abortable-iterator';
 import { connect } from 'it-ws';
+import { CloseEvent } from 'ws';
 import PrivateGatewayError from '../PrivateGatewayError';
 
 export enum CourierSyncStatus {
@@ -44,6 +45,11 @@ async function* _synchronizeWithCourier(token: string): AsyncIterable<CourierSyn
   try {
     const WS_URL = 'ws://127.0.0.1:13276/_control/courier-sync?auth=' + token;
     const stream = connect(WS_URL, { binary: true });
+    let closeEventCode = 0;
+    stream.socket.addEventListener('close', (event: CloseEvent) => {
+      closeEventCode = event.code;
+    });
+
     for await (const buffer of stream.source) {
       const name = buffer.toString();
       switch (name) {
@@ -59,6 +65,9 @@ async function* _synchronizeWithCourier(token: string): AsyncIterable<CourierSyn
         default:
           throw new CourierSyncError(`Unknown status: ${name}`);
       }
+    }
+    if (closeEventCode !== 1000) {
+      throw new CourierSyncError(`Socket error: ${closeEventCode}`);
     }
     // Server does not send this one, but the UI is waiting for it
     yield CourierSyncStatus.COMPLETE;
