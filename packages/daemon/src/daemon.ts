@@ -17,6 +17,19 @@ const APP_NAME = 'AwalaGateway';
 
 export default async function (): Promise<void> {
   const logger = makeLogger();
+  logger.info('Starting daemon...');
+
+  process.on('uncaughtException', (err) => {
+    logger.error({ err }, 'uncaughtException');
+    process.exit(1);
+  });
+  process.on('unhandledRejection', (reason) => {
+    logger.error({ reason }, 'unhandledRejection');
+    process.exit(1);
+  });
+  process.on('beforeExit', (code) => {
+    logger.info({ code }, 'beforeExit');
+  });
 
   await registerTokens(logger);
   await createDBConnection();
