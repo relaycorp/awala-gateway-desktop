@@ -1,6 +1,7 @@
 import { fork } from 'child_process';
 import { app, BrowserWindow, Menu, Tray } from 'electron';
 import envPaths from 'env-paths';
+import { mkdirSync } from 'fs';
 import path from 'path';
 import pino from 'pino';
 import WebSocket from 'ws';
@@ -18,6 +19,8 @@ let tray: Tray | null = null;
 let closeWebSocket: (() => void) | null = null;
 
 const paths = envPaths('AwalaGateway', { suffix: '' });
+mkdirSync(paths.log, { recursive: true });
+mkdirSync(paths.data, { recursive: true });
 const logger = pino(
   {
     level: 'debug',
