@@ -1,6 +1,7 @@
 import { fork } from 'child_process';
 import { app, BrowserWindow, Menu, Tray } from 'electron';
 import path from 'path';
+import pino from 'pino';
 import WebSocket from 'ws';
 import { ConnectionStatus, pollConnectionStatus } from '../ipc/connectionStatus';
 import { ServerMessage, ServerMessageType } from '../ipc/message';
@@ -15,14 +16,19 @@ let token: string = 'TOKEN';
 let tray: Tray | null = null;
 let closeWebSocket: (() => void) | null = null;
 
+const logger = pino({ level: 'debug' }, pino.destination('awala.log'));
+logger.info('Starting...');
+
 // Launch the daemon process and listen for a token via IPC
 const server = fork(path.join(app.getAppPath(), 'node_modules/daemon/build/bin/gateway-daemon.js'));
 server.on('close', (code: number, _signal: string) => {
+  logger.info({ code }, 'Closing');
   if (code !== null) {
     app.exit(code);
   }
 });
 server.on('message', (message: ServerMessage) => {
+  logger.info({ message }, 'Got message');
   if (message.type === ServerMessageType.TOKEN_MESSAGE) {
     token = message.value;
     startApp();
