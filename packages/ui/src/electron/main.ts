@@ -30,6 +30,15 @@ logger.info('Starting...');
 
 // Launch the daemon process and listen for a token via IPC
 const server = fork(path.join(app.getAppPath(), 'node_modules/daemon/build/bin/gateway-daemon.js'));
+server.on('error', (err) => {
+  logger.error({ err }, 'Error!');
+});
+server.on('disconnect', () => {
+  logger.info('Disconnecting');
+});
+server.on('exit', (code, signal) => {
+  logger.info({ code, signal }, 'Exit');
+});
 server.on('close', (code: number, _signal: string) => {
   logger.info({ code }, 'Closing');
   if (code !== null) {
