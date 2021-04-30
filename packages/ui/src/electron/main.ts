@@ -30,6 +30,18 @@ const logger = pino(
 );
 logger.info('Starting...');
 
+process.on('uncaughtException', (err) => {
+  logger.error({ err }, 'uncaughtException');
+  app.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  logger.error({ reason }, 'unhandledRejection');
+  app.exit(1);
+});
+process.on('beforeExit', (code) => {
+  logger.info({ code }, 'beforeExit');
+});
+
 // Launch the daemon process and listen for a token via IPC
 const server = fork(path.join(app.getAppPath(), 'node_modules/daemon/build/bin/gateway-daemon.js'));
 server.on('error', (err) => {
