@@ -16,7 +16,16 @@ let token: string = 'TOKEN';
 let tray: Tray | null = null;
 let closeWebSocket: (() => void) | null = null;
 
-const logger = pino({ level: 'debug' }, pino.destination('awala.log'));
+const logger = pino(
+  {
+    level: 'debug',
+    prettyPrint: {
+      colorize: false,
+      translateTime: 'yyyy-dd-mm, h:MM:ss TT',
+    },
+  },
+  pino.destination('awala.log'),
+);
 logger.info('Starting...');
 
 // Launch the daemon process and listen for a token via IPC
