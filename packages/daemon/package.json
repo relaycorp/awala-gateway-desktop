@@ -29,6 +29,7 @@
     "it-pipe": "^1.1.0",
     "make-promises-safe": "^5.1.0",
     "pino": "^6.11.3",
+    "pino-pretty": "^4.7.1",
     "reflect-metadata": "^0.1.13",
     "split2": "^3.2.2",
     "sqlite3": "^5.0.2",
@@ -58,7 +59,6 @@
     "jest": "^26.6.3",
     "jest-extended": "^0.11.5",
     "light-my-request": "^4.4.1",
-    "pino-pretty": "^4.7.1",
     "ts-jest": "^26.5.5",
     "ts-node-dev": "^1.1.6"
   }
