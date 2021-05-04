@@ -1,6 +1,6 @@
 import envPaths from 'env-paths';
 import { join } from 'path';
-import pino, { Logger } from 'pino';
+import { Logger } from 'pino';
 import { Container } from 'typedi';
 import { ConnectionOptions, createConnection, getConnectionOptions } from 'typeorm';
 
@@ -17,25 +17,6 @@ const APP_NAME = 'AwalaGateway';
 
 export default async function (): Promise<void> {
   const logger = makeLogger();
-  logger.info('Starting daemon...');
-
-  process.on(
-    'uncaughtException',
-    pino.final(logger, (err, finalLogger) => {
-      finalLogger.fatal({ err }, 'uncaughtException');
-      process.exit(1);
-    }),
-  );
-  process.on(
-    'unhandledRejection',
-    pino.final(logger, (err, finalLogger) => {
-      finalLogger.fatal({ err }, 'uncaughtException');
-      process.exit(1);
-    }) as any,
-  );
-  process.on('beforeExit', (code) => {
-    logger.info({ code }, 'beforeExit');
-  });
 
   await registerTokens(logger);
   await createDBConnection();
