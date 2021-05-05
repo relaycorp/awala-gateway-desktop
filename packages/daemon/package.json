@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "scripts": {
     "build": "tsc",
-    "clean": "del build data test coverage",
+    "clean": "rimraf build data test coverage",
     "start": "ts-node-dev --files src/bin/gateway-daemon.ts",
     "test": "jest --coverage",
     "test:functional": "jest --config jest.config.functional.js --runInBand --detectOpenHandles",
