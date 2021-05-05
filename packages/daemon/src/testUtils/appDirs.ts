@@ -1,3 +1,4 @@
+import del from 'del';
 import { Paths } from 'env-paths';
 import { promises as fs } from 'fs';
 import { tmpdir } from 'os';
@@ -25,7 +26,7 @@ export function useTemporaryAppDirs(): () => Paths {
   });
 
   afterEach(async () => {
-    await fs.rmdir(tempDir, { recursive: true });
+    await del(tempDir);
   });
 
   return () => tempAppDirs;

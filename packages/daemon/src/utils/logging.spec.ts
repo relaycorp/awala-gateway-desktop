@@ -1,3 +1,4 @@
+import del from 'del';
 import { promises as fs } from 'fs';
 import { hostname, tmpdir } from 'os';
 import { join } from 'path';
@@ -16,7 +17,7 @@ describe('makeLogger', () => {
     logDirPath = await fs.mkdtemp(join(tmpdir(), 'logging-tests'));
   });
   afterEach(async () => {
-    await fs.rmdir(logDirPath, { recursive: true });
+    await del(logDirPath);
   });
 
   test('Log level should be info if LOG_LEVEL env var is absent', () => {
