@@ -1,15 +1,12 @@
 import { promises as fs } from 'fs';
-import { tmpdir } from 'os';
+import { hostname, tmpdir } from 'os';
 import { join } from 'path';
 
 import { configureMockEnvVars } from '../testUtils/envVars';
-import { makeProcessSendMock } from '../testUtils/process';
 import { makeLogger } from './logging';
 
 const REQUIRED_ENV_VARS = {};
 const mockEnvVars = configureMockEnvVars(REQUIRED_ENV_VARS);
-
-const mockProcessSend = makeProcessSendMock();
 
 const LOG_NAME = 'foo';
 
@@ -48,9 +45,9 @@ describe('makeLogger', () => {
     expect(logger).toHaveProperty('level', loglevel.toLowerCase());
   });
 
-  test('Logs should be saved to a file if the daemon was forked', async () => {
+  test('Logs should be saved to a file if the daemon was forked by UI', async () => {
     const logMessage = 'This is the message';
-    mockProcessSend(() => true);
+    mockEnvVars({ ...REQUIRED_ENV_VARS, GATEWAY_FORKED_FROM_UI: 'true' });
 
     const logger = makeLogger(LOG_NAME, logDirPath);
     logger.info(logMessage);
@@ -59,7 +56,7 @@ describe('makeLogger', () => {
     expect(logFile.toString()).toContain(logMessage);
   });
 
-  test('Logs should be output to stdout if the daemon was not forked', async () => {
+  test('Logs should be output to stdout if the daemon was not forked by UI', async () => {
     const logMessage = 'This is the message';
 
     const logger = makeLogger(LOG_NAME, logDirPath);
@@ -68,5 +65,28 @@ describe('makeLogger', () => {
     await expect(fs.readdir(logDirPath)).resolves.toEqual([]);
   });
 
-  test.todo('Logs should be formatted as plain text instead of JSON');
+  describe('Log pretty-printing', () => {
+    const logMessage = 'This should not be in a JSON document';
+
+    beforeEach(() => {
+      mockEnvVars({ ...REQUIRED_ENV_VARS, GATEWAY_FORKED_FROM_UI: 'true' });
+      const logger = makeLogger(LOG_NAME, logDirPath);
+      logger.info(logMessage);
+    });
+
+    test('Logs should be formatted as plain text instead of JSON', async () => {
+      const logFile = await fs.readFile(join(logDirPath, `${LOG_NAME}.log`));
+      expect(logFile.toString()).not.toContain('{');
+    });
+
+    test('Timestamp should be human-friendly', async () => {
+      const logFile = await fs.readFile(join(logDirPath, `${LOG_NAME}.log`));
+      expect(logFile.toString()).toMatch(/\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
+    });
+
+    test('Hostname should be suppressed', async () => {
+      const logFile = await fs.readFile(join(logDirPath, `${LOG_NAME}.log`));
+      expect(logFile.toString()).not.toContain(hostname());
+    });
+  });
 });
