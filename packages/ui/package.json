@@ -14,7 +14,7 @@
     "webpack": "webpack --config ./webpack.config.js",
     "tsc": "tsc -p tsconfig.json",
     "start": "npm run build && electron ./app/main.js",
-    "clean": "del build test coverage dist",
+    "clean": "rimraf build test coverage dist",
     "cov": "run-s build test:unit && opn coverage/lcov-report/index.html",
     "dist": "electron-builder",
     "test": "jest --coverage",
@@ -67,7 +67,6 @@
   },
   "build": {
     "appId": "tech.relaycorp.gateway",
-    "asar": false,
     "directories": {
       "buildResources": "./buildResources"
     },
@@ -75,7 +74,9 @@
       {
         "from": "app/daemon/node_modules",
         "to": "app/daemon/node_modules/",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "linux": {
@@ -90,6 +91,7 @@
     },
     "mac": {
       "target": "dmg"
-    }
+    },
+    "npmRebuild": false
   }
 }
