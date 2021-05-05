@@ -12,7 +12,7 @@ You only need Node.js 12+ installed.
 
 ```shell
 npm install
-npx run bootstrap
+npm run bootstrap
 ```
 
 ### Code structure

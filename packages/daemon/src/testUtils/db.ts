@@ -1,19 +1,20 @@
+import { dirname, join } from 'path';
 import { Connection, createConnection, getConnectionOptions } from 'typeorm';
 
-const isTypescript = __filename.endsWith('.ts');
+const IS_TYPESCRIPT = __filename.endsWith('.ts');
 
 export function setUpTestDBConnection(): void {
   beforeAll(async () => {
     const originalConnectionOptions = await getConnectionOptions();
+
+    const entityDirPath = join(dirname(__dirname), 'entity', '**', IS_TYPESCRIPT ? '*.ts' : '*.js');
     const connectionOptions = {
       ...originalConnectionOptions,
-      entities: isTypescript ? originalConnectionOptions.entities : ['build/entity/**/*.js'],
-    };
-    connection = await createConnection({
-      ...(connectionOptions as any),
       database: ':memory:',
       dropSchema: true,
-    });
+      entities: [entityDirPath],
+    };
+    connection = await createConnection(connectionOptions as any);
   });
 
   let connection: Connection;

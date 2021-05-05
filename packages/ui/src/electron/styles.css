@@ -147,13 +147,12 @@ a:hover {
   align-items: center;
 }
 .stepper {
-  width: 770px;
-  height: 460px;
+  height: 100%;
+  width: 100%;
   margin: auto;
   display: flex;
   flex-direction: row;
   background: white;
-  box-shadow: 4px 4px 10px 0px rgb(0, 0, 0, 0.1);
 }
 .stepper .left {
   padding: 10px 30px;
@@ -162,12 +161,14 @@ a:hover {
   align-items: center;
 }
 .stepper .right {
-  flex-grow: 1;
+  box-sizing: border-box;
+  height: 460px;
+  width: 700px;
+  margin: auto;
   padding: 40px 30px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-
 }
 .stepper .right h1 {
   text-align: left;
