@@ -42,13 +42,14 @@ describe('getObject', () => {
   test('Permission errors should be propagated', async () => {
     const store = new FileStore(tempAppDirs);
     await store.putObject(OBJECT_CONTENT, OBJECT_KEY);
-    // Make write-only by owner:
-    await fs.chmod(join(tempAppDirs.data, OBJECT_KEY), 2);
+    const readError = new Error('oh no');
+    const readFileSpy = jest.spyOn(fs, 'readFile')
+    readFileSpy.mockRejectedValueOnce(readError);
 
     const error = await getPromiseRejection(store.getObject(OBJECT_KEY), FileStoreError);
 
     expect(error.message).toMatch(/^Failed to read object/);
-    expect(error.cause()?.message).toMatch(/^EACCES: permission denied/);
+    expect(error.cause()).toEqual(readError);
   });
 });
 
