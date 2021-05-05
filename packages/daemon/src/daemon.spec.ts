@@ -1,3 +1,4 @@
+import { promises as fs } from 'fs';
 import { join } from 'path';
 import { Container } from 'typedi';
 import * as typeorm from 'typeorm';
@@ -26,11 +27,9 @@ beforeEach(() => {
 });
 mockSpy(jest.spyOn(logging, 'makeLogger'), () => mockLogging.logger);
 
-test('Logger should be enabled by default', async () => {
-  await daemon();
+const mockMkdir = mockSpy(jest.spyOn(fs, 'mkdir'));
 
-  expect(makeServer).toBeCalledWith(mockLogging.logger);
-});
+const PATHS = envPaths('AwalaGateway', { suffix: '' });
 
 test('Server should be run', async () => {
   await daemon();
@@ -44,17 +43,42 @@ test('Sync should be run', async () => {
   expect(runSync).toBeCalled();
 });
 
-describe('Token registration', () => {
-  test('APP_DIRS', async () => {
+describe('App directories', () => {
+  test('Data directory should be created', async () => {
+    await daemon();
+
+    expect(mockMkdir).toBeCalledWith(PATHS.data, { recursive: true });
+  });
+
+  test('Log directory should be created', async () => {
+    await daemon();
+
+    expect(mockMkdir).toBeCalledWith(PATHS.log, { recursive: true });
+  });
+
+  test('APP_DIRS token should be registered', async () => {
     expect(Container.has(APP_DIRS)).toBeFalse();
 
     await daemon();
 
-    const expectedPaths = envPaths('AwalaGateway', { suffix: '' });
-    expect(Container.get(APP_DIRS)).toEqual(expectedPaths);
+    expect(Container.get(APP_DIRS)).toEqual(PATHS);
+  });
+});
+
+describe('Logging', () => {
+  test('Logger factory should receive path to log directory', async () => {
+    await daemon();
+
+    expect(logging.makeLogger).toBeCalledWith('daemon', PATHS.log);
   });
 
-  test('LOGGER', async () => {
+  test('Logger should be enabled by default', async () => {
+    await daemon();
+
+    expect(makeServer).toBeCalledWith(mockLogging.logger);
+  });
+
+  test('LOGGER token should be registered', async () => {
     expect(Container.has(LOGGER)).toBeFalse();
 
     await daemon();
@@ -68,11 +92,10 @@ test('DB connection should be established', async () => {
 
   await daemon();
 
-  const expectedPaths = envPaths('AwalaGateway', { suffix: '' });
   const entitiesDir = __filename.endsWith('.ts')
     ? join(__dirname, 'entity', '**', '*.ts')
     : join(__dirname, 'entity', '**', '*.js');
-  const dbPath = join(expectedPaths.data, 'db.sqlite');
+  const dbPath = join(PATHS.data, 'db.sqlite');
   expect(mockCreateConnection).toBeCalledWith({
     ...originalConnectionOptions,
     database: dbPath,
