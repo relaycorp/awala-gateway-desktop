@@ -21,11 +21,10 @@ jobs:
       - run: npm ci
       - run: npm run static-checks
   ci:
-    name: ci-${{ matrix.os }}
     needs: static-checks
     strategy:
       matrix:
-        os: [ubuntu-20.04, windows-2019, macos-11.0]
+        os: [ubuntu-20.04, windows-2019, macos-10.15]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
