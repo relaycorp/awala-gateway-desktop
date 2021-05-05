@@ -16,9 +16,12 @@ let tray: Tray | null = null;
 let closeWebSocket: (() => void) | null = null;
 
 // Launch the daemon process and listen for a token via IPC
-const server = fork(path.join(app.getAppPath(), 'daemon/build/bin/gateway-daemon.js'), {
-  cwd: path.join(app.getAppPath(), 'daemon/'),
-});
+const server = fork(
+  path.join(app.getAppPath(), 'node_modules/daemon/build/bin/gateway-daemon.js'),
+  {
+    env: { ...process.env, GATEWAY_FORKED_FROM_UI: 'true' },
+  },
+);
 server.on('close', (code: number, _signal: string) => {
   if (code !== null) {
     app.exit(code);

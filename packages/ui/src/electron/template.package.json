@@ -16,5 +16,7 @@
     "url": "https://relaycorp.tech/"
   },
   "license": "GPL-3.0",
-  "dependencies": {}
+  "dependencies": {
+    "daemon": "file:../daemon"
+  }
 }
