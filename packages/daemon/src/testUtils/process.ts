@@ -18,5 +18,5 @@ export function makeProcessSendMock(): (implementation?: (message: any) => boole
   return (implementation) => {
     // tslint:disable-next-line:no-object-mutation
     process.send = implementation;
-  }
+  };
 }
