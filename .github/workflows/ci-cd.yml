@@ -22,10 +22,10 @@ jobs:
       - run: npm run static-checks
   ci:
     needs: static-checks
-    runs-on: ubuntu-20.04
     strategy:
       matrix:
         os: [ubuntu-20.04, windows-2019, macos-11.0]
+    runs-on: ${{ runner.os }}
     steps:
       - uses: actions/checkout@v2
       - name: Setup node
