@@ -43,7 +43,7 @@ describe('getObject', () => {
     const store = new FileStore(tempAppDirs);
     await store.putObject(OBJECT_CONTENT, OBJECT_KEY);
     const readError = new Error('oh no');
-    const readFileSpy = jest.spyOn(fs, 'readFile')
+    const readFileSpy = jest.spyOn(fs, 'readFile');
     readFileSpy.mockRejectedValueOnce(readError);
 
     const error = await getPromiseRejection(store.getObject(OBJECT_KEY), FileStoreError);
