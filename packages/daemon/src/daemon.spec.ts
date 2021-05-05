@@ -69,7 +69,7 @@ describe('Logging', () => {
   test('Logger factory should receive path to log directory', async () => {
     await daemon();
 
-    expect(logging.makeLogger).toBeCalledWith(PATHS.log);
+    expect(logging.makeLogger).toBeCalledWith(PATHS.log, 'daemon');
   });
 
   test('Logger should be enabled by default', async () => {

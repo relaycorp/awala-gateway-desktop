@@ -19,7 +19,7 @@ const APP_NAME = 'AwalaGateway';
 export default async function (): Promise<void> {
   const paths = envPaths(APP_NAME, { suffix: '' });
   await createPaths(paths);
-  const logger = makeLogger(paths.log);
+  const logger = makeLogger(paths.log, 'daemon');
   await registerTokens(logger, paths);
 
   await createDBConnection();
