@@ -17,7 +17,7 @@ jobs:
           path: ~/.npm
           key: ${{ runner.os }}-root-${{ hashFiles('package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-node-
+            ${{ runner.os }}-root-
       - run: npm ci
       - run: npm run static-checks
   ci:
