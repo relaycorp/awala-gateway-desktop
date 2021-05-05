@@ -46,21 +46,8 @@ process.on('beforeExit', (code) => {
 });
 
 // Launch the daemon process and listen for a token via IPC
-const server = fork(path.join(app.getAppPath(), 'node_modules/daemon/build/bin/gateway-daemon.js'));
-server.stdout?.on('data', (message) => {
-  logger.info({ message }, 'daemon stdout');
-});
-server.stderr?.on('data', (message) => {
-  logger.error({ message }, 'daemon stderr');
-});
-server.on('error', (err) => {
-  logger.error({ err }, 'Daemon is aborting');
-});
-server.on('disconnect', () => {
-  logger.info('Daemon is disconnecting');
-});
-server.on('exit', (code, signal) => {
-  logger.info({ code, signal }, 'Daemon is exiting');
+const server = fork(path.join(app.getAppPath(), 'node_modules/daemon/build/bin/gateway-daemon.js'), {
+  env: { ...process.env, GATEWAY_FORKED_FROM_UI: 'true' },
 });
 server.on('close', (code: number, _signal: string) => {
   logger.info({ code }, 'Closing');
