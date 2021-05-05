@@ -21,6 +21,7 @@ jobs:
       - run: npm ci
       - run: npm run static-checks
   ci:
+    name: ci-${{ matrix.os }}
     needs: static-checks
     strategy:
       matrix:
