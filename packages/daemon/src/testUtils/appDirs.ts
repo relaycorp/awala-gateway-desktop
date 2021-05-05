@@ -26,7 +26,7 @@ export function useTemporaryAppDirs(): () => Paths {
   });
 
   afterEach(async () => {
-    await del(tempDir);
+    await del(tempDir, { force: true });
   });
 
   return () => tempAppDirs;
