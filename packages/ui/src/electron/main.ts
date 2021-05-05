@@ -1,9 +1,6 @@
 import { fork } from 'child_process';
 import { app, BrowserWindow, Menu, Tray } from 'electron';
-import envPaths from 'env-paths';
-import { mkdirSync } from 'fs';
 import path from 'path';
-import pino from 'pino';
 import WebSocket from 'ws';
 import { ConnectionStatus, pollConnectionStatus } from '../ipc/connectionStatus';
 import { ServerMessage, ServerMessageType } from '../ipc/message';
@@ -18,45 +15,16 @@ let token: string = 'TOKEN';
 let tray: Tray | null = null;
 let closeWebSocket: (() => void) | null = null;
 
-const paths = envPaths('AwalaGateway', { suffix: '' });
-mkdirSync(paths.log, { recursive: true });
-mkdirSync(paths.data, { recursive: true });
-const logger = pino(
-  {
-    level: 'debug',
-    prettyPrint: {
-      colorize: false,
-      translateTime: 'yyyy-dd-mm, h:MM:ss TT',
-    },
-  },
-  pino.destination(path.join(paths.log, 'awala.log')),
-);
-logger.info('Starting...');
-
-process.on('uncaughtException', (err) => {
-  logger.error({ err }, 'uncaughtException');
-  app.exit(1);
-});
-process.on('unhandledRejection', (reason) => {
-  logger.error({ reason }, 'unhandledRejection');
-  app.exit(1);
-});
-process.on('beforeExit', (code) => {
-  logger.info({ code }, 'beforeExit');
-});
-
 // Launch the daemon process and listen for a token via IPC
 const server = fork(path.join(app.getAppPath(), 'node_modules/daemon/build/bin/gateway-daemon.js'), {
   env: { ...process.env, GATEWAY_FORKED_FROM_UI: 'true' },
 });
 server.on('close', (code: number, _signal: string) => {
-  logger.info({ code }, 'Closing');
   if (code !== null) {
     app.exit(code);
   }
 });
 server.on('message', (message: ServerMessage) => {
-  logger.info({ message }, 'Got message');
   if (message.type === ServerMessageType.TOKEN_MESSAGE) {
     token = message.value;
     startApp();
