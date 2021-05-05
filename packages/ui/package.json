@@ -16,7 +16,7 @@
     "start": "npm run build && electron ./app/main.js",
     "clean": "rimraf build test coverage dist",
     "cov": "run-s build test:unit && opn coverage/lcov-report/index.html",
-    "dist": "electron-builder",
+    "dist": "electron-builder --publish=never",
     "test": "jest --coverage",
     "test:functional": "jest --config jest.config.functional.js --runInBand --detectOpenHandles",
     "test:ci:unit:jest": "jest --config jest.config.ci.js --coverage"
