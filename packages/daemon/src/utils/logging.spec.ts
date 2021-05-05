@@ -17,7 +17,7 @@ describe('makeLogger', () => {
     logDirPath = await fs.mkdtemp(join(tmpdir(), 'logging-tests'));
   });
   afterEach(async () => {
-    await del(logDirPath, { force: true });
+    await del(logDirPath);
   });
 
   test('Log level should be info if LOG_LEVEL env var is absent', () => {

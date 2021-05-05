@@ -20,7 +20,7 @@ beforeEach(async () => {
   };
 });
 afterEach(async () => {
-  await del(tempDir, { force: true });
+  await del(tempDir);
 });
 
 const OBJECT_KEY = 'the-key.ext';
