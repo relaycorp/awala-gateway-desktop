@@ -5,6 +5,7 @@ import uuid from 'uuid-random';
 import WebSocket from 'ws';
 
 import { getMockContext, getMockInstance, mockSpy } from '../testUtils/jest';
+import { makeProcessSendMock } from '../testUtils/process';
 import controlRoutes, { CONTROL_API_PREFIX } from './control';
 import makeConnectionStatusServer from './control/connectionStatus';
 import makeCourierSyncServer from './control/courierSync';
@@ -36,18 +37,7 @@ afterAll(() => {
 
 const customLogger = pino();
 
-let originalProcessSend: any;
-beforeAll(() => {
-  originalProcessSend = process.send;
-});
-beforeEach(() => {
-  // tslint:disable-next-line:no-object-mutation
-  process.send = undefined;
-});
-afterAll(async () => {
-  // tslint:disable-next-line:no-object-mutation
-  process.send = originalProcessSend;
-});
+const mockProcessSend = makeProcessSendMock();
 
 describe('makeServer', () => {
   test('Logger should be honoured', async () => {
@@ -114,11 +104,10 @@ describe('makeServer', () => {
   describe('Control auth token', () => {
     test('Token should be shared with parent if process was forked', async () => {
       let passedMessage: any;
-      // tslint:disable-next-line:no-object-mutation
-      process.send = (message: any) => {
+      mockProcessSend((message: any) => {
         passedMessage = message;
         return true;
-      };
+      });
 
       await makeServer(customLogger);
 
@@ -133,11 +122,10 @@ describe('makeServer', () => {
     test('Any explicit token should be honoured', async () => {
       const token = 'the-auth-token';
       let passedMessage: any;
-      // tslint:disable-next-line:no-object-mutation
-      process.send = (message: any) => {
+      mockProcessSend((message: any) => {
         passedMessage = message;
         return true;
-      };
+      });
 
       await makeServer(customLogger, token);
 
