@@ -26,12 +26,6 @@ beforeEach(() => {
 });
 mockSpy(jest.spyOn(logging, 'makeLogger'), () => mockLogging.logger);
 
-test('Logger should be enabled by default', async () => {
-  await daemon();
-
-  expect(makeServer).toBeCalledWith(mockLogging.logger);
-});
-
 test('Server should be run', async () => {
   await daemon();
 
@@ -44,22 +38,30 @@ test('Sync should be run', async () => {
   expect(runSync).toBeCalled();
 });
 
-describe('Token registration', () => {
-  test('APP_DIRS', async () => {
+describe('Logging', () => {
+  test('Logger should be enabled by default', async () => {
+    await daemon();
+
+    expect(makeServer).toBeCalledWith(mockLogging.logger);
+  });
+
+  test('LOGGER token should be registered', async () => {
+    expect(Container.has(LOGGER)).toBeFalse();
+
+    await daemon();
+
+    expect(Container.get(LOGGER)).toBe(mockLogging.logger);
+  });
+});
+
+describe('App directories', () => {
+  test('APP_DIRS token should be registered', async () => {
     expect(Container.has(APP_DIRS)).toBeFalse();
 
     await daemon();
 
     const expectedPaths = envPaths('AwalaGateway', { suffix: '' });
     expect(Container.get(APP_DIRS)).toEqual(expectedPaths);
-  });
-
-  test('LOGGER', async () => {
-    expect(Container.has(LOGGER)).toBeFalse();
-
-    await daemon();
-
-    expect(Container.get(LOGGER)).toBe(mockLogging.logger);
   });
 });
 
