@@ -26,9 +26,7 @@
     "abortable-iterator": "^3.0.0",
     "bufferutil": "^4.0.3",
     "daemon": "file:../daemon",
-    "env-paths": "^2.2.1",
     "pino": "^6.11.3",
-    "pino-pretty": "^4.7.1",
     "utf-8-validate": "^5.0.4",
     "verror": "^1.10.0",
     "ws": "^7.4.5"
@@ -76,7 +74,9 @@
       {
         "from": "app/daemon/node_modules",
         "to": "app/daemon/node_modules/",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "linux": {
