@@ -25,7 +25,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-20.04, windows-2019, macos-11.0]
-    runs-on: ${{ runner.os }}
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
       - name: Setup node
@@ -38,7 +38,7 @@ jobs:
           path: |
             node_modules
             */*/node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          key: ${{ matrix.os }}-node-${{ hashFiles('**/package-lock.json') }}
       - run: npm ci
       - run: npm run bootstrap
       - run: npm run build
