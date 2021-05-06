@@ -49,6 +49,8 @@ jobs:
             ${{ runner.os }}-monorepo-
       - run: npm ci
       - run: npm run bootstrap
+      - run: npm run install-daemon
+        working-directory: packages/ui
       - run: npm run build
       - run: npm run test:ci
       - run: npm run dist
