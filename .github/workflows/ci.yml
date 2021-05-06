@@ -15,7 +15,7 @@ jobs:
       - uses: actions/cache@v2
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-root-${{ hashFiles('package-lock.json') }}
+          key: root-${{ hashFiles('package-lock.json') }}
       - run: npm ci
       - run: npm run static-checks
   ci:
@@ -65,7 +65,7 @@ jobs:
       - uses: actions/cache@v2
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-root-${{ hashFiles('package-lock.json') }}
+          key: root-${{ hashFiles('package-lock.json') }}
       - name: Install dependencies
         run: npm ci
       - run: npx semantic-release

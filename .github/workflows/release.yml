@@ -23,7 +23,7 @@ jobs:
           path: |
             node_modules
             */*/node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          key: ${{ matrix.os }}-all-${{ hashFiles('**/package-lock.json') }}
       - run: npm ci
       - run: npm run bootstrap
       - run: npm run build
