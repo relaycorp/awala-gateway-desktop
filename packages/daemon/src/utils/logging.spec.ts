@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs';
 import { hostname, tmpdir } from 'os';
 import { join } from 'path';
+import pino from 'pino';
 
 import { configureMockEnvVars } from '../testUtils/envVars';
 import { makeLogger } from './logging';
@@ -11,11 +12,16 @@ const mockEnvVars = configureMockEnvVars(REQUIRED_ENV_VARS);
 const LOG_NAME = 'foo';
 
 describe('makeLogger', () => {
+  const pinoDestinationSpy = jest.spyOn(pino, 'destination');
   let logDirPath: string;
   beforeEach(async () => {
     logDirPath = await fs.mkdtemp(join(tmpdir(), 'logging-tests'));
   });
   afterEach(async () => {
+    // Windows will refuse to delete the directory if we don't close the log file first
+    const pinoDestination = pinoDestinationSpy.mock.results[0]?.value;
+    pinoDestination?.destroy();
+
     await fs.rmdir(logDirPath, { recursive: true });
   });
 
