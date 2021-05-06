@@ -1,0 +1,37 @@
+name: Release
+on:
+  release:
+    types:
+      - released
+jobs:
+  release:
+    name: Package and release installers
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
+      - name: Cache dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            node_modules
+            */*/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+      - run: npm ci
+      - run: npm run bootstrap
+      - run: npm run build
+      - run: npm version ${GITHUB_REF#refs/tags/}
+        working-directory: packages/ui/app
+      - run: npm run dist
+        working-directory: packages/ui
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CODE_SIGNING_CERT }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CODE_SIGNING_PASSWORD }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

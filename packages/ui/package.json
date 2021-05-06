@@ -14,7 +14,7 @@
     "webpack": "webpack --config ./webpack.config.js",
     "tsc": "tsc -p tsconfig.json",
     "start": "npm run build && electron ./app/main.js",
-    "clean": "rimraf build test coverage dist",
+    "clean": "rimraf build test coverage dist app",
     "cov": "run-s build test:unit && opn coverage/lcov-report/index.html",
     "dist": "electron-builder --publish=never",
     "test": "jest --coverage",
