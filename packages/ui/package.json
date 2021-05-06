@@ -6,7 +6,7 @@
   ],
   "main": "app/main.js",
   "scripts": {
-    "install-daemon": "run-s link-daemon rebuild",
+    "postinstall": "run-s link-daemon rebuild",
     "link-daemon": "npm link ../daemon",
     "license-report": "node ./license-report.js",
     "build": "run-s license-report tsc webpack",
