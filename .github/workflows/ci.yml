@@ -49,10 +49,14 @@ jobs:
             ${{ runner.os }}-monorepo-
       - run: npm ci
       - run: npm run bootstrap
+
+      # TODO: Delete
       - uses: actions/upload-artifact@v2
+        if: failure()
         with:
           name: npm-logs-${{ matrix.os }}
           path: /home/runner/.npm/_logs/*-debug.log
+
       - run: npm run build
       - run: npm run test:ci
       - run: npm run dist
