@@ -47,11 +47,14 @@ jobs:
           key: ${{ runner.os }}-monorepo-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-monorepo-
+
+      # TODO: Use `lerna bootstrap` (https://github.com/relaycorp/awala-gateway-desktop/issues/186)
       - run: npm ci
       - run: ../../node_modules/.bin/npm ci
         working-directory: packages/daemon
       - run: ../../node_modules/.bin/npm ci
         working-directory: packages/ui
+
       - run: npm run build
       - run: npm run test:ci
       - run: npm run dist
