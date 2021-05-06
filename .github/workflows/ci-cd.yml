@@ -37,16 +37,16 @@ jobs:
         uses: actions/setup-node@v2
         with:
           node-version: 14
-      - name: Get npm cache directory
-        id: npm-cache
-        run: |
-          echo "::set-output name=dir::$(npm config get cache)"
-      - uses: actions/cache@v2
-        with:
-          path: ${{ steps.npm-cache.outputs.dir }}
-          key: ${{ runner.os }}-monorepo-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-monorepo-
+#      - name: Get npm cache directory
+#        id: npm-cache
+#        run: |
+#          echo "::set-output name=dir::$(npm config get cache)"
+#      - uses: actions/cache@v2
+#        with:
+#          path: ${{ steps.npm-cache.outputs.dir }}
+#          key: ${{ runner.os }}-monorepo-${{ hashFiles('**/package-lock.json') }}
+#          restore-keys: |
+#            ${{ runner.os }}-monorepo-
       - run: npm ci
       - run: npm run bootstrap
 
