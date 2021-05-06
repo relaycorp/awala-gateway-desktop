@@ -5,7 +5,7 @@
   "scripts": {
     "prebuild": "run-s clean",
     "build": "lerna run build",
-    "bootstrap": "lerna bootstrap --concurrency=1 --loglevel=debug --no-ci",
+    "bootstrap": "lerna bootstrap --no-ci",
     "fix": "run-s fix:*",
     "fix:prettier": "prettier \"packages/**/*.ts\" --write",
     "fix:tslint": "tslint --fix --project .",
