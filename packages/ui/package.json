@@ -16,7 +16,7 @@
     "start": "npm run build && electron ./app/main.js",
     "clean": "rimraf build test coverage dist app",
     "cov": "run-s build test:unit && opn coverage/lcov-report/index.html",
-    "dist": "electron-builder --publish=never",
+    "dist": "electron-builder --config electron-builder.yml --publish=never",
     "test": "jest --coverage",
     "test:functional": "jest --config jest.config.functional.js --runInBand --detectOpenHandles",
     "test:ci:unit:jest": "jest --config jest.config.ci.js --coverage"
@@ -64,34 +64,5 @@
     "typescript": "^4.2.4",
     "webpack": "^5.36.2",
     "webpack-cli": "^4.5.0"
-  },
-  "build": {
-    "appId": "tech.relaycorp.gateway",
-    "directories": {
-      "buildResources": "./buildResources"
-    },
-    "extraResources": [
-      {
-        "from": "app/daemon/node_modules",
-        "to": "app/daemon/node_modules/",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
-    "linux": {
-      "category": "Network",
-      "icon": "src/electron/assets/logo.png",
-      "target": [
-        "AppImage"
-      ]
-    },
-    "win": {
-      "target": "nsis"
-    },
-    "mac": {
-      "target": "dmg"
-    },
-    "npmRebuild": false
   }
 }
