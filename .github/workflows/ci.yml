@@ -12,12 +12,10 @@ jobs:
       - uses: actions/setup-node@v2
         with:
           node-version: 14
-      - uses: actions/cache@v1
+      - uses: actions/cache@v2
         with:
           path: ~/.npm
           key: ${{ runner.os }}-root-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-root-
       - run: npm ci
       - run: npm run static-checks
   ci:
@@ -39,7 +37,7 @@ jobs:
           path: |
             node_modules
             */*/node_modules
-          key: ${{ matrix.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          key: ${{ matrix.os }}-all-${{ hashFiles('**/package-lock.json') }}
       - run: npm ci
       - run: npm run bootstrap
       - run: npm run build
@@ -51,6 +49,25 @@ jobs:
           CSC_LINK: ${{ secrets.WINDOWS_CODE_SIGNING_CERT }}
           CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CODE_SIGNING_PASSWORD }}
 
+
+  release:
+    name: Release
+    needs: ci
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
+      - uses: actions/cache@v2
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-root-${{ hashFiles('package-lock.json') }}
+      - name: Install dependencies
+        run: npm ci
       - run: npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
