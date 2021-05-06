@@ -48,9 +48,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-monorepo-
       - run: npm ci
-      - run: npm install
+      - run: node_modules/.bin/npm install
         working-directory: packages/daemon
-      - run: npm install
+      - run: node_modules/.bin/npm install
         working-directory: packages/ui
       - run: npm run build
       - run: npm run test:ci
