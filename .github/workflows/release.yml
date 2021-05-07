@@ -49,7 +49,7 @@ jobs:
         working-directory: packages/ui
 
       - run: npm run build
-      - run: npm version ${{ github.event.inputs.tag }}
+      - run: npm version --allow-same-version ${{ github.event.inputs.tag }}
 # TODO: Remove
 #      - run: npm version ${GITHUB_REF#refs/tags/}
         working-directory: packages/ui/app
