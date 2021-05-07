@@ -3,6 +3,13 @@ on:
   release:
     types:
       - released
+
+  # TODO: Remove
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The Git tag
+        required: true
 jobs:
   release:
     name: release-${{ matrix.os }}
@@ -42,7 +49,9 @@ jobs:
         working-directory: packages/ui
 
       - run: npm run build
-      - run: npm version ${GITHUB_REF#refs/tags/}
+      - run: npm version ${{ github.event.inputs.tag }}
+# TODO: Remove
+#      - run: npm version ${GITHUB_REF#refs/tags/}
         working-directory: packages/ui/app
       - run: npm run dist
         working-directory: packages/ui
