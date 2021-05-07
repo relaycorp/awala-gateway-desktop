@@ -47,15 +47,13 @@ jobs:
           key: ${{ runner.os }}-monorepo-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-monorepo-
-      - run: npm ci
-      - run: npm run bootstrap
 
-      # TODO: Delete
-      - uses: actions/upload-artifact@v2
-        if: failure()
-        with:
-          name: npm-logs-${{ matrix.os }}
-          path: /home/runner/.npm/_logs/*-debug.log
+      # TODO: Use `lerna bootstrap` (https://github.com/relaycorp/awala-gateway-desktop/issues/186)
+      - run: npm ci
+      - run: ../../node_modules/.bin/npm ci
+        working-directory: packages/daemon
+      - run: ../../node_modules/.bin/npm ci
+        working-directory: packages/ui
 
       - run: npm run build
       - run: npm run test:ci
