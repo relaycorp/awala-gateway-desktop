@@ -5,7 +5,7 @@ on:
       - released
 jobs:
   release:
-    name: Package and release installers
+    name: release-${{ matrix.os }}
     strategy:
       matrix:
         include:
@@ -23,15 +23,24 @@ jobs:
         uses: actions/setup-node@v2
         with:
           node-version: 14
-      - name: Cache dependencies
-        uses: actions/cache@v2
+      - name: Get npm cache directory
+        id: npm-cache
+        run: |
+          echo "::set-output name=dir::$(npm config get cache)"
+      - uses: actions/cache@v2
         with:
-          path: |
-            node_modules
-            */*/node_modules
-          key: ${{ matrix.os }}-all-${{ hashFiles('**/package-lock.json') }}
+          path: ${{ steps.npm-cache.outputs.dir }}
+          key: ${{ matrix.os }}-monorepo-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ matrix.os }}-monorepo-
+
+      # TODO: Use `lerna bootstrap` (https://github.com/relaycorp/awala-gateway-desktop/issues/186)
       - run: npm ci
-      - run: npm run bootstrap
+      - run: ../../node_modules/.bin/npm ci
+        working-directory: packages/daemon
+      - run: ../../node_modules/.bin/npm ci
+        working-directory: packages/ui
+
       - run: npm run build
       - run: npm version ${GITHUB_REF#refs/tags/}
         working-directory: packages/ui/app
