@@ -1,0 +1,58 @@
+name: Release
+on:
+  release:
+    types:
+      - released
+jobs:
+  release:
+    name: release-${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: Awala*.AppImage
+          - os: windows-latest
+            artifact_name: Awala*.exe
+          - os: macos-latest
+            artifact_name: Awala*.dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
+      - name: Get npm cache directory
+        id: npm-cache
+        run: |
+          echo "::set-output name=dir::$(npm config get cache)"
+      - uses: actions/cache@v2
+        with:
+          path: ${{ steps.npm-cache.outputs.dir }}
+          key: ${{ matrix.os }}-monorepo-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ matrix.os }}-monorepo-
+
+      # TODO: Use `lerna bootstrap` (https://github.com/relaycorp/awala-gateway-desktop/issues/186)
+      - run: npm ci
+      - run: ../../node_modules/.bin/npm ci
+        working-directory: packages/daemon
+      - run: ../../node_modules/.bin/npm ci
+        working-directory: packages/ui
+
+      - run: npm run build
+      - run: npm version ${GITHUB_REF#refs/tags/}
+        working-directory: packages/ui/app
+      - run: npm run dist
+        working-directory: packages/ui
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CODE_SIGNING_CERT }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CODE_SIGNING_PASSWORD }}
+      - name: Upload installer to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref }}
+          file: packages/ui/dist/${{ matrix.artifact_name }}
+          file_glob: true
