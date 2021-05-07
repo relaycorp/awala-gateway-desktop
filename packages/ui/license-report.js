@@ -3,7 +3,7 @@ const fs = require('fs');
 
 async function runReport(args) {
   return new Promise(function(resolve, reject) {
-    exec('npx license-report --output=json ' + args, function (error, stdout, stderr) {
+    exec('npx license-report --only=prod --output=json ' + args, function (error, stdout, stderr) {
       if (error) {
         console.log('exec error: ' + error);
         reject(stderr);
