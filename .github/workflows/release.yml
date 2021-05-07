@@ -47,8 +47,8 @@ jobs:
       - run: npm run dist
         working-directory: packages/ui
         env:
-          CSC_LINK: ${{ secrets.WINDOWS_CODE_SIGNING_CERT }}
-          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CODE_SIGNING_PASSWORD }}
+          WIN_CSC_LINK: ${{ secrets.WINDOWS_CODE_SIGNING_CERT }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CODE_SIGNING_PASSWORD }}
       - name: Upload installer to release
         uses: svenstaro/upload-release-action@v2
         with:
