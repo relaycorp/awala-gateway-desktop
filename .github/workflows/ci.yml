@@ -44,9 +44,9 @@ jobs:
       - uses: actions/cache@v2
         with:
           path: ${{ steps.npm-cache.outputs.dir }}
-          key: ${{ runner.os }}-monorepo-${{ hashFiles('**/package-lock.json') }}
+          key: ${{ matrix.os }}-monorepo-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-monorepo-
+            ${{ matrix.os }}-monorepo-
 
       # TODO: Use `lerna bootstrap` (https://github.com/relaycorp/awala-gateway-desktop/issues/186)
       - run: npm ci
