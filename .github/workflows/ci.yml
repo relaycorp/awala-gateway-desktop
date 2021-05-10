@@ -87,18 +87,16 @@ jobs:
         run: npm ci
       - name: Create GitHub release
         id: semantic-release
-        uses: cycjimmy/semantic-release-action@v2
+        run: |
+          echo "" > version.txt
+          npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Save new version number
-        if: steps.semantic-release.outputs.new_release_published == 'true'
-        run: |
-          echo ${{ steps.semantic.outputs.new_release_version }} > version.txt
       - name: Upload new version number
         if: steps.semantic-release.outputs.new_release_published == 'true'
         uses: actions/upload-artifact@v2
         with:
-          name: new-version.txt
+          name: new-version
           path: version.txt
 
   upload-package:
@@ -135,7 +133,7 @@ jobs:
         id: version-artefact
         uses: actions/download-artifact@v2
         with:
-          name: new-version.txt
+          name: new-version
       - name: Load version
         id: set-version
         uses: juliangruber/read-file-action@v1
@@ -144,21 +142,28 @@ jobs:
 
       # TODO: Use `lerna bootstrap` (https://github.com/relaycorp/awala-gateway-desktop/issues/186)
       - run: npm ci
+        if: ${{ steps.set-version.outputs.content != "" }}
       - run: ../../node_modules/.bin/npm ci
+        if: ${{ steps.set-version.outputs.content != "" }}
         working-directory: packages/daemon
       - run: ../../node_modules/.bin/npm ci
+        if: ${{ steps.set-version.outputs.content != "" }}
         working-directory: packages/ui
 
       - run: npm run build
+        if: ${{ steps.set-version.outputs.content != "" }}
       - name: Set version in app
+        if: ${{ steps.set-version.outputs.content != "" }}
         run: npm version ${{ steps.set-version.outputs.content }}
         working-directory: packages/ui/app
       - run: npm run dist
+        if: ${{ steps.set-version.outputs.content != "" }}
         working-directory: packages/ui
         env:
           WIN_CSC_LINK: ${{ secrets.WINDOWS_CODE_SIGNING_CERT }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CODE_SIGNING_PASSWORD }}
       - name: Upload installer to release
+        if: ${{ steps.set-version.outputs.content != "" }}
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
