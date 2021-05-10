@@ -135,6 +135,11 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: new-version.txt
+      - name: Load version
+        id: set-version
+        run: |
+          VERSION="$(cat new-version.txt)"
+          echo "::set-output name=version::${VERSION}"
 
       # TODO: Use `lerna bootstrap` (https://github.com/relaycorp/awala-gateway-desktop/issues/186)
       - run: npm ci
@@ -143,15 +148,10 @@ jobs:
       - run: ../../node_modules/.bin/npm ci
         working-directory: packages/ui
 
-      - name: Set version
-        id: set-version
-        run: |
-          ls -lA
-          VERSION="cat new-version.txt"
-          echo "::set-output name=version::${VERSION}"
-          npm version ${VERSION}
-        working-directory: packages/ui/app
       - run: npm run build
+      - name: Set version in app
+        run: npm version ${{ steps.set-version.outputs.version }}
+        working-directory: packages/ui/app
       - run: npm run dist
         working-directory: packages/ui
         env:
