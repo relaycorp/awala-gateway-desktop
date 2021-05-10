@@ -146,7 +146,7 @@ jobs:
       - name: Set version
         id: set-version
         run: |
-          VERSION="cat ${{ steps.version-artefact.outputs.download-path }}"
+          VERSION="cat ${{ steps.version-artefact.outputs.download-path }}/version.txt"
           echo "::set-output name=version::${VERSION}"
           npm version ${VERSION}
         working-directory: packages/ui/app
