@@ -97,7 +97,7 @@ jobs:
         if: steps.semantic-release.outputs.new_release_published == 'true'
         uses: actions/upload-artifact@v2
         with:
-          name: new-version
+          name: new-version.txt
           path: version.txt
 
   upload-package:
@@ -134,7 +134,7 @@ jobs:
         id: version-artefact
         uses: actions/download-artifact@v2
         with:
-          name: new-version
+          name: new-version.txt
 
       # TODO: Use `lerna bootstrap` (https://github.com/relaycorp/awala-gateway-desktop/issues/186)
       - run: npm ci
@@ -146,7 +146,8 @@ jobs:
       - name: Set version
         id: set-version
         run: |
-          VERSION="cat version.txt"
+          ls -lA
+          VERSION="cat new-version.txt"
           echo "::set-output name=version::${VERSION}"
           npm version ${VERSION}
         working-directory: packages/ui/app
