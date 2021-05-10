@@ -62,7 +62,8 @@ jobs:
 
   release:
     name: Release
-    needs: ci
+# TODO: UNDO!
+#    needs: ci
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-20.04
     steps:
@@ -138,6 +139,8 @@ jobs:
       - name: Load version
         id: set-version
         run: |
+          pwd
+          ls -lA
           VERSION="$(cat new-version.txt)"
           echo "::set-output name=version::${VERSION}"
 
