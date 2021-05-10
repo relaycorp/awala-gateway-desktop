@@ -139,9 +139,8 @@ jobs:
       - name: Load version
         id: set-version
         run: |
-          pwd
-          ls -lA
           VERSION="$(cat version.txt)"
+          echo "Version: ${VERSION}"
           echo "::set-output name=version::${VERSION}"
 
       # TODO: Use `lerna bootstrap` (https://github.com/relaycorp/awala-gateway-desktop/issues/186)
