@@ -62,8 +62,7 @@ jobs:
 
   release:
     name: Release
-# TODO: UNDO!
-#    needs: ci
+    needs: ci
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-20.04
     steps:
