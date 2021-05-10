@@ -134,6 +134,7 @@ jobs:
         with:
           name: new-version
       - name: Load version
+        id: set-version
         if: ${{ steps.version-artefact.outcome == 'success' }}
         uses: juliangruber/read-file-action@v1
         with:
