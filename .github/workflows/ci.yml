@@ -87,13 +87,11 @@ jobs:
         run: npm ci
       - name: Create GitHub release
         id: semantic-release
-        run: |
-          echo "" > version.txt
-          npx semantic-release
+        run: npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload new version number
-        if: steps.semantic-release.outputs.new_release_published == 'true'
+        continue-on-error: true
         uses: actions/upload-artifact@v2
         with:
           name: new-version
@@ -131,39 +129,40 @@ jobs:
             ${{ matrix.os }}-monorepo-
       - name: Download new version number
         id: version-artefact
+        continue-on-error: true
         uses: actions/download-artifact@v2
         with:
           name: new-version
       - name: Load version
-        id: set-version
+        if: ${{ steps.version-artefact.outcome == "success" }}
         uses: juliangruber/read-file-action@v1
         with:
           path: ./version.txt
 
       # TODO: Use `lerna bootstrap` (https://github.com/relaycorp/awala-gateway-desktop/issues/186)
       - run: npm ci
-        if: ${{ steps.set-version.outputs.content != "" }}
+        if: ${{ steps.version-artefact.outcome == "success" }}
       - run: ../../node_modules/.bin/npm ci
-        if: ${{ steps.set-version.outputs.content != "" }}
+        if: ${{ steps.version-artefact.outcome == "success" }}
         working-directory: packages/daemon
       - run: ../../node_modules/.bin/npm ci
-        if: ${{ steps.set-version.outputs.content != "" }}
+        if: ${{ steps.version-artefact.outcome == "success" }}
         working-directory: packages/ui
 
       - run: npm run build
-        if: ${{ steps.set-version.outputs.content != "" }}
+        if: ${{ steps.version-artefact.outcome == "success" }}
       - name: Set version in app
-        if: ${{ steps.set-version.outputs.content != "" }}
+        if: ${{ steps.version-artefact.outcome == "success" }}
         run: npm version ${{ steps.set-version.outputs.content }}
         working-directory: packages/ui/app
       - run: npm run dist
-        if: ${{ steps.set-version.outputs.content != "" }}
+        if: ${{ steps.version-artefact.outcome == "success" }}
         working-directory: packages/ui
         env:
           WIN_CSC_LINK: ${{ secrets.WINDOWS_CODE_SIGNING_CERT }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CODE_SIGNING_PASSWORD }}
       - name: Upload installer to release
-        if: ${{ steps.set-version.outputs.content != "" }}
+        if: ${{ steps.version-artefact.outcome == "success" }}
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
