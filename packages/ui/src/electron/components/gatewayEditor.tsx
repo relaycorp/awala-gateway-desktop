@@ -30,7 +30,7 @@ class GatewayEditor extends Component<Props, State> {
         </p>
         <p>
           At present, changing this gateway will most likely prevent your
-          existing Awala apps from receiving dat for a while.
+          existing Awala apps from receiving data for a while.
         </p>
         <p>
           Gateways ending with “.relaycorp.cloud” are provide by Relaycorp,
