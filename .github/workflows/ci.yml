@@ -84,6 +84,88 @@ jobs:
             ${{ runner.os }}-root-
       - name: Install dependencies
         run: npm ci
-      - run: npx semantic-release
+      - name: Create GitHub release
+        id: semantic-release
+        run: npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload new version number
+        continue-on-error: true
+        uses: actions/upload-artifact@v2
+        with:
+          name: new-version
+          path: version.txt
+
+  upload-package:
+    name: package-${{ matrix.os }}
+    needs: release
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: Awala*.AppImage
+          - os: windows-latest
+            artifact_name: Awala*.exe
+          - os: macos-latest
+            artifact_name: Awala*.dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
+      - name: Get npm cache directory
+        id: npm-cache
+        run: |
+          echo "::set-output name=dir::$(npm config get cache)"
+      - uses: actions/cache@v2
+        with:
+          path: ${{ steps.npm-cache.outputs.dir }}
+          key: ${{ matrix.os }}-monorepo-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ matrix.os }}-monorepo-
+      - name: Download new version number
+        id: version-artefact
+        continue-on-error: true
+        uses: actions/download-artifact@v2
+        with:
+          name: new-version
+      - name: Load version
+        id: set-version
+        if: ${{ steps.version-artefact.outcome == 'success' }}
+        uses: juliangruber/read-file-action@v1
+        with:
+          path: ./version.txt
+
+      # TODO: Use `lerna bootstrap` (https://github.com/relaycorp/awala-gateway-desktop/issues/186)
+      - run: npm ci
+        if: ${{ steps.version-artefact.outcome == 'success' }}
+      - run: ../../node_modules/.bin/npm ci
+        if: ${{ steps.version-artefact.outcome == 'success' }}
+        working-directory: packages/daemon
+      - run: ../../node_modules/.bin/npm ci
+        if: ${{ steps.version-artefact.outcome == 'success' }}
+        working-directory: packages/ui
+
+      - run: npm run build
+        if: ${{ steps.version-artefact.outcome == 'success' }}
+      - name: Set version in app
+        if: ${{ steps.version-artefact.outcome == 'success' }}
+        run: npm version ${{ steps.set-version.outputs.content }}
+        working-directory: packages/ui/app
+      - run: npm run dist
+        if: ${{ steps.version-artefact.outcome == 'success' }}
+        working-directory: packages/ui
+        env:
+          WIN_CSC_LINK: ${{ secrets.WINDOWS_CODE_SIGNING_CERT }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CODE_SIGNING_PASSWORD }}
+      - name: Upload installer to release
+        if: ${{ steps.version-artefact.outcome == 'success' }}
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ steps.set-version.outputs.content }}
+          file: packages/ui/dist/${{ matrix.artifact_name }}
+          file_glob: true
