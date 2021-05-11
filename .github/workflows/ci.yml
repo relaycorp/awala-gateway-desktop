@@ -62,8 +62,7 @@ jobs:
 
   release:
     name: Release
-# TODO: UNDO!
-#    needs: ci
+    needs: ci
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-20.04
     steps:
@@ -134,35 +133,36 @@ jobs:
         with:
           name: new-version
       - name: Load version
-        if: ${{ steps.version-artefact.outcome == "success" }}
+        id: set-version
+        if: ${{ steps.version-artefact.outcome == 'success' }}
         uses: juliangruber/read-file-action@v1
         with:
           path: ./version.txt
 
       # TODO: Use `lerna bootstrap` (https://github.com/relaycorp/awala-gateway-desktop/issues/186)
       - run: npm ci
-        if: ${{ steps.version-artefact.outcome == "success" }}
+        if: ${{ steps.version-artefact.outcome == 'success' }}
       - run: ../../node_modules/.bin/npm ci
-        if: ${{ steps.version-artefact.outcome == "success" }}
+        if: ${{ steps.version-artefact.outcome == 'success' }}
         working-directory: packages/daemon
       - run: ../../node_modules/.bin/npm ci
-        if: ${{ steps.version-artefact.outcome == "success" }}
+        if: ${{ steps.version-artefact.outcome == 'success' }}
         working-directory: packages/ui
 
       - run: npm run build
-        if: ${{ steps.version-artefact.outcome == "success" }}
+        if: ${{ steps.version-artefact.outcome == 'success' }}
       - name: Set version in app
-        if: ${{ steps.version-artefact.outcome == "success" }}
+        if: ${{ steps.version-artefact.outcome == 'success' }}
         run: npm version ${{ steps.set-version.outputs.content }}
         working-directory: packages/ui/app
       - run: npm run dist
-        if: ${{ steps.version-artefact.outcome == "success" }}
+        if: ${{ steps.version-artefact.outcome == 'success' }}
         working-directory: packages/ui
         env:
           WIN_CSC_LINK: ${{ secrets.WINDOWS_CODE_SIGNING_CERT }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CODE_SIGNING_PASSWORD }}
       - name: Upload installer to release
-        if: ${{ steps.version-artefact.outcome == "success" }}
+        if: ${{ steps.version-artefact.outcome == 'success' }}
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
