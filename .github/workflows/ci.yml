@@ -166,6 +166,6 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ steps.set-version.outputs.content }}
+          tag: v${{ steps.set-version.outputs.content }}
           file: packages/ui/dist/${{ matrix.artifact_name }}
           file_glob: true
