@@ -1,6 +1,7 @@
 // tslint:disable:max-classes-per-file
 
 import {
+  Certificate,
   getPublicKeyDigest,
   issueEndpointCertificate,
   PrivateNodeRegistration,
@@ -55,44 +56,17 @@ export class EndpointRegistrar {
    * @throws InvalidRegistrationRequestError if `registrationRequestSerialized` is malformed/invalid
    */
   public async completeRegistration(registrationRequestSerialized: Buffer): Promise<Buffer> {
-    let request: PrivateNodeRegistrationRequest;
-    try {
-      request = await PrivateNodeRegistrationRequest.deserialize(
-        bufferToArray(registrationRequestSerialized),
-      );
-    } catch (err) {
-      throw new InvalidRegistrationRequestError(err, 'Registration request is invalid/malformed');
-    }
-
     const currentKey = await this.getCurrentKey();
-    const currentPublicKey = await currentKey.certificate.getPublicKey();
-    let authorization: PrivateNodeRegistrationAuthorization;
-    try {
-      authorization = await PrivateNodeRegistrationAuthorization.deserialize(
-        request.pnraSerialized,
-        currentPublicKey,
-      );
-    } catch (err) {
-      throw new InvalidRegistrationRequestError(
-        err,
-        'Authorization in registration request is invalid/malformed',
-      );
-    }
-
-    const endpointPublicKeyDigest = Buffer.from(
-      await getPublicKeyDigest(request.privateNodePublicKey),
+    const endpointPublicKey = await validateRegistrationRequest(
+      registrationRequestSerialized,
+      currentKey.certificate,
     );
-    if (!endpointPublicKeyDigest.equals(Buffer.from(authorization.gatewayData))) {
-      throw new InvalidRegistrationRequestError(
-        'Subject key in request does not match that of authorization',
-      );
-    }
 
     const now = new Date();
     const endpointCertificate = await issueEndpointCertificate({
       issuerCertificate: currentKey.certificate,
       issuerPrivateKey: currentKey.privateKey,
-      subjectPublicKey: request.privateNodePublicKey,
+      subjectPublicKey: endpointPublicKey,
       validityEndDate: addMonths(now, ENDPOINT_CERT_VALIDITY_MONTHS),
       validityStartDate: now,
     });
@@ -107,6 +81,43 @@ export class EndpointRegistrar {
     }
     return currentKey;
   }
+}
+
+async function validateRegistrationRequest(
+  registrationRequestSerialized: Buffer,
+  gatewayCertificate: Certificate,
+): Promise<CryptoKey> {
+  let request: PrivateNodeRegistrationRequest;
+  try {
+    request = await PrivateNodeRegistrationRequest.deserialize(
+      bufferToArray(registrationRequestSerialized),
+    );
+  } catch (err) {
+    throw new InvalidRegistrationRequestError(err, 'Registration request is invalid/malformed');
+  }
+
+  const currentPublicKey = await gatewayCertificate.getPublicKey();
+  let authorization: PrivateNodeRegistrationAuthorization;
+  try {
+    authorization = await PrivateNodeRegistrationAuthorization.deserialize(
+      request.pnraSerialized,
+      currentPublicKey,
+    );
+  } catch (err) {
+    throw new InvalidRegistrationRequestError(
+      err,
+      'Authorization in registration request is invalid/malformed',
+    );
+  }
+
+  const endpointPublicKey = request.privateNodePublicKey;
+  const endpointPublicKeyDigest = Buffer.from(await getPublicKeyDigest(endpointPublicKey));
+  if (!endpointPublicKeyDigest.equals(Buffer.from(authorization.gatewayData))) {
+    throw new InvalidRegistrationRequestError(
+      'Subject key in request does not match that of authorization',
+    );
+  }
+  return endpointPublicKey;
 }
 
 export class MalformedEndpointKeyDigestError extends PrivateGatewayError {}
