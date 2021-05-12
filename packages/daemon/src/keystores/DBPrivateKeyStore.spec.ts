@@ -1,8 +1,8 @@
 import {
   Certificate,
   derSerializePrivateKey,
-  derSerializePublicKey,
   generateECDHKeyPair,
+  getPublicKeyDigestHex,
   issueInitialDHKeyCertificate,
   PrivateKeyStoreError,
   UnknownKeyError,
@@ -13,7 +13,6 @@ import { getConnection, Repository } from 'typeorm';
 
 import { Config, ConfigKey } from '../Config';
 import { PrivateKey, PrivateKeyType } from '../entity/PrivateKey';
-import { sha256Hex } from '../testUtils/crypto';
 import { setUpTestDBConnection } from '../testUtils/db';
 import { DBPrivateKeyStore } from './DBPrivateKeyStore';
 
@@ -151,13 +150,13 @@ describe('saveKey', () => {
     );
 
     const key = await privateKeyRepository.findOne(SUBSEQUENT_KEY_ID.toString('hex'));
-    const recipientPublicKeyDer = await derSerializePublicKey(
+    const recipientPublicKeyDigest = await getPublicKeyDigestHex(
       await recipientNodeCertificate.getPublicKey(),
     );
     expect(key).toMatchObject<Partial<PrivateKey>>({
       certificateDer: null,
       derSerialization: await derSerializePrivateKey(sessionKeyPair.privateKey),
-      recipientPublicKeyDigest: sha256Hex(recipientPublicKeyDer),
+      recipientPublicKeyDigest,
       type: PrivateKeyType.SESSION_SUBSEQUENT,
     });
     const config = Container.get(Config);
