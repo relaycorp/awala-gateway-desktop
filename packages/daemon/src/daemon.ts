@@ -1,7 +1,9 @@
-import envPaths from 'env-paths';
+import envPaths, { Paths } from 'env-paths';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 import { Logger } from 'pino';
 import { Container } from 'typedi';
-import { createConnection, getConnectionOptions } from 'typeorm';
+import { ConnectionOptions, createConnection, getConnectionOptions } from 'typeorm';
 
 import { makeServer, runServer } from './server';
 import runSync from './sync';
@@ -10,31 +12,41 @@ import { makeLogger } from './utils/logging';
 
 const IS_TYPESCRIPT = __filename.endsWith('.ts');
 
+const DB_FILE_NAME = 'db.sqlite';
+
 const APP_NAME = 'AwalaGateway';
 
 export default async function (): Promise<void> {
-  const logger = makeLogger();
+  const paths = envPaths(APP_NAME, { suffix: '' });
+  await createPaths(paths);
+  const logger = makeLogger('daemon', paths.log);
+  await registerTokens(logger, paths);
 
-  await registerTokens(logger);
   await createDBConnection();
 
   const server = await makeServer(logger);
   await Promise.all([runServer(server), runSync()]);
 }
 
-async function registerTokens(logger: Logger): Promise<void> {
-  Container.set(LOGGER, logger);
+async function createPaths(paths: Paths): Promise<void> {
+  const neededPaths: readonly string[] = [paths.data, paths.log];
+  await Promise.all(neededPaths.map((p) => fs.mkdir(p, { recursive: true })));
+}
 
-  const paths = envPaths(APP_NAME, { suffix: '' });
+async function registerTokens(logger: Logger, paths: Paths): Promise<void> {
+  Container.set(LOGGER, logger);
   Container.set(APP_DIRS, paths);
 }
 
 async function createDBConnection(): Promise<void> {
+  const { data: dataPath } = Container.get(APP_DIRS);
   const originalConnectionOptions = await getConnectionOptions();
   /* istanbul ignore next */
+  const entityDirPath = join(__dirname, 'entity', '**', IS_TYPESCRIPT ? '*.ts' : '*.js');
   const connectionOptions = {
     ...originalConnectionOptions,
-    ...(!IS_TYPESCRIPT && { entities: ['build/entity/**/*.js'] }),
+    database: join(dataPath, DB_FILE_NAME),
+    entities: [entityDirPath],
   };
-  await createConnection(connectionOptions);
+  await createConnection(connectionOptions as ConnectionOptions);
 }

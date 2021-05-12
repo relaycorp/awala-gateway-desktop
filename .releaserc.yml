@@ -1,2 +1,10 @@
-branch: master
-extends: '@relaycorp/shared-config'
+branches: [master]
+plugins:
+  - "@semantic-release/commit-analyzer"
+  - "@semantic-release/release-notes-generator"
+  - - "@semantic-release/npm"
+    - npmPublish: false
+  - - "@semantic-release/exec"
+    - prepareCmd: echo ${nextRelease.version} > version.txt
+  - - "@semantic-release/github"
+    - assets: []

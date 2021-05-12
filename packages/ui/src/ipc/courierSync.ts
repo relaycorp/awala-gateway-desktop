@@ -1,5 +1,6 @@
 import abortable from 'abortable-iterator';
 import { connect } from 'it-ws';
+import { CloseEvent } from 'ws';
 import PrivateGatewayError from '../PrivateGatewayError';
 
 export enum CourierSyncStatus {
@@ -40,31 +41,35 @@ export function synchronizeWithCourier(token: string): CourierSync {
  *
  * @throws CourierSyncError if the synchronization fails at any point
  */
-async function* _synchronizeWithCourier(_token: string): AsyncIterable<CourierSyncStatus> {
+async function* _synchronizeWithCourier(token: string): AsyncIterable<CourierSyncStatus> {
   try {
-    // FIXME: using the connection status endpoint because courier status isn't there yet.
-    const WS_URL = 'ws://127.0.0.1:13276/_control/sync-status';
+    const WS_URL = 'ws://127.0.0.1:13276/_control/courier-sync?auth=' + token;
     const stream = connect(WS_URL, { binary: true });
+    let closeEventCode = 0;
+    stream.socket.addEventListener('close', (event: CloseEvent) => {
+      closeEventCode = event.code;
+    });
+
     for await (const buffer of stream.source) {
       const name = buffer.toString();
       switch (name) {
-        case 'COLLECTING_CARGO':
+        case 'COLLECTION':
           yield CourierSyncStatus.COLLECTING_CARGO;
           break;
-        case 'WAITING':
+        case 'WAIT':
           yield CourierSyncStatus.WAITING;
           break;
-        case 'DELIVERING_CARGO':
+        case 'DELIVERY':
           yield CourierSyncStatus.DELIVERING_CARGO;
-          break;
-        case 'COMPLETE':
-          yield CourierSyncStatus.COMPLETE;
           break;
         default:
           throw new CourierSyncError(`Unknown status: ${name}`);
       }
     }
-    // Server may not send this one, but the UI is waiting for it
+    if (closeEventCode !== 1000) {
+      throw new CourierSyncError(`Socket error: ${closeEventCode}`);
+    }
+    // Server does not send this one, but the UI is waiting for it
     yield CourierSyncStatus.COMPLETE;
   } catch (err) {
     throw new CourierSyncError(err);

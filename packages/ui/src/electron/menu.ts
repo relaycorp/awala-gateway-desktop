@@ -1,24 +1,15 @@
-import { BrowserWindow, Menu } from 'electron';
+import { BrowserWindow, Menu, MenuItemConstructorOptions } from 'electron';
 
 const isMac = process.platform === 'darwin';
 
 export default function buildMenu(
-  logo: string,
   showMainWindow: () => void,
   showSettings: () => void,
+  showAbout: () => void,
+  showLibraries: () => void,
 ): Menu {
   return Menu.buildFromTemplate([
-    {
-      label: 'Awala',
-      submenu: [
-        {
-          click: showMainWindow,
-          label: 'Open Awala',
-        },
-        { role: 'close' },
-        { role: 'quit' },
-      ],
-    },
+    makeMainMenu(showMainWindow),
     { role: 'editMenu' },
     {
       label: 'Settings',
@@ -34,40 +25,11 @@ export default function buildMenu(
       role: 'help',
       submenu: [
         {
-          click: async () => {
-            const win = new BrowserWindow({
-              height: 320,
-              icon: logo,
-              resizable: false,
-              title: 'About Awala',
-              webPreferences: {
-                contextIsolation: false,
-                nodeIntegration: true,
-              },
-              width: 400,
-            });
-
-            // and load the index.html of the app.
-            win.loadFile('about.html');
-          },
+          click: showAbout,
           label: 'About Awala',
         },
         {
-          click: async () => {
-            const win = new BrowserWindow({
-              height: 500,
-              icon: logo,
-              title: 'Open Source Libraries',
-              webPreferences: {
-                contextIsolation: false,
-                nodeIntegration: true,
-              },
-              width: 500,
-            });
-
-            // and load the index.html of the app.
-            win.loadFile('libraries.html');
-          },
+          click: showLibraries,
           label: 'Open Source Libraries',
         },
       ],
@@ -77,7 +39,7 @@ export default function buildMenu(
       submenu: [
         {
           accelerator: isMac ? 'Alt+Cmd+I' : 'Alt+Shift+I',
-          click: async () => {
+          click: () => {
             const win = BrowserWindow.getFocusedWindow();
             if (win) {
               win.webContents.toggleDevTools();
@@ -87,7 +49,7 @@ export default function buildMenu(
         },
         {
           accelerator: isMac ? 'Cmd+R' : 'Ctrl+R',
-          click: async () => {
+          click: () => {
             const win = BrowserWindow.getFocusedWindow();
             if (win) {
               win.webContents.reload();
@@ -98,4 +60,16 @@ export default function buildMenu(
       ],
     },
   ]);
+}
+
+function makeMainMenu(showMainWindow: () => void): MenuItemConstructorOptions {
+  const openAppItem = {
+    click: showMainWindow,
+    label: 'Open Awala',
+  };
+  const topItems = isMac ? [openAppItem] : [];
+  return {
+    label: isMac ? 'Awala' : 'File',
+    submenu: [...topItems, { role: 'close' }, { role: 'quit' }],
+  };
 }

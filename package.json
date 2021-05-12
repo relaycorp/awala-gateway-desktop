@@ -21,12 +21,13 @@
     "node": ">=14"
   },
   "devDependencies": {
-    "@relaycorp/shared-config": "^1.4.13",
+    "@relaycorp/shared-config": "^1.4.15",
+    "@semantic-release/exec": "^5.0.0",
     "lerna": "^4.0.0",
     "npm-run-all": "^4.1.5",
-    "prettier": "^2.2.1",
-    "trash-cli": "^4.0.0",
-    "ts-jest": "^26.5.5",
+    "prettier": "^2.3.0",
+    "rimraf": "^3.0.2",
+    "ts-jest": "^26.5.6",
     "ts-node": "^9.1.1",
     "ts-node-dev": "^1.1.1",
     "tslint": "^5.18.0",

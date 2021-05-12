@@ -3,6 +3,7 @@ import { ConnectionStatus } from '../../ipc/connectionStatus';
 import connected from '../assets/connected.svg';
 import courier from '../assets/courier.svg';
 import disconnected from '../assets/disconnected.svg';
+import unregistered from '../assets/unregistered.svg';
 import HomeContent from './homeContent';
 
 interface Props {
@@ -41,6 +42,17 @@ class Status extends Component<Props> {
               and if it gets lost we’ll try to deliver it again.
             </p>
             <button onClick={this.props.onSynchronize}>Start sync</button>
+          </HomeContent>
+        );
+      case ConnectionStatus.UNREGISTERED:
+        return (
+          <HomeContent title="Awala needs an Internet connection the first time ever" image={unregistered} >
+            <p>
+              You need to connect to the Internet for a few seconds the first time you use Awala.
+            </p>
+            <p>
+              An Internet connection won’t ever be needed afterwards.
+            </p>
           </HomeContent>
         );
       default:
