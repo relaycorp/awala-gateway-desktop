@@ -1,23 +1,44 @@
-import { Certificate, PrivateNodeRegistrationAuthorization } from '@relaycorp/relaynet-core';
+import {
+  Certificate,
+  derSerializePublicKey,
+  getPublicKeyDigestHex,
+  InvalidMessageError,
+  PrivateNodeRegistration,
+  PrivateNodeRegistrationAuthorization,
+  PrivateNodeRegistrationRequest,
+} from '@relaycorp/relaynet-core';
 import { generateNodeKeyPairSet, generatePDACertificationPath } from '@relaycorp/relaynet-testing';
 import bufferToArray from 'buffer-to-arraybuffer';
+import { addYears } from 'date-fns';
 import { Container } from 'typedi';
+import { getConnection } from 'typeorm';
 
+import { ConfigKey } from '../Config';
+import { ConfigItem } from '../entity/ConfigItem';
 import { UnregisteredGatewayError } from '../errors';
 import { DBPrivateKeyStore } from '../keystores/DBPrivateKeyStore';
+import { arrayBufferFrom } from '../testUtils/buffer';
 import { setUpTestDBConnection } from '../testUtils/db';
-import { EndpointRegistrar, MalformedEndpointKeyDigestError } from './registration';
+import { getPromiseRejection } from '../testUtils/promises';
+import {
+  EndpointRegistrar,
+  InvalidRegistrationRequestError,
+  MalformedEndpointKeyDigestError,
+} from './registration';
 
 setUpTestDBConnection();
 
-let nodeKeyPair: CryptoKeyPair;
-let nodeCertificate: Certificate;
+let gatewayKeyPair: CryptoKeyPair;
+let gatewayCertificate: Certificate;
+let endpointKeyPair: CryptoKeyPair;
 beforeAll(async () => {
   const pairSet = await generateNodeKeyPairSet();
   const certPath = await generatePDACertificationPath(pairSet);
 
-  nodeKeyPair = pairSet.privateGateway;
-  nodeCertificate = certPath.privateGateway;
+  gatewayKeyPair = pairSet.privateGateway;
+  gatewayCertificate = certPath.privateGateway;
+
+  endpointKeyPair = pairSet.privateEndpoint;
 });
 
 describe('EndpointRegistration', () => {
@@ -48,7 +69,7 @@ describe('EndpointRegistration', () => {
 
     test('Keys with well-formed digests should be pre-authorized', async () => {
       const privateKeyStore = Container.get(DBPrivateKeyStore);
-      await privateKeyStore.saveNodeKey(nodeKeyPair.privateKey, nodeCertificate);
+      await privateKeyStore.saveNodeKey(gatewayKeyPair.privateKey, gatewayCertificate);
       const privateEndpointPublicKeyDigest = Buffer.from('a'.repeat(64), 'hex');
       const registrar = Container.get(EndpointRegistrar);
 
@@ -58,7 +79,7 @@ describe('EndpointRegistration', () => {
 
       const authorization = await PrivateNodeRegistrationAuthorization.deserialize(
         bufferToArray(authorizationSerialized),
-        nodeKeyPair.publicKey,
+        gatewayKeyPair.publicKey,
       );
       const now = new Date();
       expect(authorization.expiryDate.getTime()).toBeGreaterThan(now.getTime() + 8_000);
@@ -67,5 +88,180 @@ describe('EndpointRegistration', () => {
         privateEndpointPublicKeyDigest.equals(Buffer.from(authorization.gatewayData)),
       ).toBeTruthy();
     });
+  });
+
+  describe('completeRegistration', () => {
+    beforeEach(async () => {
+      const privateKeyStore = Container.get(DBPrivateKeyStore);
+      await privateKeyStore.saveNodeKey(gatewayKeyPair.privateKey, gatewayCertificate);
+    });
+
+    test('InvalidRegistrationRequestError should be thrown if the PNRR is invalid', async () => {
+      const registrar = Container.get(EndpointRegistrar);
+
+      const error = await getPromiseRejection(
+        registrar.completeRegistration(Buffer.from([])),
+        InvalidRegistrationRequestError,
+      );
+
+      expect(error.message).toMatch(/^Registration request is invalid\/malformed:/);
+      expect(error.cause()).toBeInstanceOf(InvalidMessageError);
+    });
+
+    test('InvalidRegistrationRequestError should be thrown if the auth is invalid', async () => {
+      const registrar = Container.get(EndpointRegistrar);
+      const request = new PrivateNodeRegistrationRequest(
+        endpointKeyPair.publicKey,
+        arrayBufferFrom('invalid'),
+      );
+      const requestSerialized = await request.serialize(endpointKeyPair.privateKey);
+
+      const error = await getPromiseRejection(
+        registrar.completeRegistration(Buffer.from(requestSerialized)),
+        InvalidRegistrationRequestError,
+      );
+
+      expect(error.message).toMatch(
+        /^Authorization in registration request is invalid\/malformed:/,
+      );
+      expect(error.cause()).toBeInstanceOf(InvalidMessageError);
+    });
+
+    test('InvalidRegistrationRequestError should be thrown if the auth does not match key', async () => {
+      const registrar = Container.get(EndpointRegistrar);
+      const authorizationSerialized = await registrar.preRegister(
+        await getPublicKeyDigestHex(gatewayKeyPair.publicKey), // Wrong key
+      );
+      const request = new PrivateNodeRegistrationRequest(
+        endpointKeyPair.publicKey,
+        bufferToArray(authorizationSerialized),
+      );
+      const requestSerialized = await request.serialize(endpointKeyPair.privateKey);
+
+      const error = await getPromiseRejection(
+        registrar.completeRegistration(Buffer.from(requestSerialized)),
+        InvalidRegistrationRequestError,
+      );
+
+      expect(error.message).toEqual('Subject key in request does not match that of authorization');
+      expect(error.cause()).toBeUndefined();
+    });
+
+    test('Registration should fail if gateway is unregistered', async () => {
+      const registrar = Container.get(EndpointRegistrar);
+      const requestSerialized = await makeRegistrationRequest(registrar);
+      await getConnection().getRepository(ConfigItem).delete(ConfigKey.NODE_KEY_SERIAL_NUMBER);
+
+      await expect(registrar.completeRegistration(requestSerialized)).rejects.toBeInstanceOf(
+        UnregisteredGatewayError,
+      );
+    });
+
+    test('Registration data should be returned on success', async () => {
+      const registrar = Container.get(EndpointRegistrar);
+      const requestSerialized = await makeRegistrationRequest(registrar);
+
+      const registrationSerialized = await registrar.completeRegistration(
+        Buffer.from(requestSerialized),
+      );
+
+      PrivateNodeRegistration.deserialize(bufferToArray(registrationSerialized));
+    });
+
+    test('Endpoint certificate should be issued by public gateway', async () => {
+      const registrar = Container.get(EndpointRegistrar);
+      const requestSerialized = await makeRegistrationRequest(registrar);
+
+      const registrationSerialized = await registrar.completeRegistration(
+        Buffer.from(requestSerialized),
+      );
+
+      const registration = PrivateNodeRegistration.deserialize(
+        bufferToArray(registrationSerialized),
+      );
+      const endpointCertificate = registration.privateNodeCertificate;
+      await expect(endpointCertificate.getCertificationPath([], [gatewayCertificate]));
+    });
+
+    test('Endpoint certificate should be valid starting now', async () => {
+      const registrar = Container.get(EndpointRegistrar);
+      const requestSerialized = await makeRegistrationRequest(registrar);
+
+      const registrationSerialized = await registrar.completeRegistration(
+        Buffer.from(requestSerialized),
+      );
+
+      const registration = PrivateNodeRegistration.deserialize(
+        bufferToArray(registrationSerialized),
+      );
+      const endpointCertificate = registration.privateNodeCertificate;
+      const now = new Date();
+      expect(endpointCertificate.startDate.getTime()).toBeWithin(
+        now.getTime() - 2_000,
+        now.getTime(),
+      );
+    });
+
+    test('Endpoint certificate should be valid for 12 months', async () => {
+      const registrar = Container.get(EndpointRegistrar);
+      const requestSerialized = await makeRegistrationRequest(registrar);
+
+      const registrationSerialized = await registrar.completeRegistration(
+        Buffer.from(requestSerialized),
+      );
+
+      const registration = PrivateNodeRegistration.deserialize(
+        bufferToArray(registrationSerialized),
+      );
+      const endpointCertificate = registration.privateNodeCertificate;
+      const expectedEndDate = addYears(new Date(), 1).getTime();
+      expect(endpointCertificate.expiryDate.getTime()).toBeWithin(
+        expectedEndDate - 2_000,
+        expectedEndDate,
+      );
+    });
+
+    test('Endpoint certificate should honor subject public key', async () => {
+      const registrar = Container.get(EndpointRegistrar);
+      const requestSerialized = await makeRegistrationRequest(registrar);
+
+      const registrationSerialized = await registrar.completeRegistration(
+        Buffer.from(requestSerialized),
+      );
+
+      const registration = PrivateNodeRegistration.deserialize(
+        bufferToArray(registrationSerialized),
+      );
+      const endpointCertificate = registration.privateNodeCertificate;
+      await expect(
+        derSerializePublicKey(await endpointCertificate.getPublicKey()),
+      ).resolves.toEqual(await derSerializePublicKey(endpointKeyPair.publicKey));
+    });
+
+    test('Gateway certificate should be included in registration', async () => {
+      const registrar = Container.get(EndpointRegistrar);
+      const requestSerialized = await makeRegistrationRequest(registrar);
+
+      const registrationSerialized = await registrar.completeRegistration(
+        Buffer.from(requestSerialized),
+      );
+
+      const registration = PrivateNodeRegistration.deserialize(
+        bufferToArray(registrationSerialized),
+      );
+      expect(registration.gatewayCertificate.isEqual(gatewayCertificate)).toBeTrue();
+    });
+
+    async function makeRegistrationRequest(registrar: EndpointRegistrar): Promise<Buffer> {
+      const authorizationSerialized = await registrar.preRegister(
+        await getPublicKeyDigestHex(endpointKeyPair.publicKey),
+      );
+      const request = new PrivateNodeRegistrationRequest(
+        endpointKeyPair.publicKey,
+        bufferToArray(authorizationSerialized),
+      );
+      const requestSerialized = await request.serialize(endpointKeyPair.privateKey);
+      return Buffer.from(requestSerialized);
+    }
   });
 });

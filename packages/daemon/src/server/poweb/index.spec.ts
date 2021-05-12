@@ -4,8 +4,12 @@ import { mockSpy } from '../../testUtils/jest';
 import RouteOptions from '../RouteOptions';
 import registerPoWebRoutes, { POWEB_API_PREFIX } from './index';
 import preRegistrationRoutes from './preRegistration';
+import registrationRoutes from './registration';
 
-const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [preRegistrationRoutes];
+const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [
+  preRegistrationRoutes,
+  registrationRoutes,
+];
 
 const mockFastify: FastifyInstance = {
   register: mockSpy(jest.fn()),
