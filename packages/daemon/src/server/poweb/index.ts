@@ -1,12 +1,14 @@
 import { FastifyInstance, FastifyPluginCallback } from 'fastify';
 
 import RouteOptions from '../RouteOptions';
+import parcelDeliveryRoutes from './parcelDelivery';
 import preRegistrationRoutes from './preRegistration';
 import registrationRoutes from './registration';
 
 export const POWEB_API_PREFIX = '/v1';
 
 const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [
+  parcelDeliveryRoutes,
   preRegistrationRoutes,
   registrationRoutes,
 ];
