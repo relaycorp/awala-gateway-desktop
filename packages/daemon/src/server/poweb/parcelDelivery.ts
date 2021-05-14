@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 
-import { registerDisallowedMethods } from '../http';
+import { registerAllowedMethods } from '../http';
 import RouteOptions from '../RouteOptions';
 
 const ENDPOINT_URL = '/parcels';
@@ -9,5 +9,5 @@ export default async function registerRoutes(
   fastify: FastifyInstance,
   _options: RouteOptions,
 ): Promise<void> {
-  registerDisallowedMethods(['POST'], ENDPOINT_URL, fastify);
+  registerAllowedMethods(['POST'], ENDPOINT_URL, fastify);
 }
