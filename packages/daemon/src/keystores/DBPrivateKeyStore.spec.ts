@@ -190,3 +190,44 @@ describe('getCurrentIdKey', () => {
     );
   });
 });
+
+describe('fetchNodeCertificates', () => {
+  test('Nothing should be output if there are no node keys', async () => {
+    const certificates = await keystore.fetchNodeCertificates();
+
+    expect(certificates).toHaveLength(0);
+  });
+
+  test('Node certificates should be output if there are node keys', async () => {
+    await keystore.saveNodeKey(nodeKeyPair.privateKey, nodeCertificate);
+
+    const certificates = await keystore.fetchNodeCertificates();
+
+    expect(certificates).toHaveLength(1);
+    expect(nodeCertificate.isEqual(certificates[0])).toBeTrue();
+  });
+
+  test('Certificates for initial session keys should be ignored', async () => {
+    await keystore.saveInitialSessionKey(sessionKeyPair.privateKey, sessionKeyInitialCertificate);
+    await keystore.saveNodeKey(nodeKeyPair.privateKey, nodeCertificate);
+
+    const certificates = await keystore.fetchNodeCertificates();
+
+    expect(certificates).toHaveLength(1);
+    expect(nodeCertificate.isEqual(certificates[0])).toBeTrue();
+  });
+
+  test('Certificates for subsequent session keys should be ignored', async () => {
+    await keystore.saveSubsequentSessionKey(
+      sessionKeyPair.privateKey,
+      SUBSEQUENT_KEY_ID,
+      recipientNodeCertificate,
+    );
+    await keystore.saveNodeKey(nodeKeyPair.privateKey, nodeCertificate);
+
+    const certificates = await keystore.fetchNodeCertificates();
+
+    expect(certificates).toHaveLength(1);
+    expect(nodeCertificate.isEqual(certificates[0])).toBeTrue();
+  });
+});
