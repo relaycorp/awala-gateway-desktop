@@ -3,7 +3,7 @@ import { Container } from 'typedi';
 
 import { DBPrivateKeyStore } from '../keystores/DBPrivateKeyStore';
 
-export function mockPrivateKeyStore(): PrivateKeyStore {
+export function mockPrivateKeyStore(): MockPrivateKeyStore {
   let originalKeyStore: PrivateKeyStore;
 
   const privateKeyStore = new MockPrivateKeyStore();
