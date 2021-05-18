@@ -34,7 +34,7 @@ export default async function registerRoutes(
         return reply.code(415).send();
       }
 
-      const parcelSerialized = bufferToArray(request.body);
+      const parcelSerialized = request.body;
       const countersignerCertificate = await verifyCountersignature(
         parcelSerialized,
         request.headers.authorization,

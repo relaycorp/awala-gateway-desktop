@@ -177,7 +177,7 @@ test('Well-formed yet invalid parcels should be refused with an HTTP 422 respons
 
 test('Valid parcels should result in an HTTP 202 response', async () => {
   const fastify = await makeServer(mockLogging.logger);
-  const parcelSerialized = arrayBufferFrom('valid parcel');
+  const parcelSerialized = Buffer.from('valid parcel');
 
   const response = await postParcel(
     parcelSerialized,
