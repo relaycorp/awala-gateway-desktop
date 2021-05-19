@@ -1,5 +1,6 @@
 import {
   BoundPrivateKeyData,
+  Certificate,
   PrivateKeyData,
   PrivateKeyStore,
   UnboundKeyPair,
@@ -9,6 +10,7 @@ import { Inject, Service } from 'typedi';
 import { Connection, Repository } from 'typeorm';
 import { InjectConnection } from 'typeorm-typedi-extensions';
 
+import bufferToArray from 'buffer-to-arraybuffer';
 import { Config, ConfigKey } from '../Config';
 import { PrivateKey, PrivateKeyType } from '../entity/PrivateKey';
 
@@ -28,6 +30,14 @@ export class DBPrivateKeyStore extends PrivateKeyStore {
       return null;
     }
     return this.fetchNodeKey(Buffer.from(keyId, 'hex'));
+  }
+
+  public async fetchNodeCertificates(): Promise<readonly Certificate[]> {
+    const keys = await this.repository.find({ type: PrivateKeyType.NODE });
+    const certificateDeserializationPromises = keys.map((k) =>
+      Certificate.deserialize(bufferToArray(k.certificateDer!!)),
+    );
+    return Promise.all(certificateDeserializationPromises);
   }
 
   protected async fetchKey(keyId: string): Promise<PrivateKeyData | null> {

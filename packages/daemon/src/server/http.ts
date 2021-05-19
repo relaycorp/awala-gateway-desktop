@@ -10,7 +10,7 @@ export const HTTP_METHODS: readonly HTTPMethods[] = [
   'OPTIONS',
 ];
 
-export function registerDisallowedMethods(
+export function registerAllowedMethods(
   allowedMethods: readonly HTTPMethods[],
   endpointURL: string,
   fastifyInstance: FastifyInstance,

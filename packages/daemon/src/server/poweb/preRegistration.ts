@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyReply } from 'fastify';
 import { Container } from 'typedi';
 
 import { EndpointRegistrar, MalformedEndpointKeyDigestError } from '../../endpoints/registration';
-import { registerDisallowedMethods } from '../http';
+import { registerAllowedMethods } from '../http';
 import RouteOptions from '../RouteOptions';
 import { CONTENT_TYPES } from './contentTypes';
 
@@ -12,7 +12,7 @@ export default async function registerRoutes(
   fastify: FastifyInstance,
   _options: RouteOptions,
 ): Promise<void> {
-  registerDisallowedMethods(['POST'], ENDPOINT_URL, fastify);
+  registerAllowedMethods(['POST'], ENDPOINT_URL, fastify);
 
   const endpointRegistrar = Container.get(EndpointRegistrar);
 
