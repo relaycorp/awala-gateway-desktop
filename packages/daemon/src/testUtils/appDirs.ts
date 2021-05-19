@@ -12,7 +12,7 @@ export function useTemporaryAppDirs(): () => Paths {
 
   let tempDir: string;
   let tempAppDirs: Paths;
-  beforeEach(async () => {
+  beforeAll(async () => {
     tempDir = await fs.mkdtemp(join(tmpdir(), 'app-dirs'));
     tempAppDirs = {
       cache: `${tempDir}/cache`,
@@ -21,6 +21,9 @@ export function useTemporaryAppDirs(): () => Paths {
       log: `${tempDir}/log`,
       temp: `${tempDir}/temp`,
     };
+  });
+
+  beforeEach(() => {
     Container.set(APP_DIRS, tempAppDirs);
   });
 
