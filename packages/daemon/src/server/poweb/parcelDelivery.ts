@@ -34,9 +34,8 @@ export default async function registerRoutes(
         return reply.code(415).send();
       }
 
-      const parcelSerialized = request.body;
       const countersignerCertificate = await verifyCountersignature(
-        parcelSerialized,
+        request.body,
         request.headers.authorization,
         request.log,
         privateKeyStore,
@@ -49,7 +48,7 @@ export default async function registerRoutes(
       }
 
       try {
-        await parcelStore.storeInternetBoundParcel(parcelSerialized);
+        await parcelStore.storeInternetBoundParcel(request.body);
       } catch (err) {
         return replyWithParcelRejection(err, request, reply);
       }
