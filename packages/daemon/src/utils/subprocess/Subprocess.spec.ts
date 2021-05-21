@@ -6,10 +6,10 @@ import { dirname, join } from 'path';
 import { Duplex } from 'stream';
 import { source } from 'stream-to-it';
 
-import { asyncIterableToArray, iterableTake } from '../testUtils/iterables';
-import { getMockInstance } from '../testUtils/jest';
-import { getPromiseRejection } from '../testUtils/promises';
-import { setImmediateAsync } from '../testUtils/timing';
+import { asyncIterableToArray, iterableTake } from '../../testUtils/iterables';
+import { getMockInstance } from '../../testUtils/jest';
+import { getPromiseRejection } from '../../testUtils/promises';
+import { setImmediateAsync } from '../../testUtils/timing';
 import { fork } from './Subprocess';
 import { SubprocessError } from './SubprocessError';
 

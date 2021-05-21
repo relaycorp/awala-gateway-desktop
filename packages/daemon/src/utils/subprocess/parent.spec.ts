@@ -1,10 +1,10 @@
 import pipe from 'it-pipe';
 import { source } from 'stream-to-it';
 
-import { asyncIterableToArray, iterableTake } from '../testUtils/iterables';
-import { makeProcessSendMock } from '../testUtils/process';
-import { getPromiseRejection } from '../testUtils/promises';
-import { setImmediateAsync } from '../testUtils/timing';
+import { asyncIterableToArray, iterableTake } from '../../testUtils/iterables';
+import { makeProcessSendMock } from '../../testUtils/process';
+import { getPromiseRejection } from '../../testUtils/promises';
+import { setImmediateAsync } from '../../testUtils/timing';
 import { makeParentStream } from './parent';
 import { SubprocessError } from './SubprocessError';
 
