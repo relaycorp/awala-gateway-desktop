@@ -27,7 +27,7 @@ describe('fork', () => {
 
     const isTypescript = __filename.endsWith('.ts');
     const expectedScriptPath = join(
-      dirname(__dirname),
+      dirname(dirname(__dirname)),
       'bin',
       isTypescript ? 'subprocess.ts' : 'subprocess.js',
     );

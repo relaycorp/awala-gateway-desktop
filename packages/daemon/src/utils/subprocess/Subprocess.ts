@@ -6,7 +6,8 @@ import { SubprocessError } from './SubprocessError';
 const IS_TYPESCRIPT = __filename.endsWith('.ts');
 // istanbul ignore next
 const SUBPROCESS_SCRIPT_NAME = IS_TYPESCRIPT ? 'subprocess.ts' : 'subprocess.js';
-const SUBPROCESS_SCRIPT_PATH = join(dirname(__dirname), 'bin', SUBPROCESS_SCRIPT_NAME);
+const ROOT_DIR = dirname(dirname(__dirname));
+const SUBPROCESS_SCRIPT_PATH = join(ROOT_DIR, 'bin', SUBPROCESS_SCRIPT_NAME);
 
 export async function fork(subprocessName: string): Promise<Duplex> {
   const childProcess = forkChildProcess(SUBPROCESS_SCRIPT_PATH, [subprocessName]);
