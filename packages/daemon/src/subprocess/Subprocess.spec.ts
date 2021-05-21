@@ -10,8 +10,8 @@ import { asyncIterableToArray, iterableTake } from '../testUtils/iterables';
 import { getMockInstance } from '../testUtils/jest';
 import { getPromiseRejection } from '../testUtils/promises';
 import { setImmediateAsync } from '../testUtils/timing';
-import { fork} from './Subprocess';
-import {SubprocessError} from "./SubprocessError";
+import { fork } from './Subprocess';
+import { SubprocessError } from './SubprocessError';
 
 jest.mock('child_process');
 
