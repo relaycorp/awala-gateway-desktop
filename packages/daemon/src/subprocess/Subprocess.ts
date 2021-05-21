@@ -1,8 +1,7 @@
 import { fork as forkChildProcess } from 'child_process';
 import { dirname, join } from 'path';
 import { Duplex } from 'stream';
-
-import { PrivateGatewayError } from '../errors';
+import { SubprocessError } from './SubprocessError';
 
 const IS_TYPESCRIPT = __filename.endsWith('.ts');
 const SUBPROCESS_SCRIPT_PATH = join(
@@ -52,5 +51,3 @@ export async function fork(subprocessName: string): Promise<Duplex> {
     });
   });
 }
-
-export class SubprocessError extends PrivateGatewayError {}
