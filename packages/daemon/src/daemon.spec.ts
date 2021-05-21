@@ -1,105 +1,34 @@
-import { promises as fs } from 'fs';
-import { join } from 'path';
 import { Container } from 'typedi';
-import * as typeorm from 'typeorm';
 
-import envPaths from 'env-paths';
 import daemon from './daemon';
 import { makeServer, runServer } from './server';
+import startup from './startup';
 import runSync from './sync';
-import { mockSpy } from './testUtils/jest';
-import { makeMockLogging, MockLogging } from './testUtils/logging';
-import { mockToken } from './testUtils/tokens';
-import { APP_DIRS, LOGGER } from './tokens';
-import * as logging from './utils/logging';
+import { mockLoggerToken } from './testUtils/logging';
+import { LOGGER } from './tokens';
 
 jest.mock('./server');
 jest.mock('./sync');
+jest.mock('./startup');
 
-const mockCreateConnection = mockSpy(jest.spyOn(typeorm, 'createConnection'));
+mockLoggerToken();
 
-mockToken(APP_DIRS);
-mockToken(LOGGER);
+test('Startup routine should be called', async () => {
+  await daemon();
 
-let mockLogging: MockLogging;
-beforeEach(() => {
-  mockLogging = makeMockLogging();
+  expect(startup).toBeCalled();
 });
-mockSpy(jest.spyOn(logging, 'makeLogger'), () => mockLogging.logger);
-
-const mockMkdir = mockSpy(jest.spyOn(fs, 'mkdir'));
-
-const PATHS = envPaths('AwalaGateway', { suffix: '' });
 
 test('Server should be run', async () => {
   await daemon();
 
-  expect(runServer).toBeCalled();
+  const logger = Container.get(LOGGER);
+  expect(makeServer).toBeCalledWith(logger);
+  expect(runServer).toHaveBeenCalledAfter(startup as any);
 });
 
 test('Sync should be run', async () => {
   await daemon();
 
-  expect(runSync).toBeCalled();
-});
-
-describe('App directories', () => {
-  test('Data directory should be created', async () => {
-    await daemon();
-
-    expect(mockMkdir).toBeCalledWith(PATHS.data, { recursive: true });
-  });
-
-  test('Log directory should be created', async () => {
-    await daemon();
-
-    expect(mockMkdir).toBeCalledWith(PATHS.log, { recursive: true });
-  });
-
-  test('APP_DIRS token should be registered', async () => {
-    expect(Container.has(APP_DIRS)).toBeFalse();
-
-    await daemon();
-
-    expect(Container.get(APP_DIRS)).toEqual(PATHS);
-  });
-});
-
-describe('Logging', () => {
-  test('Logger factory should receive path to log directory', async () => {
-    await daemon();
-
-    expect(logging.makeLogger).toBeCalledWith('daemon', PATHS.log);
-  });
-
-  test('Logger should be enabled by default', async () => {
-    await daemon();
-
-    expect(makeServer).toBeCalledWith(mockLogging.logger);
-  });
-
-  test('LOGGER token should be registered', async () => {
-    expect(Container.has(LOGGER)).toBeFalse();
-
-    await daemon();
-
-    expect(Container.get(LOGGER)).toBe(mockLogging.logger);
-  });
-});
-
-test('DB connection should be established', async () => {
-  const originalConnectionOptions = await typeorm.getConnectionOptions();
-
-  await daemon();
-
-  const entitiesDir = __filename.endsWith('.ts')
-    ? join(__dirname, 'entity', '**', '*.ts')
-    : join(__dirname, 'entity', '**', '*.js');
-  const dbPath = join(PATHS.data, 'db.sqlite');
-  expect(mockCreateConnection).toBeCalledWith({
-    ...originalConnectionOptions,
-    database: dbPath,
-    entities: [entitiesDir],
-  });
-  expect(mockCreateConnection).toHaveBeenCalledBefore(makeServer as any);
+  expect(runSync).toHaveBeenCalledAfter(startup as any);
 });

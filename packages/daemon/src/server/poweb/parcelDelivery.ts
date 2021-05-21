@@ -1,6 +1,6 @@
 import { Certificate, DETACHED_SIGNATURE_TYPES } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { FastifyInstance, FastifyLoggerInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { FastifyInstance, FastifyLoggerInstance, FastifyReply } from 'fastify';
 import { Container } from 'typedi';
 
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
@@ -34,9 +34,8 @@ export default async function registerRoutes(
         return reply.code(415).send();
       }
 
-      const parcelSerialized = request.body;
       const countersignerCertificate = await verifyCountersignature(
-        parcelSerialized,
+        request.body,
         request.headers.authorization,
         request.log,
         privateKeyStore,
@@ -49,9 +48,9 @@ export default async function registerRoutes(
       }
 
       try {
-        await parcelStore.storeInternetBoundParcel(parcelSerialized);
+        await parcelStore.storeInternetBoundParcel(request.body);
       } catch (err) {
-        return replyWithParcelRejection(err, request, reply);
+        return replyWithParcelRejection(err, reply, request.log);
       }
 
       request.log.info('Parcel was successfully saved');
@@ -61,24 +60,26 @@ export default async function registerRoutes(
 }
 
 function replyWithParcelRejection(
-  err: Error,
-  request: FastifyRequest<any>,
+  error: Error,
   reply: FastifyReply<any>,
+  logger: FastifyLoggerInstance,
 ): FastifyReply<any> {
+  const errorAwareLogger = logger.child({ err: error });
+
   let statusCode: number;
   let message: string;
-  if (err instanceof MalformedParcelError) {
+  if (error instanceof MalformedParcelError) {
     statusCode = 400;
     message = 'Parcel is malformed';
-    request.log.info({ err }, 'Rejected malformed parcel');
-  } else if (err instanceof InvalidParcelError) {
+    errorAwareLogger.info('Rejected malformed parcel');
+  } else if (error instanceof InvalidParcelError) {
     statusCode = 422;
     message = 'Parcel is well-formed but invalid';
-    request.log.info({ err }, 'Rejected invalid parcel');
+    errorAwareLogger.info('Rejected invalid parcel');
   } else {
     statusCode = 500;
     message = 'Internal server error';
-    request.log.error({ err }, 'Failed to store parcel');
+    errorAwareLogger.error('Failed to store parcel');
   }
   return reply.code(statusCode).send({ message });
 }
