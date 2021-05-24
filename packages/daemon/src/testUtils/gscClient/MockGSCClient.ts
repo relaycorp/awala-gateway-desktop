@@ -22,7 +22,7 @@ import {
 
 export class MockGSCClient implements GSCClient {
   // tslint:disable-next-line:readonly-array
-  constructor(private callQueue: MockMethodCall<any, any>[]) {}
+  constructor(private callQueue: Array<MockMethodCall<any, any>>) {}
 
   public get callsRemaining(): number {
     return this.callQueue.length;

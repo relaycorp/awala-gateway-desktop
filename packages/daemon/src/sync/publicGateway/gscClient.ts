@@ -6,7 +6,7 @@ import { PrivateGatewayError } from '../../errors';
 export class NonExistingAddressError extends PrivateGatewayError {}
 
 /**
- * Result the PoWeb address and return a client bound to it.
+ * Resolve the PoWeb address and return a client bound to it.
  *
  * @param publicGatewayAddress
  * @throws PublicAddressingError if the DNS lookup or DNSSEC verification failed

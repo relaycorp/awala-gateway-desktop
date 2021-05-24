@@ -75,4 +75,6 @@ describe('storeInternetBoundParcel', () => {
     const parcelFile = await fs.readFile(expectedParcelPath);
     expect(parcelFile).toEqual(parcelSerialized);
   });
+
+  test.todo('Parcel expiry date should be stored in metadata file');
 });
