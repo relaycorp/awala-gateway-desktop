@@ -19,7 +19,7 @@
     "abortable-iterator": "^3.0.0",
     "buffer-to-arraybuffer": "0.0.6",
     "bufferutil": "^4.0.3",
-    "date-fns": "^2.21.3",
+    "date-fns": "^2.22.1",
     "default-gateway": "^6.0.3",
     "env-paths": "^2.2.1",
     "env-var": "^7.0.1",
