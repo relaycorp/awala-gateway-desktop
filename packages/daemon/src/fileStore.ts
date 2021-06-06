@@ -1,6 +1,6 @@
 // tslint:disable:max-classes-per-file
 import { Paths } from 'env-paths';
-import { promises as fs } from 'fs';
+import { Dirent, promises as fs } from 'fs';
 import { dirname, join } from 'path';
 import { Inject, Service } from 'typedi';
 
@@ -35,5 +35,27 @@ export class FileStore {
     const objectDirPath = dirname(objectPath);
     await fs.mkdir(objectDirPath, { recursive: true });
     await fs.writeFile(objectPath, objectContent);
+  }
+
+  public async *listObjects(keyPrefix: string): AsyncIterable<string> {
+    const directoryPath = join(this.dataPath, keyPrefix);
+    let directoryContents: readonly Dirent[];
+    try {
+      directoryContents = await fs.readdir(directoryPath, { withFileTypes: true });
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        directoryContents = [];
+      } else {
+        throw new FileStoreError(err, 'Failed to read directory');
+      }
+    }
+    for (const directoryItem of directoryContents) {
+      const itemRelativePath = join(keyPrefix, directoryItem.name);
+      if (directoryItem.isDirectory()) {
+        yield* await this.listObjects(itemRelativePath);
+      } else {
+        yield itemRelativePath;
+      }
+    }
   }
 }
