@@ -85,6 +85,35 @@ describe('putObject', () => {
   });
 });
 
+describe('deleteObject', () => {
+  test('Non-existing object should be ignored', async () => {
+    const store = new FileStore(tempAppDirs);
+
+    await store.deleteObject(OBJECT_KEY);
+  });
+
+  test('Error deleting file should be propagated', async () => {
+    const store = new FileStore(tempAppDirs);
+    const unlinkError = new Error('oh no');
+    const unlinkSpy = jest.spyOn(fs, 'unlink');
+    unlinkSpy.mockRejectedValueOnce(unlinkError);
+
+    const error = await getPromiseRejection(store.deleteObject(OBJECT_KEY), FileStoreError);
+
+    expect(error.message).toMatch(/^Failed to delete object: /);
+    expect(error.cause()).toEqual(unlinkError);
+  });
+
+  test('Existing object should be deleted', async () => {
+    const store = new FileStore(tempAppDirs);
+    await store.putObject(OBJECT_CONTENT, OBJECT_KEY);
+
+    await store.deleteObject(OBJECT_KEY);
+
+    await expect(store.getObject(OBJECT_KEY)).resolves.toBeNull();
+  });
+});
+
 describe('listObjects', () => {
   const keyPrefix = 'sub';
 

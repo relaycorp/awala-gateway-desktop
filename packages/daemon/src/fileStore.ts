@@ -18,7 +18,7 @@ export class FileStore {
   }
 
   public async getObject(key: string): Promise<Buffer | null> {
-    const objectPath = join(this.dataPath, key);
+    const objectPath = this.getObjectPath(key);
     try {
       return await fs.readFile(objectPath);
     } catch (err) {
@@ -31,14 +31,25 @@ export class FileStore {
   }
 
   public async putObject(objectContent: Buffer, key: string): Promise<void> {
-    const objectPath = join(this.dataPath, key);
+    const objectPath = this.getObjectPath(key);
     const objectDirPath = dirname(objectPath);
     await fs.mkdir(objectDirPath, { recursive: true });
     await fs.writeFile(objectPath, objectContent);
   }
 
+  public async deleteObject(key: string): Promise<void> {
+    const objectPath = this.getObjectPath(key);
+    try {
+      await fs.unlink(objectPath);
+    } catch (err) {
+      if (err?.code !== 'ENOENT') {
+        throw new FileStoreError(err, 'Failed to delete object');
+      }
+    }
+  }
+
   public async *listObjects(keyPrefix: string): AsyncIterable<string> {
-    const directoryPath = join(this.dataPath, keyPrefix);
+    const directoryPath = this.getObjectPath(keyPrefix);
     let directoryContents: readonly Dirent[];
     try {
       directoryContents = await fs.readdir(directoryPath, { withFileTypes: true });
@@ -57,5 +68,9 @@ export class FileStore {
         yield itemRelativePath;
       }
     }
+  }
+
+  protected getObjectPath(key: string): string {
+    return join(this.dataPath, key);
   }
 }
