@@ -1,6 +1,7 @@
 // tslint:disable:max-classes-per-file
 
 import { Parcel } from '@relaycorp/relaynet-core';
+import { serialize } from 'bson';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { createHash } from 'crypto';
 import { Inject, Service } from 'typedi';
@@ -39,6 +40,9 @@ export class ParcelStore {
       await sha256Hex(parcel.recipientAddress + parcel.id),
     ].join('/');
     await this.fileStore.putObject(parcelSerialized, parcelKey);
+
+    const parcelMetadata = { expiryDate: parcel.expiryDate.getTime() / 1_000 };
+    await this.fileStore.putObject(serialize(parcelMetadata), parcelKey + '.pmeta');
   }
 }
 

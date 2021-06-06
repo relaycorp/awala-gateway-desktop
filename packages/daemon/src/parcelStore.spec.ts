@@ -5,6 +5,7 @@ import {
   RAMFSyntaxError,
 } from '@relaycorp/relaynet-core';
 import { generateNodeKeyPairSet, generatePDACertificationPath } from '@relaycorp/relaynet-testing';
+import { deserialize } from 'bson';
 import { subSeconds } from 'date-fns';
 import { promises as fs } from 'fs';
 import { join } from 'path';
@@ -33,6 +34,8 @@ beforeEach(() => {
   parcelStore = new ParcelStore(Container.get(FileStore));
 });
 
+const PUBLIC_ENDPOINT_ADDRESS = 'https://endpoint.com';
+
 describe('storeInternetBoundParcel', () => {
   test('Malformed parcels should be refused', async () => {
     const error = await getPromiseRejection(
@@ -44,7 +47,7 @@ describe('storeInternetBoundParcel', () => {
   });
 
   test('Well-formed yet invalid parcels should be refused', async () => {
-    const parcel = new Parcel('https://endpoint.com', endpointCertificate, Buffer.from([]), {
+    const parcel = new Parcel(PUBLIC_ENDPOINT_ADDRESS, endpointCertificate, Buffer.from([]), {
       creationDate: subSeconds(new Date(), 2),
       ttl: 1,
     });
@@ -59,22 +62,35 @@ describe('storeInternetBoundParcel', () => {
   });
 
   test('Valid parcels should be stored', async () => {
-    const recipientAddress = 'https://endpoint.com';
-    const parcel = new Parcel(recipientAddress, endpointCertificate, Buffer.from([]));
+    const parcel = new Parcel(PUBLIC_ENDPOINT_ADDRESS, endpointCertificate, Buffer.from([]));
     const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
 
     await parcelStore.storeInternetBoundParcel(parcelSerialized);
 
-    const expectedParcelPath = join(
-      getAppDirs().data,
-      'parcels',
-      'internet-bound',
-      await endpointCertificate.calculateSubjectPrivateAddress(),
-      await sha256Hex(recipientAddress + parcel.id),
-    );
+    const expectedParcelPath = await computeInternetBoundParcelKey(parcel);
     const parcelFile = await fs.readFile(expectedParcelPath);
     expect(parcelFile).toEqual(parcelSerialized);
   });
 
-  test.todo('Parcel expiry date should be stored in metadata file');
+  test('Parcel expiry date should be stored in metadata file', async () => {
+    const parcel = new Parcel(PUBLIC_ENDPOINT_ADDRESS, endpointCertificate, Buffer.from([]));
+    const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
+
+    await parcelStore.storeInternetBoundParcel(parcelSerialized);
+
+    const parcelPath = await computeInternetBoundParcelKey(parcel);
+    const parcelMetadataPath = parcelPath + '.pmeta';
+    const parcelMetadata = deserialize(await fs.readFile(parcelMetadataPath));
+    expect(parcelMetadata).toHaveProperty('expiryDate', parcel.expiryDate.getTime() / 1_000);
+  });
+
+  async function computeInternetBoundParcelKey(parcel: Parcel): Promise<string> {
+    return join(
+      getAppDirs().data,
+      'parcels',
+      'internet-bound',
+      await endpointCertificate.calculateSubjectPrivateAddress(),
+      await sha256Hex(PUBLIC_ENDPOINT_ADDRESS + parcel.id),
+    );
+  }
 });
