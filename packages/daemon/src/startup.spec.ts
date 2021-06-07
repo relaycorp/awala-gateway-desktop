@@ -26,7 +26,7 @@ const mockMkdir = mockSpy(jest.spyOn(fs, 'mkdir'));
 
 const PATHS = envPaths('AwalaGateway', { suffix: '' });
 
-const COMPONENT_NAME = 'the-component'
+const COMPONENT_NAME = 'the-component';
 
 describe('App directories', () => {
   test('Data directory should be created', async () => {
