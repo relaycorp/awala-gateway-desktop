@@ -14,10 +14,10 @@ const DB_FILE_NAME = 'db.sqlite';
 
 const APP_NAME = 'AwalaGateway';
 
-export default async function (): Promise<void> {
+export default async function runStartup(componentName: string): Promise<void> {
   const paths = envPaths(APP_NAME, { suffix: '' });
   await createPaths(paths);
-  const logger = makeLogger('daemon', paths.log);
+  const logger = makeLogger(componentName, paths.log);
   await registerTokens(logger, paths);
 
   await createDBConnection();

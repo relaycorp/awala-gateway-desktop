@@ -6,7 +6,7 @@ import runSync from './sync';
 import { LOGGER } from './tokens';
 
 export default async function (): Promise<void> {
-  await startup();
+  await startup('daemon');
 
   const logger = Container.get(LOGGER);
   const server = await makeServer(logger);
