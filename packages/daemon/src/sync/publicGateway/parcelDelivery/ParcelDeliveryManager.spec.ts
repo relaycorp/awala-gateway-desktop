@@ -107,7 +107,37 @@ describe('deliverWhileConnected', () => {
 });
 
 describe('notifyAboutNewParcel', () => {
-  test.todo('Notification should be skipped while disconnected');
+  test('Notification should be skipped while disconnected', async () => {
+    let notificationsCount = 0;
+    subprocessStream.on('data', () => {
+      notificationsCount += 1;
+    });
 
-  test.todo('Notification should be sent if connected');
+    await parcelDeliveryManager.deliverWhileConnected();
+    parcelDeliveryManager.notifyAboutNewParcel('whatever');
+
+    await setImmediateAsync();
+    expect(notificationsCount).toEqual(0);
+  });
+
+  test('Notification should be sent if connected', async () => {
+    mockPubGatewayStatusStream.mockReturnValue(
+      arrayToAsyncIterable([
+        PublicGatewayCollectionStatus.DISCONNECTED,
+        PublicGatewayCollectionStatus.CONNECTED,
+      ]),
+    );
+    // tslint:disable-next-line:readonly-array
+    const notifications: string[] = [];
+    subprocessStream.on('data', (data) => {
+      notifications.push(data);
+    });
+    const parcelKey = 'whatever';
+
+    await parcelDeliveryManager.deliverWhileConnected();
+    parcelDeliveryManager.notifyAboutNewParcel(parcelKey);
+
+    await setImmediateAsync();
+    expect(notifications).toEqual([parcelKey]);
+  });
 });

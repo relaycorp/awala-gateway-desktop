@@ -29,6 +29,6 @@ export class ParcelDeliveryManager {
   }
 
   public notifyAboutNewParcel(parcelKey: string): void {
-    throw new Error('fds' + parcelKey);
+    this.subprocess?.write(parcelKey);
   }
 }
