@@ -18,8 +18,10 @@ export class ParcelDeliveryManager {
       for await (const status of statuses) {
         if (status === PublicGatewayCollectionStatus.DISCONNECTED) {
           this.subprocess?.destroy();
+          // tslint:disable-next-line:no-object-mutation
           this.subprocess = null;
         } else if (!this.subprocess) {
+          // tslint:disable-next-line:no-object-mutation
           this.subprocess = await fork('parcel-delivery');
         }
       }
