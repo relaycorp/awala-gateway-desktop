@@ -148,7 +148,7 @@ describe('listObjects', () => {
 
   test('Objects at the root should be output', async () => {
     const store = new FileStore(tempAppDirs);
-    const key = `${keyPrefix}/thingy`;
+    const key = join(keyPrefix, 'thingy');
     await store.putObject(OBJECT_CONTENT, key);
 
     await expect(asyncIterableToArray(store.listObjects(keyPrefix))).resolves.toEqual([key]);
@@ -156,7 +156,7 @@ describe('listObjects', () => {
 
   test('Objects in subdirectories should be output', async () => {
     const store = new FileStore(tempAppDirs);
-    const key = `${keyPrefix}/another-sub/thingy`;
+    const key = join(keyPrefix, 'another-sub', 'thingy');
     await store.putObject(OBJECT_CONTENT, key);
 
     await expect(asyncIterableToArray(store.listObjects(keyPrefix))).resolves.toEqual([key]);

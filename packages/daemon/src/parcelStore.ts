@@ -4,6 +4,7 @@ import { Parcel } from '@relaycorp/relaynet-core';
 import { deserialize, Document, serialize } from 'bson';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { createHash } from 'crypto';
+import { join } from 'path';
 import { Inject, Service } from 'typedi';
 
 import { PrivateGatewayError } from './errors';
@@ -39,11 +40,11 @@ export class ParcelStore {
       throw new InvalidParcelError(err);
     }
 
-    const parcelRelativeKey = [
+    const parcelRelativeKey = join(
       await parcel.senderCertificate.calculateSubjectPrivateAddress(),
       // Hash the recipient and id together to avoid exceeding Windows' 260-char limit for paths
       await sha256Hex(parcel.recipientAddress + parcel.id),
-    ].join('/');
+    );
     const parcelAbsoluteKey = getInternetBoundParcelKey(parcelRelativeKey);
     await this.fileStore.putObject(parcelSerialized, parcelAbsoluteKey);
 
