@@ -59,6 +59,7 @@ export default async function runParcelCollection(_parentStream: Duplex): Promis
     }
   }
 
+  logger.info('Ready to deliver parcels');
   const parentStream = await makeParentStream();
   await pipe(async function* (): AsyncIterable<string> {
     // Deliver the queued parcels before delivering parcels streamed by the parent process

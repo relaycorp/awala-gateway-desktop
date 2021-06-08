@@ -69,6 +69,13 @@ test('Client should connect to appropriate public gateway', async () => {
   expect(mockMakeGSCClient).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
 });
 
+test('Subprocess should record a log when it is ready', async () => {
+  setImmediate(endParentStream);
+  await runParcelCollection(parentStream);
+
+  expect(mockLogs).toContainEqual(partialPinoLog('info', 'Ready to deliver parcels'));
+});
+
 test('Subprocess should exit with code 2 if it ends normally', async () => {
   setImmediate(endParentStream);
   await expect(runParcelCollection(parentStream)).resolves.toEqual(2);
