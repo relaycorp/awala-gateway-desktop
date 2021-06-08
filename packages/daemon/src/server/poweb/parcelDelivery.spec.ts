@@ -12,6 +12,7 @@ import { mockSpy } from '../../testUtils/jest';
 import { makeMockLoggingFixture, partialPinoLog } from '../../testUtils/logging';
 import { makeServer } from '../index';
 import { CONTENT_TYPES } from './contentTypes';
+import { ParcelDeliveryManager } from '../../sync/publicGateway/parcelDelivery/ParcelDeliveryManager';
 
 const ENDPOINT_URL = '/v1/parcels';
 
@@ -22,6 +23,9 @@ useTemporaryAppDirs();
 
 const mockStoreInternetBoundParcel = mockSpy(
   jest.spyOn(ParcelStore.prototype, 'storeInternetBoundParcel'),
+);
+const mockParcelDeliveryManagerNotifier = mockSpy(
+  jest.spyOn(ParcelDeliveryManager.prototype, 'notifyAboutNewParcel'),
 );
 
 let gatewayCertificate: Certificate;
@@ -174,6 +178,9 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
   );
 
   expect(mockStoreInternetBoundParcel).toBeCalledWith(parcelSerialized);
+  expect(mockParcelDeliveryManagerNotifier).toBeCalledWith(
+    mockStoreInternetBoundParcel.mock.results[0].value,
+  );
   expect(response).toHaveProperty('statusCode', 202);
   expect(JSON.parse(response.payload)).toHaveProperty(
     'message',
