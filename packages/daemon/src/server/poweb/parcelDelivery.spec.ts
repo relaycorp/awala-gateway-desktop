@@ -1,13 +1,11 @@
 import { Certificate, DETACHED_SIGNATURE_TYPES } from '@relaycorp/relaynet-core';
-import { generateNodeKeyPairSet, generatePDACertificationPath } from '@relaycorp/relaynet-testing';
 import { FastifyInstance } from 'fastify';
 import { Response as LightMyRequestResponse } from 'light-my-request';
-import { Container } from 'typedi';
 
-import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
 import { InvalidParcelError, MalformedParcelError, ParcelStore } from '../../parcelStore';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { arrayBufferFrom } from '../../testUtils/buffer';
+import { setUpPKIFixture } from '../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { testDisallowedMethods } from '../../testUtils/http';
 import { mockSpy } from '../../testUtils/jest';
@@ -26,24 +24,14 @@ const mockStoreInternetBoundParcel = mockSpy(
   jest.spyOn(ParcelStore.prototype, 'storeInternetBoundParcel'),
 );
 
-let gatewayPrivateKey: CryptoKey;
 let gatewayCertificate: Certificate;
 let endpointPrivateKey: CryptoKey;
 let endpointCertificate: Certificate;
-beforeAll(async () => {
-  const keyPairSet = await generateNodeKeyPairSet();
-  const certPath = await generatePDACertificationPath(keyPairSet);
-
-  gatewayPrivateKey = keyPairSet.privateGateway.privateKey;
+setUpPKIFixture((keyPairSet, certPath) => {
   gatewayCertificate = certPath.privateGateway;
 
   endpointPrivateKey = keyPairSet.privateEndpoint.privateKey;
   endpointCertificate = certPath.privateEndpoint;
-});
-
-beforeEach(async () => {
-  const privateKeyStore = Container.get(DBPrivateKeyStore);
-  await privateKeyStore.saveNodeKey(gatewayPrivateKey, gatewayCertificate);
 });
 
 describe('Disallowed methods', () => {
