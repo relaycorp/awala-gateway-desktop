@@ -5,6 +5,7 @@ import { Container } from 'typedi';
 
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
 import { InvalidParcelError, MalformedParcelError, ParcelStore } from '../../parcelStore';
+import { ParcelDeliveryManager } from '../../sync/publicGateway/parcelDelivery/ParcelDeliveryManager';
 import { registerAllowedMethods } from '../http';
 import RouteOptions from '../RouteOptions';
 import { CONTENT_TYPES } from './contentTypes';
@@ -17,6 +18,7 @@ export default async function registerRoutes(
 ): Promise<void> {
   const privateKeyStore = Container.get(DBPrivateKeyStore);
   const parcelStore = Container.get(ParcelStore);
+  const parcelDeliveryManager = Container.get(ParcelDeliveryManager);
 
   registerAllowedMethods(['POST'], ENDPOINT_URL, fastify);
 
@@ -47,12 +49,14 @@ export default async function registerRoutes(
           .send({ message: 'Parcel delivery countersignature is either missing or invalid' });
       }
 
+      let parcelKey: string;
       try {
-        await parcelStore.storeInternetBoundParcel(request.body);
+        parcelKey = await parcelStore.storeInternetBoundParcel(request.body);
       } catch (err) {
         return replyWithParcelRejection(err, reply, request.log);
       }
 
+      parcelDeliveryManager.notifyAboutNewParcel(parcelKey);
       request.log.info('Parcel was successfully saved');
       return reply.code(202).send({ message: 'Parcel is well-formed but invalid' });
     },

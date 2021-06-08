@@ -19,7 +19,7 @@ let closeWebSocket: (() => void) | null = null;
 const server = fork(
   path.join(app.getAppPath(), 'node_modules/daemon/build/bin/gateway-daemon.js'),
   {
-    env: { ...process.env, GATEWAY_FORKED_FROM_UI: 'true' },
+    env: { ...process.env, LOG_FILES: 'true' },
   },
 );
 server.on('close', (code: number, _signal: string) => {

@@ -16,7 +16,7 @@ mockLoggerToken();
 test('Startup routine should be called', async () => {
   await daemon();
 
-  expect(startup).toBeCalled();
+  expect(startup).toBeCalledWith('daemon');
 });
 
 test('Server should be run', async () => {

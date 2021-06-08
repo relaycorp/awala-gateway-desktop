@@ -3,4 +3,4 @@
 import './_setup';
 
 import main from '../subprocessEntrypoint';
-main();
+main(process.argv[2]);

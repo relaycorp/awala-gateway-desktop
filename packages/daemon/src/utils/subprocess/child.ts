@@ -10,7 +10,9 @@ const ROOT_DIR = dirname(dirname(__dirname));
 const SUBPROCESS_SCRIPT_PATH = join(ROOT_DIR, 'bin', SUBPROCESS_SCRIPT_NAME);
 
 export async function fork(subprocessName: string): Promise<Duplex> {
-  const childProcess = forkChildProcess(SUBPROCESS_SCRIPT_PATH, [subprocessName]);
+  const childProcess = forkChildProcess(SUBPROCESS_SCRIPT_PATH, [subprocessName], {
+    env: { ...process.env, LOG_FILES: 'true' },
+  });
   const duplex = new Duplex({
     objectMode: true,
     read(): void {
@@ -22,18 +24,17 @@ export async function fork(subprocessName: string): Promise<Duplex> {
       childProcess.send(chunk);
       cb();
     },
+    destroy(error, cb): void {
+      childProcess.kill();
+      cb(error);
+    },
   });
 
-  childProcess.once('exit', (code, signal) => {
-    let error: Error | undefined;
-    if (code === 0) {
-      error = undefined;
-    } else {
-      const errorMessage = code
-        ? `Subprocess errored out with code ${code}`
-        : `Subprocess was killed with ${signal}`;
-      error = new SubprocessError(errorMessage);
-    }
+  childProcess.once('exit', (code) => {
+    const error =
+      code && 0 < code
+        ? new SubprocessError(`Subprocess errored out with code ${code}`)
+        : undefined;
     duplex.destroy(error);
   });
 

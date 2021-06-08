@@ -1,13 +1,12 @@
 import { Certificate, DETACHED_SIGNATURE_TYPES } from '@relaycorp/relaynet-core';
-import { generateNodeKeyPairSet, generatePDACertificationPath } from '@relaycorp/relaynet-testing';
 import { FastifyInstance } from 'fastify';
 import { Response as LightMyRequestResponse } from 'light-my-request';
-import { Container } from 'typedi';
 
-import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
 import { InvalidParcelError, MalformedParcelError, ParcelStore } from '../../parcelStore';
+import { ParcelDeliveryManager } from '../../sync/publicGateway/parcelDelivery/ParcelDeliveryManager';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { arrayBufferFrom } from '../../testUtils/buffer';
+import { setUpPKIFixture } from '../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { testDisallowedMethods } from '../../testUtils/http';
 import { mockSpy } from '../../testUtils/jest';
@@ -25,25 +24,18 @@ useTemporaryAppDirs();
 const mockStoreInternetBoundParcel = mockSpy(
   jest.spyOn(ParcelStore.prototype, 'storeInternetBoundParcel'),
 );
+const mockParcelDeliveryManagerNotifier = mockSpy(
+  jest.spyOn(ParcelDeliveryManager.prototype, 'notifyAboutNewParcel'),
+);
 
-let gatewayPrivateKey: CryptoKey;
 let gatewayCertificate: Certificate;
 let endpointPrivateKey: CryptoKey;
 let endpointCertificate: Certificate;
-beforeAll(async () => {
-  const keyPairSet = await generateNodeKeyPairSet();
-  const certPath = await generatePDACertificationPath(keyPairSet);
-
-  gatewayPrivateKey = keyPairSet.privateGateway.privateKey;
+setUpPKIFixture((keyPairSet, certPath) => {
   gatewayCertificate = certPath.privateGateway;
 
   endpointPrivateKey = keyPairSet.privateEndpoint.privateKey;
   endpointCertificate = certPath.privateEndpoint;
-});
-
-beforeEach(async () => {
-  const privateKeyStore = Container.get(DBPrivateKeyStore);
-  await privateKeyStore.saveNodeKey(gatewayPrivateKey, gatewayCertificate);
 });
 
 describe('Disallowed methods', () => {
@@ -186,6 +178,9 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
   );
 
   expect(mockStoreInternetBoundParcel).toBeCalledWith(parcelSerialized);
+  expect(mockParcelDeliveryManagerNotifier).toBeCalledWith(
+    mockStoreInternetBoundParcel.mock.results[0].value,
+  );
   expect(response).toHaveProperty('statusCode', 202);
   expect(JSON.parse(response.payload)).toHaveProperty(
     'message',

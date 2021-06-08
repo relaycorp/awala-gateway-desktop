@@ -26,15 +26,17 @@ const mockMkdir = mockSpy(jest.spyOn(fs, 'mkdir'));
 
 const PATHS = envPaths('AwalaGateway', { suffix: '' });
 
+const COMPONENT_NAME = 'the-component';
+
 describe('App directories', () => {
   test('Data directory should be created', async () => {
-    await startUp();
+    await startUp(COMPONENT_NAME);
 
     expect(mockMkdir).toBeCalledWith(PATHS.data, { recursive: true });
   });
 
   test('Log directory should be created', async () => {
-    await startUp();
+    await startUp(COMPONENT_NAME);
 
     expect(mockMkdir).toBeCalledWith(PATHS.log, { recursive: true });
   });
@@ -42,7 +44,7 @@ describe('App directories', () => {
   test('APP_DIRS token should be registered', async () => {
     expect(Container.has(APP_DIRS)).toBeFalse();
 
-    await startUp();
+    await startUp(COMPONENT_NAME);
 
     expect(Container.get(APP_DIRS)).toEqual(PATHS);
   });
@@ -50,15 +52,15 @@ describe('App directories', () => {
 
 describe('Logging', () => {
   test('Logger factory should receive path to log directory', async () => {
-    await startUp();
+    await startUp(COMPONENT_NAME);
 
-    expect(logging.makeLogger).toBeCalledWith('daemon', PATHS.log);
+    expect(logging.makeLogger).toBeCalledWith(COMPONENT_NAME, PATHS.log);
   });
 
   test('LOGGER token should be registered', async () => {
     expect(Container.has(LOGGER)).toBeFalse();
 
-    await startUp();
+    await startUp(COMPONENT_NAME);
 
     expect(Container.get(LOGGER)).toBe(mockLogging.logger);
   });
@@ -67,7 +69,7 @@ describe('Logging', () => {
 test('DB connection should be established', async () => {
   const originalConnectionOptions = await typeorm.getConnectionOptions();
 
-  await startUp();
+  await startUp(COMPONENT_NAME);
 
   const entitiesDir = __filename.endsWith('.ts')
     ? join(__dirname, 'entity', '**', '*.ts')
