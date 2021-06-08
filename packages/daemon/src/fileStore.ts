@@ -42,7 +42,7 @@ export class FileStore {
     try {
       await fs.unlink(objectPath);
     } catch (err) {
-      if (err?.code !== 'ENOENT') {
+      if (err.code !== 'ENOENT') {
         throw new FileStoreError(err, 'Failed to delete object');
       }
     }
