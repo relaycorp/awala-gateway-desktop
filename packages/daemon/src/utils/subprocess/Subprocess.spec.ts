@@ -86,25 +86,32 @@ describe('fork', () => {
     mockChildProcess.emit('exit', exitCode, null);
   });
 
-  test('Stream should be destroyed with an error when the subprocess is killed', async (cb) => {
+  test('Stream should end normally when the subprocess is killed', async (cb) => {
     const signal = 'SIGTERM';
 
     const subprocess = await testSuccessfulFork('foo');
 
-    subprocess.on('error', (error) => {
-      expect(error).toBeInstanceOf(SubprocessError);
-      expect(error.message).toEqual(`Subprocess was killed with ${signal}`);
-      cb();
-    });
+    subprocess.on('error', cb);
+    subprocess.on('close', cb);
     mockChildProcess.emit('exit', null, signal);
   });
 
-  test('Stream should end when subprocess ends normally', async (cb) => {
+  test('Stream should end normally when subprocess ends normally', async (cb) => {
     const subprocess = await testSuccessfulFork('foo');
 
     subprocess.on('error', cb);
     subprocess.on('close', cb);
     mockChildProcess.emit('exit', 0, null);
+  });
+
+  test('Subprocess should be killed when stream is destroyed', async () => {
+    const subprocess = await testSuccessfulFork('foo');
+
+    subprocess.destroy();
+
+    await setImmediateAsync();
+    expect(mockChildProcess.wasKilled).toBeTrue();
+    expect(mockChildProcess.killSignal).toBeUndefined();
   });
 
   test('Messages sent to the writable stream should be passed to the subprocess', async () => {
@@ -142,7 +149,19 @@ class MockChildProcess extends EventEmitter {
   // tslint:disable-next-line:readonly-array
   public readonly sentMessages: any[] = [];
 
+  // tslint:disable-next-line:readonly-keyword
+  public wasKilled: boolean = false;
+  // tslint:disable-next-line:readonly-keyword
+  public killSignal: string | undefined = undefined;
+
   public send(message: any): void {
     this.sentMessages.push(message);
+  }
+
+  public kill(signal?: string): void {
+    // tslint:disable-next-line:no-object-mutation
+    this.wasKilled = true;
+    // tslint:disable-next-line:no-object-mutation
+    this.killSignal = signal;
   }
 }
