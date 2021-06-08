@@ -1,0 +1,32 @@
+import pipe from 'it-pipe';
+import { Duplex } from 'stream';
+import { Inject, Service } from 'typedi';
+
+import { fork } from '../../../utils/subprocess/child';
+import { ParcelCollectorManager } from '../parcelCollection/ParcelCollectorManager';
+import { PublicGatewayCollectionStatus } from '../PublicGatewayCollectionStatus';
+
+@Service()
+export class ParcelDeliveryManager {
+  // tslint:disable-next-line:readonly-keyword
+  protected subprocess: Duplex | null = null;
+
+  constructor(@Inject() private parcelCollectorManager: ParcelCollectorManager) {}
+
+  public async deliverWhileConnected(): Promise<void> {
+    await pipe(this.parcelCollectorManager.streamStatus(), async (statuses) => {
+      for await (const status of statuses) {
+        if (status === PublicGatewayCollectionStatus.DISCONNECTED) {
+          this.subprocess?.destroy();
+          this.subprocess = null;
+        } else if (!this.subprocess) {
+          this.subprocess = await fork('parcel-delivery');
+        }
+      }
+    });
+  }
+
+  public notifyAboutNewParcel(parcelKey: string): void {
+    throw new Error('fds' + parcelKey);
+  }
+}
