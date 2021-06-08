@@ -51,9 +51,9 @@ describe('makeLogger', () => {
     expect(logger).toHaveProperty('level', loglevel.toLowerCase());
   });
 
-  test('Logs should be saved to a file if the daemon was forked by UI', async () => {
+  test('Logs should be saved to a file if requested via env var', async () => {
     const logMessage = 'This is the message';
-    mockEnvVars({ ...REQUIRED_ENV_VARS, GATEWAY_FORKED_FROM_UI: 'true' });
+    mockEnvVars({ ...REQUIRED_ENV_VARS, LOG_FILES: 'true' });
 
     const logger = makeLogger(LOG_NAME, logDirPath);
     logger.info(logMessage);
@@ -62,7 +62,7 @@ describe('makeLogger', () => {
     expect(logFile.toString()).toContain(logMessage);
   });
 
-  test('Logs should be output to stdout if the daemon was not forked by UI', async () => {
+  test('Logs should be output to stdout unless requested via env var', async () => {
     const logMessage = 'This is the message';
 
     const logger = makeLogger(LOG_NAME, logDirPath);
@@ -75,7 +75,7 @@ describe('makeLogger', () => {
     const logMessage = 'This should not be in a JSON document';
 
     beforeEach(() => {
-      mockEnvVars({ ...REQUIRED_ENV_VARS, GATEWAY_FORKED_FROM_UI: 'true' });
+      mockEnvVars({ ...REQUIRED_ENV_VARS, LOG_FILES: 'true' });
       const logger = makeLogger(LOG_NAME, logDirPath);
       logger.info(logMessage);
     });

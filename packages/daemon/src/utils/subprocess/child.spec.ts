@@ -32,7 +32,11 @@ describe('fork', () => {
       isTypescript ? 'subprocess.ts' : 'subprocess.js',
     );
     await expect(fs.stat(expectedScriptPath)).toResolve();
-    expect(childProcess.fork).toBeCalledWith(expectedScriptPath, expect.anything());
+    expect(childProcess.fork).toBeCalledWith(
+      expectedScriptPath,
+      expect.anything(),
+      expect.anything(),
+    );
   });
 
   test('Subprocess name should be passed as argument', async () => {
@@ -40,7 +44,25 @@ describe('fork', () => {
 
     await testSuccessfulFork(subprocessName);
 
-    expect(childProcess.fork).toBeCalledWith(expect.anything(), [subprocessName]);
+    expect(childProcess.fork).toBeCalledWith(
+      expect.anything(),
+      [subprocessName],
+      expect.anything(),
+    );
+  });
+
+  test('Subprocess should be run with LOG_FILES=true', async () => {
+    const subprocessName = 'foo';
+
+    await testSuccessfulFork(subprocessName);
+
+    expect(childProcess.fork).toBeCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        env: { ...process.env, LOG_FILES: 'true' },
+      }),
+    );
   });
 
   test('Stream should be returned as soon as the process is spawn', async () => {
