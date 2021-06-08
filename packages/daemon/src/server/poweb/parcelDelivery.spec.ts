@@ -3,6 +3,7 @@ import { FastifyInstance } from 'fastify';
 import { Response as LightMyRequestResponse } from 'light-my-request';
 
 import { InvalidParcelError, MalformedParcelError, ParcelStore } from '../../parcelStore';
+import { ParcelDeliveryManager } from '../../sync/publicGateway/parcelDelivery/ParcelDeliveryManager';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { arrayBufferFrom } from '../../testUtils/buffer';
 import { setUpPKIFixture } from '../../testUtils/crypto';
@@ -12,7 +13,6 @@ import { mockSpy } from '../../testUtils/jest';
 import { makeMockLoggingFixture, partialPinoLog } from '../../testUtils/logging';
 import { makeServer } from '../index';
 import { CONTENT_TYPES } from './contentTypes';
-import { ParcelDeliveryManager } from '../../sync/publicGateway/parcelDelivery/ParcelDeliveryManager';
 
 const ENDPOINT_URL = '/v1/parcels';
 
