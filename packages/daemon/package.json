@@ -13,6 +13,7 @@
   "private": "true",
   "dependencies": {
     "@relaycorp/cogrpc": "^1.3.9",
+    "@relaycorp/keystore-db": "^1.0.0",
     "@relaycorp/relaynet-core": "^1.45.1",
     "@relaycorp/relaynet-poweb": "^1.5.2",
     "abort-controller": "^3.0.0",

@@ -1,3 +1,4 @@
+import { PrivateKey, PublicKey } from '@relaycorp/keystore-db';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { Container } from 'typedi';
@@ -78,6 +79,6 @@ test('DB connection should be established', async () => {
   expect(mockCreateConnection).toBeCalledWith({
     ...originalConnectionOptions,
     database: dbPath,
-    entities: [entitiesDir],
+    entities: [entitiesDir, PrivateKey, PublicKey],
   });
 });

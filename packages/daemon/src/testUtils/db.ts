@@ -1,3 +1,4 @@
+import { PrivateKey, PublicKey } from '@relaycorp/keystore-db';
 import { dirname, join } from 'path';
 import { Connection, createConnection, getConnectionOptions } from 'typeorm';
 
@@ -12,7 +13,7 @@ export function setUpTestDBConnection(): void {
       ...originalConnectionOptions,
       database: ':memory:',
       dropSchema: true,
-      entities: [entityDirPath],
+      entities: [entityDirPath, PublicKey, PrivateKey],
     };
     connection = await createConnection(connectionOptions as any);
   });
