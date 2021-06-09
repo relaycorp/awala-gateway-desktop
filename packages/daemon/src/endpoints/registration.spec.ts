@@ -16,8 +16,8 @@ import { getConnection } from 'typeorm';
 import { ConfigKey } from '../Config';
 import { ConfigItem } from '../entity/ConfigItem';
 import { UnregisteredGatewayError } from '../errors';
-import { DBPrivateKeyStore } from '../keystores/DBPrivateKeyStore';
 import { arrayBufferFrom } from '../testUtils/buffer';
+import { mockGatewayRegistration } from '../testUtils/crypto';
 import { setUpTestDBConnection } from '../testUtils/db';
 import { getPromiseRejection } from '../testUtils/promises';
 import {
@@ -68,8 +68,7 @@ describe('EndpointRegistration', () => {
     });
 
     test('Keys with well-formed digests should be pre-authorized', async () => {
-      const privateKeyStore = Container.get(DBPrivateKeyStore);
-      await privateKeyStore.saveNodeKey(gatewayKeyPair.privateKey, gatewayCertificate);
+      await mockGatewayRegistration(gatewayCertificate, gatewayKeyPair.privateKey);
       const privateEndpointPublicKeyDigest = Buffer.from('a'.repeat(64), 'hex');
       const registrar = Container.get(EndpointRegistrar);
 
@@ -92,8 +91,7 @@ describe('EndpointRegistration', () => {
 
   describe('completeRegistration', () => {
     beforeEach(async () => {
-      const privateKeyStore = Container.get(DBPrivateKeyStore);
-      await privateKeyStore.saveNodeKey(gatewayKeyPair.privateKey, gatewayCertificate);
+      await mockGatewayRegistration(gatewayCertificate, gatewayKeyPair.privateKey);
     });
 
     test('InvalidRegistrationRequestError should be thrown if the PNRR is invalid', async () => {

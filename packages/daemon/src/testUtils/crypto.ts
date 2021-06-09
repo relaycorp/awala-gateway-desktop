@@ -35,10 +35,20 @@ export function setUpPKIFixture(
   });
 
   beforeEach(async () => {
-    const privateKeyStore = Container.get(DBPrivateKeyStore);
-    await privateKeyStore.saveNodeKey(gatewayPrivateKey, gatewayCertificate);
-
-    const config = Container.get(Config);
-    await config.set(ConfigKey.NODE_KEY_SERIAL_NUMBER, gatewayCertificate.getSerialNumberHex());
+    await mockGatewayRegistration(gatewayCertificate, gatewayPrivateKey);
   });
+}
+
+export async function mockGatewayRegistration(
+  privateGatewayCertificate: Certificate,
+  privateGatewayPrivateKey: CryptoKey,
+): Promise<void> {
+  const privateKeyStore = Container.get(DBPrivateKeyStore);
+  await privateKeyStore.saveNodeKey(privateGatewayPrivateKey, privateGatewayCertificate);
+
+  const config = Container.get(Config);
+  await config.set(
+    ConfigKey.NODE_KEY_SERIAL_NUMBER,
+    privateGatewayCertificate.getSerialNumberHex(),
+  );
 }
