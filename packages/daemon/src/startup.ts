@@ -1,3 +1,4 @@
+import { PrivateKey, PublicKey } from '@relaycorp/keystore-db';
 import envPaths, { Paths } from 'env-paths';
 import { promises as fs } from 'fs';
 import { join } from 'path';
@@ -41,7 +42,7 @@ async function createDBConnection(): Promise<void> {
   const connectionOptions = {
     ...originalConnectionOptions,
     database: join(dataPath, DB_FILE_NAME),
-    entities: [entityDirPath],
+    entities: [entityDirPath, PrivateKey, PublicKey],
   };
   await createConnection(connectionOptions as ConnectionOptions);
 }
