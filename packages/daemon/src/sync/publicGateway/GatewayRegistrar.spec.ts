@@ -6,7 +6,13 @@ import {
   PrivateNodeRegistrationRequest,
   PublicAddressingError,
 } from '@relaycorp/relaynet-core';
-import { generateNodeKeyPairSet, generatePDACertificationPath } from '@relaycorp/relaynet-testing';
+import {
+  generateNodeKeyPairSet,
+  generatePDACertificationPath,
+  MockGSCClient,
+  PreRegisterNodeCall,
+  RegisterNodeCall,
+} from '@relaycorp/relaynet-testing';
 import { Container } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
@@ -15,8 +21,6 @@ import { FileStore } from '../../fileStore';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { arrayBufferFrom } from '../../testUtils/buffer';
 import { setUpTestDBConnection } from '../../testUtils/db';
-import { PreRegisterNodeCall, RegisterNodeCall } from '../../testUtils/gscClient/methodCalls';
-import { MockGSCClient } from '../../testUtils/gscClient/MockGSCClient';
 import { mockSpy } from '../../testUtils/jest';
 import { mockPrivateKeyStore } from '../../testUtils/keystores';
 import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
