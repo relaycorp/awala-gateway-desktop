@@ -1,5 +1,6 @@
 import { Certificate, Parcel } from '@relaycorp/relaynet-core';
 import { RefusedParcelError, ServerError } from '@relaycorp/relaynet-poweb';
+import { DeliverParcelCall, MockGSCClient } from '@relaycorp/relaynet-testing';
 import { PassThrough } from 'stream';
 import { Container } from 'typedi';
 
@@ -8,8 +9,6 @@ import { ParcelStore } from '../../../parcelStore';
 import { useTemporaryAppDirs } from '../../../testUtils/appDirs';
 import { setUpPKIFixture } from '../../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../../testUtils/db';
-import { DeliverParcelCall } from '../../../testUtils/gscClient/methodCalls';
-import { MockGSCClient } from '../../../testUtils/gscClient/MockGSCClient';
 import { mockSpy } from '../../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
 import * as parentSubprocess from '../../../utils/subprocess/parent';
