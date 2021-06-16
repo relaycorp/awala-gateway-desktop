@@ -80,7 +80,7 @@ export class ParcelStore {
 
       const expiryDate = await this.getParcelExpiryDate(objectKey);
       if (!expiryDate || expiryDate < new Date()) {
-        await this.delete(parcelRelativeKey, ParcelDirection.ENDPOINT_TO_INTERNET);
+        await this.delete(parcelRelativeKey, direction);
         continue;
       }
 
