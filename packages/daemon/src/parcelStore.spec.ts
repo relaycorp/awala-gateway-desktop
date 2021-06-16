@@ -338,11 +338,20 @@ describe('retrieve', () => {
     ).resolves.toBeNull();
   });
 
-  test('Parcel should be output if it exists', async () => {
+  test('Internet-bound parcel should be output if it exists', async () => {
     const { parcelSerialized } = await makeInternetBoundParcel();
     const key = await parcelStore.store(parcelSerialized, ParcelDirection.ENDPOINT_TO_INTERNET);
 
     await expect(parcelStore.retrieve(key, ParcelDirection.ENDPOINT_TO_INTERNET)).resolves.toEqual(
+      parcelSerialized,
+    );
+  });
+
+  test('Endpoint-bound parcel should be output if it exists', async () => {
+    const { parcelSerialized } = await makeEndpointBoundParcel();
+    const key = await parcelStore.store(parcelSerialized, ParcelDirection.INTERNET_TO_ENDPOINT);
+
+    await expect(parcelStore.retrieve(key, ParcelDirection.INTERNET_TO_ENDPOINT)).resolves.toEqual(
       parcelSerialized,
     );
   });
@@ -353,7 +362,7 @@ describe('delete', () => {
     await parcelStore.delete('non-existing', ParcelDirection.ENDPOINT_TO_INTERNET);
   });
 
-  test('Existing parcel should be deleted', async () => {
+  test('Internet-bound parcel should be deleted if it exists', async () => {
     const { parcelSerialized } = await makeInternetBoundParcel();
     const key = await parcelStore.store(parcelSerialized, ParcelDirection.ENDPOINT_TO_INTERNET);
 
@@ -361,6 +370,17 @@ describe('delete', () => {
 
     await expect(
       parcelStore.retrieve(key, ParcelDirection.ENDPOINT_TO_INTERNET),
+    ).resolves.toBeNull();
+  });
+
+  test('Endpoint-bound parcel should be deleted if it exists', async () => {
+    const { parcelSerialized } = await makeEndpointBoundParcel();
+    const key = await parcelStore.store(parcelSerialized, ParcelDirection.INTERNET_TO_ENDPOINT);
+
+    await parcelStore.delete(key, ParcelDirection.INTERNET_TO_ENDPOINT);
+
+    await expect(
+      parcelStore.retrieve(key, ParcelDirection.INTERNET_TO_ENDPOINT),
     ).resolves.toBeNull();
   });
 
