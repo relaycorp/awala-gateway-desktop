@@ -1,17 +1,19 @@
 import {
   Certificate,
+  generateRSAKeyPair,
   InvalidMessageError,
+  issueEndpointCertificate,
   Parcel,
   RAMFSyntaxError,
 } from '@relaycorp/relaynet-core';
-import { generateNodeKeyPairSet, generatePDACertificationPath } from '@relaycorp/relaynet-testing';
 import { deserialize, Document, serialize } from 'bson';
-import { subSeconds } from 'date-fns';
+import { addDays, subSeconds } from 'date-fns';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { Container } from 'typedi';
 
 import { FileStore } from './fileStore';
+import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 import {
   InvalidParcelError,
   MalformedParcelError,
@@ -19,25 +21,40 @@ import {
   ParcelStore,
 } from './parcelStore';
 import { useTemporaryAppDirs } from './testUtils/appDirs';
-import { sha256Hex } from './testUtils/crypto';
+import { setUpPKIFixture, sha256Hex } from './testUtils/crypto';
+import { setUpTestDBConnection } from './testUtils/db';
 import { asyncIterableToArray } from './testUtils/iterables';
 import { getPromiseRejection } from './testUtils/promises';
 
+setUpTestDBConnection();
+
 const getAppDirs = useTemporaryAppDirs();
 
-let endpointPrivateKey: CryptoKey;
-let endpointCertificate: Certificate;
-beforeAll(async () => {
-  const keyPairSet = await generateNodeKeyPairSet();
-  const certPath = await generatePDACertificationPath(keyPairSet);
+let localEndpointPrivateKey: CryptoKey;
+let localEndpointCertificate: Certificate;
+let remoteEndpointPrivateKey: CryptoKey;
+let remoteEndpointCertificate: Certificate;
+let gatewayPrivateKey: CryptoKey;
+let gatewayCertificate: Certificate;
+setUpPKIFixture((keyPairSet, certPath) => {
+  localEndpointPrivateKey = keyPairSet.privateEndpoint.privateKey;
+  localEndpointCertificate = certPath.privateEndpoint;
 
-  endpointPrivateKey = keyPairSet.privateEndpoint.privateKey;
-  endpointCertificate = certPath.privateEndpoint;
+  remoteEndpointPrivateKey = keyPairSet.pdaGrantee.privateKey;
+  remoteEndpointCertificate = certPath.pdaGrantee;
+
+  gatewayPrivateKey = keyPairSet.privateGateway.privateKey;
+  gatewayCertificate = certPath.privateGateway;
+});
+
+beforeEach(async () => {
+  const privateKeyStore = Container.get(DBPrivateKeyStore);
+  await privateKeyStore.saveNodeKey(gatewayPrivateKey, gatewayCertificate);
 });
 
 let parcelStore: ParcelStore;
 beforeEach(() => {
-  parcelStore = new ParcelStore(Container.get(FileStore));
+  parcelStore = new ParcelStore(Container.get(FileStore), Container.get(DBPrivateKeyStore));
 });
 
 const PUBLIC_ENDPOINT_ADDRESS = 'https://endpoint.com';
@@ -45,7 +62,7 @@ const PUBLIC_ENDPOINT_ADDRESS = 'https://endpoint.com';
 describe('store', () => {
   test('Malformed parcels should be refused', async () => {
     const error = await getPromiseRejection(
-      parcelStore.store(Buffer.from('malformed'), ParcelDirection.TO_INTERNET),
+      parcelStore.store(Buffer.from('malformed'), ParcelDirection.ENDPOINT_TO_INTERNET),
       MalformedParcelError,
     );
 
@@ -53,14 +70,14 @@ describe('store', () => {
   });
 
   test('Well-formed yet invalid parcels should be refused', async () => {
-    const parcel = new Parcel(PUBLIC_ENDPOINT_ADDRESS, endpointCertificate, Buffer.from([]), {
+    const parcel = new Parcel(PUBLIC_ENDPOINT_ADDRESS, localEndpointCertificate, Buffer.from([]), {
       creationDate: subSeconds(new Date(), 2),
       ttl: 1,
     });
-    const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
+    const parcelSerialized = Buffer.from(await parcel.serialize(localEndpointPrivateKey));
 
     const error = await getPromiseRejection(
-      parcelStore.store(parcelSerialized, ParcelDirection.TO_INTERNET),
+      parcelStore.store(parcelSerialized, ParcelDirection.ENDPOINT_TO_INTERNET),
       InvalidParcelError,
     );
 
@@ -69,31 +86,76 @@ describe('store', () => {
     await expect(fs.stat(parcelPath)).toReject();
   });
 
-  test('Valid parcels should be stored', async () => {
-    const parcel = makeInternetBoundParcel();
-    const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
+  test('Endpoint-bound parcels with public recipient should be refused', async () => {
+    const { parcel, parcelSerialized } = await makeInternetBoundParcel();
 
-    await parcelStore.store(parcelSerialized, ParcelDirection.TO_INTERNET);
+    const error = await getPromiseRejection(
+      parcelStore.store(parcelSerialized, ParcelDirection.INTERNET_TO_ENDPOINT),
+      InvalidParcelError,
+    );
+
+    expect(error.cause()).toBeInstanceOf(InvalidMessageError);
+    const parcelPath = await computeInternetBoundParcelPath(parcel);
+    await expect(fs.stat(parcelPath)).toReject();
+  });
+
+  test('Endpoint-bound parcels with an invalid PDA should be refused', async () => {
+    const unauthorizedSenderKeyPair = await generateRSAKeyPair();
+    const unauthorizedSenderCertificate = await issueEndpointCertificate({
+      issuerPrivateKey: unauthorizedSenderKeyPair.privateKey,
+      subjectPublicKey: unauthorizedSenderKeyPair.publicKey,
+      validityEndDate: addDays(new Date(), 1),
+    });
+    const parcel = new Parcel(
+      await localEndpointCertificate.calculateSubjectPrivateAddress(),
+      unauthorizedSenderCertificate,
+      Buffer.from([]),
+    );
+    const parcelSerialized = Buffer.from(
+      await parcel.serialize(unauthorizedSenderKeyPair.privateKey),
+    );
+
+    const error = await getPromiseRejection(
+      parcelStore.store(parcelSerialized, ParcelDirection.INTERNET_TO_ENDPOINT),
+      InvalidParcelError,
+    );
+
+    expect(error.cause()).toBeInstanceOf(InvalidMessageError);
+    const parcelPath = await computeInternetBoundParcelPath(parcel);
+    await expect(fs.stat(parcelPath)).toReject();
+  });
+
+  test('Valid, Internet-bound parcels should be stored', async () => {
+    const { parcel, parcelSerialized } = await makeInternetBoundParcel();
+
+    await parcelStore.store(parcelSerialized, ParcelDirection.ENDPOINT_TO_INTERNET);
 
     const expectedParcelPath = await computeInternetBoundParcelPath(parcel);
     const parcelFile = await fs.readFile(expectedParcelPath);
     expect(parcelFile).toEqual(parcelSerialized);
   });
 
-  test('Stored parcel key should be output', async () => {
-    const parcel = makeInternetBoundParcel();
-    const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
+  test('Valid, endpoint-bound parcels should be stored', async () => {
+    const { parcel, parcelSerialized } = await makeEndpointBoundParcel();
 
-    const key = await parcelStore.store(parcelSerialized, ParcelDirection.TO_INTERNET);
+    await parcelStore.store(parcelSerialized, ParcelDirection.INTERNET_TO_ENDPOINT);
+
+    const expectedParcelPath = await computeEndpointBoundParcelPath(parcel);
+    const parcelFile = await fs.readFile(expectedParcelPath);
+    expect(parcelFile).toEqual(parcelSerialized);
+  });
+
+  test('Stored parcel key should be output', async () => {
+    const { parcel, parcelSerialized } = await makeInternetBoundParcel();
+
+    const key = await parcelStore.store(parcelSerialized, ParcelDirection.ENDPOINT_TO_INTERNET);
 
     expect(key).toEqual(await computeInternetBoundParcelKey(parcel));
   });
 
   test('Parcel expiry date should be stored in metadata file', async () => {
-    const parcel = makeInternetBoundParcel();
-    const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
-
-    await parcelStore.store(parcelSerialized, ParcelDirection.TO_INTERNET);
+    const { parcel, parcelSerialized } = await makeInternetBoundParcel();
+    await parcelStore.store(parcelSerialized, ParcelDirection.ENDPOINT_TO_INTERNET);
 
     const parcelPath = await computeInternetBoundParcelPath(parcel);
     const parcelMetadataPath = parcelPath + '.pmeta';
@@ -105,39 +167,36 @@ describe('store', () => {
 describe('listActive', () => {
   test('No parcels should be output if there are none', async () => {
     await expect(
-      asyncIterableToArray(parcelStore.listActive(ParcelDirection.TO_INTERNET)),
+      asyncIterableToArray(parcelStore.listActive(ParcelDirection.ENDPOINT_TO_INTERNET)),
     ).resolves.toHaveLength(0);
   });
 
   test('Expired parcels should be skipped and deleted', async () => {
-    const parcel = makeInternetBoundParcel();
-    const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
-    const key = await parcelStore.store(parcelSerialized, ParcelDirection.TO_INTERNET);
+    const { parcel, parcelSerialized } = await makeInternetBoundParcel();
+    const key = await parcelStore.store(parcelSerialized, ParcelDirection.ENDPOINT_TO_INTERNET);
     // Override the metadata to mark the parcel as expired
     const expiryDate = subSeconds(new Date(), 1);
     await overrideMetadataFile({ expiryDate }, parcel);
 
     await expect(
-      asyncIterableToArray(parcelStore.listActive(ParcelDirection.TO_INTERNET)),
+      asyncIterableToArray(parcelStore.listActive(ParcelDirection.ENDPOINT_TO_INTERNET)),
     ).resolves.toHaveLength(0);
 
-    await expect(parcelStore.retrieve(key, ParcelDirection.TO_INTERNET)).resolves.toBeNull();
+    await expect(
+      parcelStore.retrieve(key, ParcelDirection.ENDPOINT_TO_INTERNET),
+    ).resolves.toBeNull();
   });
 
   test('Parcels should be output', async () => {
-    const parcel1 = makeInternetBoundParcel();
-    await parcelStore.store(
-      Buffer.from(await parcel1.serialize(endpointPrivateKey)),
-      ParcelDirection.TO_INTERNET,
-    );
-    const parcel2 = makeInternetBoundParcel();
-    await parcelStore.store(
-      Buffer.from(await parcel2.serialize(endpointPrivateKey)),
-      ParcelDirection.TO_INTERNET,
-    );
+    const { parcel: parcel1, parcelSerialized: parcel1Serialized } =
+      await makeInternetBoundParcel();
+    await parcelStore.store(parcel1Serialized, ParcelDirection.ENDPOINT_TO_INTERNET);
+    const { parcel: parcel2, parcelSerialized: parcel2Serialized } =
+      await makeInternetBoundParcel();
+    await parcelStore.store(parcel2Serialized, ParcelDirection.ENDPOINT_TO_INTERNET);
 
     const parcelObjects = await asyncIterableToArray(
-      parcelStore.listActive(ParcelDirection.TO_INTERNET),
+      parcelStore.listActive(ParcelDirection.ENDPOINT_TO_INTERNET),
     );
 
     expect(parcelObjects).toHaveLength(2);
@@ -147,62 +206,70 @@ describe('listActive', () => {
 
   describe('Invalid metadata file', () => {
     test('Parcel with missing metadata file should be ignored and deleted', async () => {
-      const parcel = makeInternetBoundParcel();
-      const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
-      const parcelKey = await parcelStore.store(parcelSerialized, ParcelDirection.TO_INTERNET);
+      const { parcel, parcelSerialized } = await makeInternetBoundParcel();
+      const parcelKey = await parcelStore.store(
+        parcelSerialized,
+        ParcelDirection.ENDPOINT_TO_INTERNET,
+      );
       await fs.unlink((await computeInternetBoundParcelPath(parcel)) + '.pmeta');
 
       await expect(
-        asyncIterableToArray(parcelStore.listActive(ParcelDirection.TO_INTERNET)),
+        asyncIterableToArray(parcelStore.listActive(ParcelDirection.ENDPOINT_TO_INTERNET)),
       ).toResolve();
 
       await expect(
-        parcelStore.retrieve(parcelKey, ParcelDirection.TO_INTERNET),
+        parcelStore.retrieve(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET),
       ).resolves.toBeNull();
     });
 
     test('Parcel with malformed metadata should be ignored and delete', async () => {
-      const parcel = makeInternetBoundParcel();
-      const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
-      const parcelKey = await parcelStore.store(parcelSerialized, ParcelDirection.TO_INTERNET);
+      const { parcel, parcelSerialized } = await makeInternetBoundParcel();
+      const parcelKey = await parcelStore.store(
+        parcelSerialized,
+        ParcelDirection.ENDPOINT_TO_INTERNET,
+      );
       await overrideMetadataFile(Buffer.from('malformed'), parcel);
 
       await expect(
-        asyncIterableToArray(parcelStore.listActive(ParcelDirection.TO_INTERNET)),
+        asyncIterableToArray(parcelStore.listActive(ParcelDirection.ENDPOINT_TO_INTERNET)),
       ).toResolve();
 
       await expect(
-        parcelStore.retrieve(parcelKey, ParcelDirection.TO_INTERNET),
+        parcelStore.retrieve(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET),
       ).resolves.toBeNull();
     });
 
     test('Parcel without expiry date should be ignored and deleted', async () => {
-      const parcel = makeInternetBoundParcel();
-      const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
-      const parcelKey = await parcelStore.store(parcelSerialized, ParcelDirection.TO_INTERNET);
+      const { parcel, parcelSerialized } = await makeInternetBoundParcel();
+      const parcelKey = await parcelStore.store(
+        parcelSerialized,
+        ParcelDirection.ENDPOINT_TO_INTERNET,
+      );
       await overrideMetadataFile({}, parcel);
 
       await expect(
-        asyncIterableToArray(parcelStore.listActive(ParcelDirection.TO_INTERNET)),
+        asyncIterableToArray(parcelStore.listActive(ParcelDirection.ENDPOINT_TO_INTERNET)),
       ).toResolve();
 
       await expect(
-        parcelStore.retrieve(parcelKey, ParcelDirection.TO_INTERNET),
+        parcelStore.retrieve(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET),
       ).resolves.toBeNull();
     });
 
     test('Parcel with malformed expiry date should be ignored and deleted', async () => {
-      const parcel = makeInternetBoundParcel();
-      const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
-      const parcelKey = await parcelStore.store(parcelSerialized, ParcelDirection.TO_INTERNET);
+      const { parcel, parcelSerialized } = await makeInternetBoundParcel();
+      const parcelKey = await parcelStore.store(
+        parcelSerialized,
+        ParcelDirection.ENDPOINT_TO_INTERNET,
+      );
       await overrideMetadataFile({ expiryDate: 'tomorrow' }, parcel);
 
       await expect(
-        asyncIterableToArray(parcelStore.listActive(ParcelDirection.TO_INTERNET)),
+        asyncIterableToArray(parcelStore.listActive(ParcelDirection.ENDPOINT_TO_INTERNET)),
       ).toResolve();
 
       await expect(
-        parcelStore.retrieve(parcelKey, ParcelDirection.TO_INTERNET),
+        parcelStore.retrieve(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET),
       ).resolves.toBeNull();
     });
   });
@@ -218,16 +285,15 @@ describe('listActive', () => {
 describe('retrieve', () => {
   test('Nothing should be output if parcel does not exist', async () => {
     await expect(
-      parcelStore.retrieve('non-existing', ParcelDirection.TO_INTERNET),
+      parcelStore.retrieve('non-existing', ParcelDirection.ENDPOINT_TO_INTERNET),
     ).resolves.toBeNull();
   });
 
   test('Parcel should be output if it exists', async () => {
-    const parcel = makeInternetBoundParcel();
-    const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
-    const key = await parcelStore.store(parcelSerialized, ParcelDirection.TO_INTERNET);
+    const { parcelSerialized } = await makeInternetBoundParcel();
+    const key = await parcelStore.store(parcelSerialized, ParcelDirection.ENDPOINT_TO_INTERNET);
 
-    await expect(parcelStore.retrieve(key, ParcelDirection.TO_INTERNET)).resolves.toEqual(
+    await expect(parcelStore.retrieve(key, ParcelDirection.ENDPOINT_TO_INTERNET)).resolves.toEqual(
       parcelSerialized,
     );
   });
@@ -235,34 +301,52 @@ describe('retrieve', () => {
 
 describe('delete', () => {
   test('Non-existing parcel should be ignored', async () => {
-    await parcelStore.delete('non-existing', ParcelDirection.TO_INTERNET);
+    await parcelStore.delete('non-existing', ParcelDirection.ENDPOINT_TO_INTERNET);
   });
 
   test('Existing parcel should be deleted', async () => {
-    const parcel = makeInternetBoundParcel();
-    const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
-    const key = await parcelStore.store(parcelSerialized, ParcelDirection.TO_INTERNET);
+    const { parcelSerialized } = await makeInternetBoundParcel();
+    const key = await parcelStore.store(parcelSerialized, ParcelDirection.ENDPOINT_TO_INTERNET);
 
-    await parcelStore.delete(key, ParcelDirection.TO_INTERNET);
+    await parcelStore.delete(key, ParcelDirection.ENDPOINT_TO_INTERNET);
 
-    await expect(parcelStore.retrieve(key, ParcelDirection.TO_INTERNET)).resolves.toBeNull();
+    await expect(
+      parcelStore.retrieve(key, ParcelDirection.ENDPOINT_TO_INTERNET),
+    ).resolves.toBeNull();
   });
 
   test('Parcel metadata file should be deleted', async () => {
-    const parcel = makeInternetBoundParcel();
-    const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
-    const key = await parcelStore.store(parcelSerialized, ParcelDirection.TO_INTERNET);
+    const { parcel, parcelSerialized } = await makeInternetBoundParcel();
+    const key = await parcelStore.store(parcelSerialized, ParcelDirection.ENDPOINT_TO_INTERNET);
     const parcelMetadataPath = (await computeInternetBoundParcelPath(parcel)) + '.pmeta';
     await expect(fs.stat(parcelMetadataPath)).toResolve(); // Check that we got the right path
 
-    await parcelStore.delete(key, ParcelDirection.TO_INTERNET);
+    await parcelStore.delete(key, ParcelDirection.ENDPOINT_TO_INTERNET);
 
     await expect(fs.stat(parcelMetadataPath)).toReject();
   });
 });
 
-function makeInternetBoundParcel(): Parcel {
-  return new Parcel(PUBLIC_ENDPOINT_ADDRESS, endpointCertificate, Buffer.from([]));
+interface GeneratedParcel {
+  readonly parcel: Parcel;
+  readonly parcelSerialized: Buffer;
+}
+
+async function makeInternetBoundParcel(): Promise<GeneratedParcel> {
+  const parcel = new Parcel(PUBLIC_ENDPOINT_ADDRESS, localEndpointCertificate, Buffer.from([]));
+  const parcelSerialized = Buffer.from(await parcel.serialize(localEndpointPrivateKey));
+  return { parcel, parcelSerialized };
+}
+
+async function makeEndpointBoundParcel(): Promise<GeneratedParcel> {
+  const parcel = new Parcel(
+    await localEndpointCertificate.calculateSubjectPrivateAddress(),
+    remoteEndpointCertificate,
+    Buffer.from([]),
+    { senderCaCertificateChain: [gatewayCertificate, localEndpointCertificate] },
+  );
+  const parcelSerialized = Buffer.from(await parcel.serialize(remoteEndpointPrivateKey));
+  return { parcel, parcelSerialized };
 }
 
 async function computeInternetBoundParcelPath(parcel: Parcel): Promise<string> {
@@ -276,7 +360,21 @@ async function computeInternetBoundParcelPath(parcel: Parcel): Promise<string> {
 
 async function computeInternetBoundParcelKey(parcel: Parcel): Promise<string> {
   return join(
-    await endpointCertificate.calculateSubjectPrivateAddress(),
-    await sha256Hex(PUBLIC_ENDPOINT_ADDRESS + parcel.id),
+    await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+    await sha256Hex(parcel.recipientAddress + parcel.id),
   );
+}
+
+async function computeEndpointBoundParcelPath(parcel: Parcel): Promise<string> {
+  return join(
+    getAppDirs().data,
+    'parcels',
+    'endpoint-bound',
+    await computeEndpointBoundParcelKey(parcel),
+  );
+}
+
+async function computeEndpointBoundParcelKey(parcel: Parcel): Promise<string> {
+  const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectPrivateAddress();
+  return join(parcel.recipientAddress, await sha256Hex(senderPrivateAddress + parcel.id));
 }

@@ -182,7 +182,7 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
 
   expect(mockStoreInternetBoundParcel).toBeCalledWith(
     parcelSerialized,
-    ParcelDirection.TO_INTERNET,
+    ParcelDirection.ENDPOINT_TO_INTERNET,
   );
   expect(mockParcelDeliveryManagerNotifier).toBeCalledWith(
     mockStoreInternetBoundParcel.mock.results[0].value,

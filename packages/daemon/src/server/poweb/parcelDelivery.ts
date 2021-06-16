@@ -56,7 +56,7 @@ export default async function registerRoutes(
 
       let parcelKey: string;
       try {
-        parcelKey = await parcelStore.store(request.body, ParcelDirection.TO_INTERNET);
+        parcelKey = await parcelStore.store(request.body, ParcelDirection.ENDPOINT_TO_INTERNET);
       } catch (err) {
         return replyWithParcelRejection(err, reply, request.log);
       }

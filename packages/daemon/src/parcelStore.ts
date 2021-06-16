@@ -1,6 +1,6 @@
 // tslint:disable:max-classes-per-file
 
-import { Parcel } from '@relaycorp/relaynet-core';
+import { Parcel, RecipientAddressType } from '@relaycorp/relaynet-core';
 import { deserialize, Document, serialize } from 'bson';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { createHash } from 'crypto';
@@ -9,6 +9,7 @@ import { Inject, Service } from 'typedi';
 
 import { PrivateGatewayError } from './errors';
 import { FileStore } from './fileStore';
+import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 
 const PARCEL_METADATA_EXTENSION = '.pmeta';
 
@@ -18,39 +19,45 @@ interface ParcelMetadata {
 }
 
 export enum ParcelDirection {
-  TO_INTERNET,
+  ENDPOINT_TO_INTERNET,
+  INTERNET_TO_ENDPOINT,
 }
 
 @Service()
 export class ParcelStore {
-  constructor(@Inject() protected fileStore: FileStore) {}
+  constructor(
+    @Inject() protected fileStore: FileStore,
+    @Inject() protected privateKeyStore: DBPrivateKeyStore,
+  ) {}
 
   /**
    *
    * @param parcelSerialized
-   * @param _direction The direction of the parcel
+   * @param direction The direction of the parcel
    * @throws MalformedParcelError if the parcel is malformed
    * @throws InvalidParcelError if the parcel is well-formed yet invalid
    */
-  public async store(parcelSerialized: Buffer, _direction: ParcelDirection): Promise<string> {
+  public async store(parcelSerialized: Buffer, direction: ParcelDirection): Promise<string> {
     let parcel: Parcel;
     try {
       parcel = await Parcel.deserialize(bufferToArray(parcelSerialized));
     } catch (err) {
       throw new MalformedParcelError(err);
     }
+
+    const recipientAddressType =
+      direction === ParcelDirection.INTERNET_TO_ENDPOINT ? RecipientAddressType.PRIVATE : undefined;
+    const trustedCertificates =
+      direction === ParcelDirection.INTERNET_TO_ENDPOINT
+        ? await this.privateKeyStore.fetchNodeCertificates()
+        : undefined;
     try {
-      await parcel.validate();
+      await parcel.validate(recipientAddressType, trustedCertificates);
     } catch (err) {
       throw new InvalidParcelError(err);
     }
-
-    const parcelRelativeKey = join(
-      await parcel.senderCertificate.calculateSubjectPrivateAddress(),
-      // Hash the recipient and id together to avoid exceeding Windows' 260-char limit for paths
-      await sha256Hex(parcel.recipientAddress + parcel.id),
-    );
-    const parcelAbsoluteKey = getInternetBoundParcelKey(parcelRelativeKey);
+    const parcelRelativeKey = await getRelativeParcelKey(parcel, direction);
+    const parcelAbsoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
     await this.fileStore.putObject(parcelSerialized, parcelAbsoluteKey);
 
     const parcelMetadata: ParcelMetadata = { expiryDate: parcel.expiryDate.getTime() / 1_000 };
@@ -62,8 +69,8 @@ export class ParcelStore {
     return parcelRelativeKey;
   }
 
-  public async *listActive(_direction: ParcelDirection): AsyncIterable<string> {
-    const keyPrefix = getInternetBoundParcelKey();
+  public async *listActive(direction: ParcelDirection): AsyncIterable<string> {
+    const keyPrefix = getAbsoluteParcelKey(direction);
     const objectKeys = await this.fileStore.listObjects(keyPrefix);
     for await (const objectKey of objectKeys) {
       if (objectKey.endsWith(PARCEL_METADATA_EXTENSION)) {
@@ -73,7 +80,7 @@ export class ParcelStore {
 
       const expiryDate = await this.getParcelExpiryDate(objectKey);
       if (!expiryDate || expiryDate < new Date()) {
-        await this.delete(parcelRelativeKey, ParcelDirection.TO_INTERNET);
+        await this.delete(parcelRelativeKey, ParcelDirection.ENDPOINT_TO_INTERNET);
         continue;
       }
 
@@ -83,14 +90,14 @@ export class ParcelStore {
 
   public async retrieve(
     parcelRelativeKey: string,
-    _direction: ParcelDirection,
+    direction: ParcelDirection,
   ): Promise<Buffer | null> {
-    const absoluteKey = getInternetBoundParcelKey(parcelRelativeKey);
+    const absoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
     return this.fileStore.getObject(absoluteKey);
   }
 
-  public async delete(parcelRelativeKey: string, _direction: ParcelDirection): Promise<void> {
-    const absoluteKey = getInternetBoundParcelKey(parcelRelativeKey);
+  public async delete(parcelRelativeKey: string, direction: ParcelDirection): Promise<void> {
+    const absoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
     await this.fileStore.deleteObject(absoluteKey);
     await this.fileStore.deleteObject(absoluteKey + PARCEL_METADATA_EXTENSION);
   }
@@ -123,6 +130,19 @@ function sha256Hex(plaintext: string): string {
   return createHash('sha256').update(plaintext).digest('hex');
 }
 
-function getInternetBoundParcelKey(parcelRelativeKey?: string): string {
-  return ['parcels', 'internet-bound', ...(parcelRelativeKey ? [parcelRelativeKey] : [])].join('/');
+async function getRelativeParcelKey(parcel: Parcel, direction: ParcelDirection): Promise<string> {
+  const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectPrivateAddress();
+  // Hash some components together to avoid exceeding Windows' 260-char limit for paths
+  const keyComponents =
+    direction === ParcelDirection.ENDPOINT_TO_INTERNET
+      ? [senderPrivateAddress, await sha256Hex(parcel.recipientAddress + parcel.id)]
+      : [parcel.recipientAddress, await sha256Hex(senderPrivateAddress + parcel.id)];
+  return join(...keyComponents);
+}
+
+function getAbsoluteParcelKey(direction: ParcelDirection, parcelRelativeKey?: string): string {
+  const subComponent =
+    direction === ParcelDirection.ENDPOINT_TO_INTERNET ? 'internet-bound' : 'endpoint-bound';
+  const trailingComponents = parcelRelativeKey ? [parcelRelativeKey] : [];
+  return ['parcels', subComponent, ...trailingComponents].join('/');
 }

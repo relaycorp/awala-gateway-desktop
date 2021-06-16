@@ -30,7 +30,10 @@ export default async function runParcelCollection(_parentStream: Duplex): Promis
     const currentKey = await privateKeyStore.getCurrentKey();
     const signer = new Signer(currentKey!.certificate, currentKey!.privateKey);
     for await (const parcelKey of parcelKeys) {
-      const parcelSerialized = await parcelStore.retrieve(parcelKey, ParcelDirection.TO_INTERNET);
+      const parcelSerialized = await parcelStore.retrieve(
+        parcelKey,
+        ParcelDirection.ENDPOINT_TO_INTERNET,
+      );
       const parcelAwareLogger = logger.child({ parcelKey });
       if (parcelSerialized) {
         let deleteParcel = false;
@@ -51,7 +54,7 @@ export default async function runParcelCollection(_parentStream: Duplex): Promis
         }
 
         if (deleteParcel) {
-          await parcelStore.delete(parcelKey, ParcelDirection.TO_INTERNET);
+          await parcelStore.delete(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET);
         }
       } else {
         parcelAwareLogger.info('Skipping non-existing parcel');
@@ -63,7 +66,7 @@ export default async function runParcelCollection(_parentStream: Duplex): Promis
   const parentStream = await makeParentStream();
   await pipe(async function* (): AsyncIterable<string> {
     // Deliver the queued parcels before delivering parcels streamed by the parent process
-    yield* await parcelStore.listActive(ParcelDirection.TO_INTERNET);
+    yield* await parcelStore.listActive(ParcelDirection.ENDPOINT_TO_INTERNET);
     yield* source(parentStream);
   }, deliverParcels);
 
