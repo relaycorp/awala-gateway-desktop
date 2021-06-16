@@ -17,6 +17,10 @@ interface ParcelMetadata {
   readonly expiryDate: number;
 }
 
+export enum ParcelDirection {
+  TO_INTERNET,
+}
+
 @Service()
 export class ParcelStore {
   constructor(@Inject() protected fileStore: FileStore) {}
@@ -24,10 +28,11 @@ export class ParcelStore {
   /**
    *
    * @param parcelSerialized
+   * @param _direction The direction of the parcel
    * @throws MalformedParcelError if the parcel is malformed
    * @throws InvalidParcelError if the parcel is well-formed yet invalid
    */
-  public async storeInternetBoundParcel(parcelSerialized: Buffer): Promise<string> {
+  public async store(parcelSerialized: Buffer, _direction: ParcelDirection): Promise<string> {
     let parcel: Parcel;
     try {
       parcel = await Parcel.deserialize(bufferToArray(parcelSerialized));
@@ -57,7 +62,7 @@ export class ParcelStore {
     return parcelRelativeKey;
   }
 
-  public async *listActiveInternetBoundParcels(): AsyncIterable<string> {
+  public async *listActive(_direction: ParcelDirection): AsyncIterable<string> {
     const keyPrefix = getInternetBoundParcelKey();
     const objectKeys = await this.fileStore.listObjects(keyPrefix);
     for await (const objectKey of objectKeys) {
@@ -68,7 +73,7 @@ export class ParcelStore {
 
       const expiryDate = await this.getParcelExpiryDate(objectKey);
       if (!expiryDate || expiryDate < new Date()) {
-        await this.deleteInternetBoundParcel(parcelRelativeKey);
+        await this.delete(parcelRelativeKey, ParcelDirection.TO_INTERNET);
         continue;
       }
 
@@ -76,13 +81,16 @@ export class ParcelStore {
     }
   }
 
-  public async retrieveInternetBoundParcel(key: string): Promise<Buffer | null> {
-    const absoluteKey = getInternetBoundParcelKey(key);
+  public async retrieve(
+    parcelRelativeKey: string,
+    _direction: ParcelDirection,
+  ): Promise<Buffer | null> {
+    const absoluteKey = getInternetBoundParcelKey(parcelRelativeKey);
     return this.fileStore.getObject(absoluteKey);
   }
 
-  public async deleteInternetBoundParcel(key: string): Promise<void> {
-    const absoluteKey = getInternetBoundParcelKey(key);
+  public async delete(parcelRelativeKey: string, _direction: ParcelDirection): Promise<void> {
+    const absoluteKey = getInternetBoundParcelKey(parcelRelativeKey);
     await this.fileStore.deleteObject(absoluteKey);
     await this.fileStore.deleteObject(absoluteKey + PARCEL_METADATA_EXTENSION);
   }

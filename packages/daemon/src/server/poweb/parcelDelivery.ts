@@ -4,7 +4,12 @@ import { FastifyInstance, FastifyLoggerInstance, FastifyReply } from 'fastify';
 import { Container } from 'typedi';
 
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
-import { InvalidParcelError, MalformedParcelError, ParcelStore } from '../../parcelStore';
+import {
+  InvalidParcelError,
+  MalformedParcelError,
+  ParcelDirection,
+  ParcelStore,
+} from '../../parcelStore';
 import { ParcelDeliveryManager } from '../../sync/publicGateway/parcelDelivery/ParcelDeliveryManager';
 import { registerAllowedMethods } from '../http';
 import RouteOptions from '../RouteOptions';
@@ -51,7 +56,7 @@ export default async function registerRoutes(
 
       let parcelKey: string;
       try {
-        parcelKey = await parcelStore.storeInternetBoundParcel(request.body);
+        parcelKey = await parcelStore.store(request.body, ParcelDirection.TO_INTERNET);
       } catch (err) {
         return replyWithParcelRejection(err, reply, request.log);
       }

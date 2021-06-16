@@ -2,7 +2,12 @@ import { Certificate, DETACHED_SIGNATURE_TYPES } from '@relaycorp/relaynet-core'
 import { FastifyInstance } from 'fastify';
 import { Response as LightMyRequestResponse } from 'light-my-request';
 
-import { InvalidParcelError, MalformedParcelError, ParcelStore } from '../../parcelStore';
+import {
+  InvalidParcelError,
+  MalformedParcelError,
+  ParcelDirection,
+  ParcelStore,
+} from '../../parcelStore';
 import { ParcelDeliveryManager } from '../../sync/publicGateway/parcelDelivery/ParcelDeliveryManager';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { arrayBufferFrom } from '../../testUtils/buffer';
@@ -21,9 +26,7 @@ const mockLogging = makeMockLoggingFixture();
 setUpTestDBConnection();
 useTemporaryAppDirs();
 
-const mockStoreInternetBoundParcel = mockSpy(
-  jest.spyOn(ParcelStore.prototype, 'storeInternetBoundParcel'),
-);
+const mockStoreInternetBoundParcel = mockSpy(jest.spyOn(ParcelStore.prototype, 'store'));
 const mockParcelDeliveryManagerNotifier = mockSpy(
   jest.spyOn(ParcelDeliveryManager.prototype, 'notifyAboutNewParcel'),
 );
@@ -177,7 +180,10 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
     await countersignParcelDelivery(parcelSerialized),
   );
 
-  expect(mockStoreInternetBoundParcel).toBeCalledWith(parcelSerialized);
+  expect(mockStoreInternetBoundParcel).toBeCalledWith(
+    parcelSerialized,
+    ParcelDirection.TO_INTERNET,
+  );
   expect(mockParcelDeliveryManagerNotifier).toBeCalledWith(
     mockStoreInternetBoundParcel.mock.results[0].value,
   );
