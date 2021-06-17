@@ -144,5 +144,5 @@ function getAbsoluteParcelKey(direction: ParcelDirection, parcelRelativeKey?: st
   const subComponent =
     direction === ParcelDirection.ENDPOINT_TO_INTERNET ? 'internet-bound' : 'endpoint-bound';
   const trailingComponents = parcelRelativeKey ? [parcelRelativeKey] : [];
-  return ['parcels', subComponent, ...trailingComponents].join('/');
+  return join('parcels', subComponent, ...trailingComponents);
 }
