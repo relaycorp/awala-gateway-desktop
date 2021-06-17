@@ -2,6 +2,7 @@ import {
   Certificate,
   generateRSAKeyPair,
   InvalidMessageError,
+  issueDeliveryAuthorization,
   issueEndpointCertificate,
   Parcel,
   RAMFSyntaxError,
@@ -274,14 +275,30 @@ describe('listActiveBoundForInternet', () => {
 });
 
 describe('listActiveBoundForEndpoints', () => {
-  let localEndpointAddress: string;
+  let localEndpoint1Address: string;
+  let localEndpoint2Certificate: Certificate;
+  let remoteEndpointPDA2: Certificate;
   beforeEach(async () => {
-    localEndpointAddress = await localEndpointCertificate.calculateSubjectPrivateAddress();
+    localEndpoint1Address = await localEndpointCertificate.calculateSubjectPrivateAddress();
+
+    const localEndpoint2KeyPair = await generateRSAKeyPair();
+    localEndpoint2Certificate = await issueEndpointCertificate({
+      issuerCertificate: gatewayCertificate,
+      issuerPrivateKey: gatewayPrivateKey,
+      subjectPublicKey: localEndpoint2KeyPair.publicKey,
+      validityEndDate: gatewayCertificate.expiryDate,
+    });
+    remoteEndpointPDA2 = await issueDeliveryAuthorization({
+      issuerCertificate: localEndpoint2Certificate,
+      issuerPrivateKey: localEndpoint2KeyPair.privateKey,
+      subjectPublicKey: await remoteEndpointCertificate.getPublicKey(),
+      validityEndDate: localEndpoint2Certificate.expiryDate,
+    });
   });
 
   test('No parcels should be output if there are none', async () => {
     await expect(
-      asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpointAddress])),
+      asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpoint1Address])),
     ).resolves.toHaveLength(0);
   });
 
@@ -293,7 +310,7 @@ describe('listActiveBoundForEndpoints', () => {
     await overrideMetadataFile({ expiryDate }, parcel, ParcelDirection.INTERNET_TO_ENDPOINT);
 
     await expect(
-      asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpointAddress])),
+      asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpoint1Address])),
     ).resolves.toHaveLength(0);
 
     await expect(
@@ -310,12 +327,54 @@ describe('listActiveBoundForEndpoints', () => {
     await parcelStore.store(parcel2Serialized, ParcelDirection.INTERNET_TO_ENDPOINT);
 
     const parcelObjects = await asyncIterableToArray(
-      parcelStore.listActiveBoundForEndpoints([localEndpointAddress]),
+      parcelStore.listActiveBoundForEndpoints([localEndpoint1Address]),
     );
 
     expect(parcelObjects).toHaveLength(2);
     expect(parcelObjects).toContain(await computeEndpointBoundParcelKey(parcel1));
     expect(parcelObjects).toContain(await computeEndpointBoundParcelKey(parcel2));
+  });
+
+  test('Multiple recipients can be queried', async () => {
+    const { parcel: parcel1, parcelSerialized: parcel1Serialized } =
+      await makeEndpointBoundParcel();
+    await parcelStore.store(parcel1Serialized, ParcelDirection.INTERNET_TO_ENDPOINT);
+    const { parcel: parcel2, parcelSerialized: parcel2Serialized } = await makeEndpointBoundParcel(
+      localEndpoint2Certificate,
+      remoteEndpointPDA2,
+      remoteEndpointPrivateKey,
+    );
+    await parcelStore.store(parcel2Serialized, ParcelDirection.INTERNET_TO_ENDPOINT);
+
+    const parcelObjects = await asyncIterableToArray(
+      parcelStore.listActiveBoundForEndpoints([
+        localEndpoint1Address,
+        await localEndpoint2Certificate.calculateSubjectPrivateAddress(),
+      ]),
+    );
+
+    expect(parcelObjects).toHaveLength(2);
+    expect(parcelObjects).toContain(await computeEndpointBoundParcelKey(parcel1));
+    expect(parcelObjects).toContain(await computeEndpointBoundParcelKey(parcel2));
+  });
+
+  test('Parcels bound for different endpoints should be ignored', async () => {
+    const { parcel: parcel1, parcelSerialized: parcel1Serialized } =
+      await makeEndpointBoundParcel();
+    await parcelStore.store(parcel1Serialized, ParcelDirection.INTERNET_TO_ENDPOINT);
+    const { parcelSerialized: parcel2Serialized } = await makeEndpointBoundParcel(
+      localEndpoint2Certificate,
+      remoteEndpointPDA2,
+      remoteEndpointPrivateKey,
+    );
+    await parcelStore.store(parcel2Serialized, ParcelDirection.INTERNET_TO_ENDPOINT);
+
+    const parcelObjects = await asyncIterableToArray(
+      parcelStore.listActiveBoundForEndpoints([localEndpoint1Address]),
+    );
+
+    expect(parcelObjects).toHaveLength(1);
+    expect(parcelObjects).toContain(await computeEndpointBoundParcelKey(parcel1));
   });
 
   describe('Invalid metadata file', () => {
@@ -328,7 +387,7 @@ describe('listActiveBoundForEndpoints', () => {
       await fs.unlink((await computeEndpointBoundParcelPath(parcel)) + '.pmeta');
 
       await expect(
-        asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpointAddress])),
+        asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpoint1Address])),
       ).toResolve();
 
       await expect(
@@ -349,7 +408,7 @@ describe('listActiveBoundForEndpoints', () => {
       );
 
       await expect(
-        asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpointAddress])),
+        asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpoint1Address])),
       ).toResolve();
 
       await expect(
@@ -366,7 +425,7 @@ describe('listActiveBoundForEndpoints', () => {
       await overrideMetadataFile({}, parcel, ParcelDirection.INTERNET_TO_ENDPOINT);
 
       await expect(
-        asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpointAddress])),
+        asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpoint1Address])),
       ).toResolve();
 
       await expect(
@@ -387,7 +446,7 @@ describe('listActiveBoundForEndpoints', () => {
       );
 
       await expect(
-        asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpointAddress])),
+        asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpoint1Address])),
       ).toResolve();
 
       await expect(
@@ -473,14 +532,21 @@ async function makeInternetBoundParcel(): Promise<GeneratedParcel> {
   return { parcel, parcelSerialized };
 }
 
-async function makeEndpointBoundParcel(): Promise<GeneratedParcel> {
+async function makeEndpointBoundParcel(
+  recipientCertificate?: Certificate,
+  senderCertificate?: Certificate,
+  senderPrivateKey?: CryptoKey,
+): Promise<GeneratedParcel> {
+  const finalRecipientCertificate = recipientCertificate ?? localEndpointCertificate;
   const parcel = new Parcel(
-    await localEndpointCertificate.calculateSubjectPrivateAddress(),
-    remoteEndpointCertificate,
+    await finalRecipientCertificate.calculateSubjectPrivateAddress(),
+    senderCertificate ?? remoteEndpointCertificate,
     Buffer.from([]),
-    { senderCaCertificateChain: [gatewayCertificate, localEndpointCertificate] },
+    { senderCaCertificateChain: [gatewayCertificate, finalRecipientCertificate] },
   );
-  const parcelSerialized = Buffer.from(await parcel.serialize(remoteEndpointPrivateKey));
+  const parcelSerialized = Buffer.from(
+    await parcel.serialize(senderPrivateKey ?? remoteEndpointPrivateKey),
+  );
   return { parcel, parcelSerialized };
 }
 
