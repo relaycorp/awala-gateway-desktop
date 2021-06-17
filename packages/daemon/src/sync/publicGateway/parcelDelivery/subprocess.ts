@@ -13,7 +13,7 @@ import { makeParentStream } from '../../../utils/subprocess/parent';
 import { GatewayRegistrar } from '../GatewayRegistrar';
 import { makeGSCClient } from '../gscClient';
 
-export default async function runParcelCollection(_parentStream: Duplex): Promise<number> {
+export default async function runParcelDelivery(_parentStream: Duplex): Promise<number> {
   const gatewayRegistrar = Container.get(GatewayRegistrar);
   const publicGateway = await gatewayRegistrar.getPublicGateway();
   if (!publicGateway) {
