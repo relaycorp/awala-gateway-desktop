@@ -4,6 +4,7 @@ import { Parcel, RecipientAddressType } from '@relaycorp/relaynet-core';
 import { deserialize, Document, serialize } from 'bson';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { createHash } from 'crypto';
+import pipe from 'it-pipe';
 import { join } from 'path';
 import { Inject, Service } from 'typedi';
 
@@ -69,23 +70,29 @@ export class ParcelStore {
     return parcelRelativeKey;
   }
 
-  public async *listActive(direction: ParcelDirection): AsyncIterable<string> {
-    const keyPrefix = getAbsoluteParcelKey(direction);
-    const objectKeys = await this.fileStore.listObjects(keyPrefix);
-    for await (const objectKey of objectKeys) {
-      if (objectKey.endsWith(PARCEL_METADATA_EXTENSION)) {
-        continue;
-      }
-      const parcelRelativeKey = objectKey.substr(keyPrefix.length + 1);
+  public async *listActiveBoundForInternet(): AsyncIterable<string> {
+    const keyPrefix = getAbsoluteParcelKey(ParcelDirection.ENDPOINT_TO_INTERNET);
+    const absoluteKeys = await this.fileStore.listObjects(keyPrefix);
+    yield* await pipe(
+      absoluteKeys,
+      this.filterActiveParcels(keyPrefix, ParcelDirection.ENDPOINT_TO_INTERNET),
+    );
+  }
 
-      const expiryDate = await this.getParcelExpiryDate(objectKey);
-      if (!expiryDate || expiryDate < new Date()) {
-        await this.delete(parcelRelativeKey, direction);
-        continue;
-      }
-
-      yield parcelRelativeKey;
-    }
+  public async *listActiveBoundForEndpoints(
+    recipientPrivateAddresses: readonly string[],
+  ): AsyncIterable<string> {
+    const keyPrefixes = recipientPrivateAddresses.map((a) =>
+      getAbsoluteParcelKey(ParcelDirection.INTERNET_TO_ENDPOINT, a),
+    );
+    const endpointBoundPrefix = getAbsoluteParcelKey(ParcelDirection.INTERNET_TO_ENDPOINT);
+    const listings = keyPrefixes.map((prefix) =>
+      pipe(
+        this.fileStore.listObjects(prefix),
+        this.filterActiveParcels(endpointBoundPrefix, ParcelDirection.INTERNET_TO_ENDPOINT),
+      ),
+    );
+    yield* await concatIterables(listings);
   }
 
   public async retrieve(
@@ -100,6 +107,30 @@ export class ParcelStore {
     const absoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
     await this.fileStore.deleteObject(absoluteKey);
     await this.fileStore.deleteObject(absoluteKey + PARCEL_METADATA_EXTENSION);
+  }
+
+  protected filterActiveParcels(
+    keyPrefix: string,
+    direction: ParcelDirection,
+  ): (parcelKeys: AsyncIterable<string>) => AsyncIterable<string> {
+    // tslint:disable-next-line:no-this-assignment
+    const store = this;
+    return async function* (parcelKeys): AsyncIterable<any> {
+      for await (const absoluteKey of parcelKeys) {
+        if (absoluteKey.endsWith(PARCEL_METADATA_EXTENSION)) {
+          continue;
+        }
+        const relativeKey = absoluteKey.substr(keyPrefix.length + 1);
+
+        const expiryDate = await store.getParcelExpiryDate(absoluteKey);
+        if (!expiryDate || expiryDate < new Date()) {
+          await store.delete(relativeKey, direction);
+          continue;
+        }
+
+        yield relativeKey;
+      }
+    };
   }
 
   protected async getParcelExpiryDate(parcelKey: string): Promise<Date | null> {
@@ -145,4 +176,10 @@ function getAbsoluteParcelKey(direction: ParcelDirection, parcelRelativeKey?: st
     direction === ParcelDirection.ENDPOINT_TO_INTERNET ? 'internet-bound' : 'endpoint-bound';
   const trailingComponents = parcelRelativeKey ? [parcelRelativeKey] : [];
   return join('parcels', subComponent, ...trailingComponents);
+}
+
+async function* concatIterables<T>(iterables: ReadonlyArray<AsyncIterable<T>>): AsyncIterable<T> {
+  for (const iterable of iterables) {
+    yield* await iterable;
+  }
 }

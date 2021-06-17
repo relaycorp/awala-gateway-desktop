@@ -66,7 +66,7 @@ export default async function runParcelCollection(_parentStream: Duplex): Promis
   const parentStream = await makeParentStream();
   await pipe(async function* (): AsyncIterable<string> {
     // Deliver the queued parcels before delivering parcels streamed by the parent process
-    yield* await parcelStore.listActive(ParcelDirection.ENDPOINT_TO_INTERNET);
+    yield* await parcelStore.listActiveBoundForInternet();
     yield* source(parentStream);
   }, deliverParcels);
 
