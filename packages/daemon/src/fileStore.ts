@@ -14,7 +14,7 @@ export class FileStore {
   protected readonly dataPath: string;
 
   constructor(@Inject(APP_DIRS) appDirs: Paths) {
-    this.dataPath = appDirs.data;
+    this.dataPath = resolve(appDirs.data);
   }
 
   public async getObject(key: string): Promise<Buffer | null> {
