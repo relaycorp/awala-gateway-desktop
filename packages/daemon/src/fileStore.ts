@@ -76,7 +76,7 @@ export class FileStore {
     // For security reasons, make sure we're not asked to operate outside the data directory
     if (!path.startsWith(this.dataPath)) {
       // tslint:disable-next-line:no-console
-      console.log({ key, dataPath: this.dataPath }); // TODO: REMOVE
+      console.log({ key, dataPath: this.dataPath, path }); // TODO: REMOVE
       throw new FileStoreError(`Object key "${key}" resolves outside data directory`);
     }
 
