@@ -26,6 +26,8 @@ afterEach(async () => {
 const OBJECT_KEY = 'the-key.ext';
 const OBJECT_CONTENT = Buffer.from('the content');
 
+const OBJECT_KEY_OUTSIDE_STORE = '../outside.ext';
+
 describe('getObject', () => {
   test('Content of existing file should be returned', async () => {
     const store = new FileStore(tempAppDirs);
@@ -38,6 +40,12 @@ describe('getObject', () => {
     const store = new FileStore(tempAppDirs);
 
     await expect(store.getObject(OBJECT_KEY)).resolves.toBeNull();
+  });
+
+  test('Relative key outside app dir should be refused', async () => {
+    const store = new FileStore(tempAppDirs);
+
+    await expect(store.getObject(OBJECT_KEY_OUTSIDE_STORE)).rejects.toBeInstanceOf(FileStoreError);
   });
 
   test('Permission errors should be propagated', async () => {
@@ -83,6 +91,14 @@ describe('putObject', () => {
 
     await expect(fs.readFile(join(tempAppDirs.data, OBJECT_KEY))).resolves.toEqual(contentV2);
   });
+
+  test('Relative key outside app dir should be refused', async () => {
+    const store = new FileStore(tempAppDirs);
+
+    await expect(store.putObject(OBJECT_CONTENT, OBJECT_KEY_OUTSIDE_STORE)).rejects.toBeInstanceOf(
+      FileStoreError,
+    );
+  });
 });
 
 describe('deleteObject', () => {
@@ -111,6 +127,14 @@ describe('deleteObject', () => {
     await store.deleteObject(OBJECT_KEY);
 
     await expect(store.getObject(OBJECT_KEY)).resolves.toBeNull();
+  });
+
+  test('Relative key outside app dir should be refused', async () => {
+    const store = new FileStore(tempAppDirs);
+
+    await expect(store.deleteObject(OBJECT_KEY_OUTSIDE_STORE)).rejects.toBeInstanceOf(
+      FileStoreError,
+    );
   });
 });
 
@@ -160,5 +184,13 @@ describe('listObjects', () => {
     await store.putObject(OBJECT_CONTENT, key);
 
     await expect(asyncIterableToArray(store.listObjects(keyPrefix))).resolves.toEqual([key]);
+  });
+
+  test('Relative key outside app dir should be refused', async () => {
+    const store = new FileStore(tempAppDirs);
+
+    await expect(asyncIterableToArray(store.listObjects('..'))).rejects.toBeInstanceOf(
+      FileStoreError,
+    );
   });
 });
