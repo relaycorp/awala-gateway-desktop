@@ -12,11 +12,11 @@ let tempAppDirs: Paths;
 beforeEach(async () => {
   tempDir = await fs.mkdtemp(join(tmpdir(), 'awala-gw-tests'));
   tempAppDirs = {
-    cache: `${tempDir}/cache`,
-    config: `${tempDir}/config`,
-    data: `${tempDir}/data`,
-    log: `${tempDir}/log`,
-    temp: `${tempDir}/temp`,
+    cache: join(tempDir, 'cache'),
+    config: join(tempDir, 'config'),
+    data: join(tempDir, 'data'),
+    log: join(tempDir, 'log'),
+    temp: join(tempDir, 'temp'),
   };
 });
 afterEach(async () => {
