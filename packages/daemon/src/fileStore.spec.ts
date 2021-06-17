@@ -1,26 +1,15 @@
-import { Paths } from 'env-paths';
 import { promises as fs } from 'fs';
-import { tmpdir } from 'os';
 import { join } from 'path';
 
 import { FileStore, FileStoreError } from './fileStore';
+import { useTemporaryAppDirs } from './testUtils/appDirs';
 import { asyncIterableToArray } from './testUtils/iterables';
 import { getPromiseRejection } from './testUtils/promises';
 
-let tempDir: string;
-let tempAppDirs: Paths;
-beforeEach(async () => {
-  tempDir = await fs.mkdtemp(join(tmpdir(), 'awala-gw-tests'));
-  tempAppDirs = {
-    cache: join(tempDir, 'cache'),
-    config: join(tempDir, 'config'),
-    data: join(tempDir, 'data'),
-    log: join(tempDir, 'log'),
-    temp: join(tempDir, 'temp'),
-  };
-});
-afterEach(async () => {
-  await fs.rmdir(tempDir, { recursive: true });
+const getTempAppDirs = useTemporaryAppDirs();
+let store: FileStore;
+beforeEach(() => {
+  store = new FileStore(getTempAppDirs());
 });
 
 const OBJECT_KEY = 'the-key.ext';
@@ -30,26 +19,20 @@ const OBJECT_KEY_OUTSIDE_STORE = '../outside.ext';
 
 describe('getObject', () => {
   test('Content of existing file should be returned', async () => {
-    const store = new FileStore(tempAppDirs);
     await store.putObject(OBJECT_CONTENT, OBJECT_KEY);
 
     await expect(store.getObject(OBJECT_KEY)).resolves.toEqual(OBJECT_CONTENT);
   });
 
   test('Null should be returned if file does not exist', async () => {
-    const store = new FileStore(tempAppDirs);
-
     await expect(store.getObject(OBJECT_KEY)).resolves.toBeNull();
   });
 
   test('Relative key outside app dir should be refused', async () => {
-    const store = new FileStore(tempAppDirs);
-
     await expect(store.getObject(OBJECT_KEY_OUTSIDE_STORE)).rejects.toBeInstanceOf(FileStoreError);
   });
 
   test('Permission errors should be propagated', async () => {
-    const store = new FileStore(tempAppDirs);
     await store.putObject(OBJECT_CONTENT, OBJECT_KEY);
     const readError = new Error('oh no');
     const readFileSpy = jest.spyOn(fs, 'readFile');
@@ -64,37 +47,32 @@ describe('getObject', () => {
 
 describe('putObject', () => {
   test('File should be created if it does not exist', async () => {
-    const store = new FileStore(tempAppDirs);
-
     await store.putObject(OBJECT_CONTENT, OBJECT_KEY);
 
-    await expect(fs.readFile(join(tempAppDirs.data, OBJECT_KEY))).resolves.toEqual(OBJECT_CONTENT);
+    await expect(fs.readFile(join(getTempAppDirs().data, OBJECT_KEY))).resolves.toEqual(
+      OBJECT_CONTENT,
+    );
   });
 
   test('Paths should be created if necessary', async () => {
-    const store = new FileStore(tempAppDirs);
     const nestedObjectKey = join('prefix', OBJECT_KEY);
 
     await store.putObject(OBJECT_CONTENT, nestedObjectKey);
 
-    await expect(fs.readFile(join(tempAppDirs.data, nestedObjectKey))).resolves.toEqual(
+    await expect(fs.readFile(join(getTempAppDirs().data, nestedObjectKey))).resolves.toEqual(
       OBJECT_CONTENT,
     );
   });
 
   test('File should be overridden if it already exists', async () => {
-    const store = new FileStore(tempAppDirs);
-
     await store.putObject(OBJECT_CONTENT, OBJECT_KEY);
     const contentV2 = Buffer.concat([OBJECT_CONTENT, Buffer.from(' extra')]);
     await store.putObject(contentV2, OBJECT_KEY);
 
-    await expect(fs.readFile(join(tempAppDirs.data, OBJECT_KEY))).resolves.toEqual(contentV2);
+    await expect(fs.readFile(join(getTempAppDirs().data, OBJECT_KEY))).resolves.toEqual(contentV2);
   });
 
   test('Relative key outside app dir should be refused', async () => {
-    const store = new FileStore(tempAppDirs);
-
     await expect(store.putObject(OBJECT_CONTENT, OBJECT_KEY_OUTSIDE_STORE)).rejects.toBeInstanceOf(
       FileStoreError,
     );
@@ -103,13 +81,10 @@ describe('putObject', () => {
 
 describe('deleteObject', () => {
   test('Non-existing object should be ignored', async () => {
-    const store = new FileStore(tempAppDirs);
-
     await store.deleteObject(OBJECT_KEY);
   });
 
   test('Error deleting file should be propagated', async () => {
-    const store = new FileStore(tempAppDirs);
     const unlinkError = new Error('oh no');
     const unlinkSpy = jest.spyOn(fs, 'unlink');
     unlinkSpy.mockRejectedValueOnce(unlinkError);
@@ -121,7 +96,6 @@ describe('deleteObject', () => {
   });
 
   test('Existing object should be deleted', async () => {
-    const store = new FileStore(tempAppDirs);
     await store.putObject(OBJECT_CONTENT, OBJECT_KEY);
 
     await store.deleteObject(OBJECT_KEY);
@@ -130,8 +104,6 @@ describe('deleteObject', () => {
   });
 
   test('Relative key outside app dir should be refused', async () => {
-    const store = new FileStore(tempAppDirs);
-
     await expect(store.deleteObject(OBJECT_KEY_OUTSIDE_STORE)).rejects.toBeInstanceOf(
       FileStoreError,
     );
@@ -142,13 +114,10 @@ describe('listObjects', () => {
   const keyPrefix = 'sub';
 
   test('Non-existing key prefixes should be ignored', async () => {
-    const store = new FileStore(tempAppDirs);
-
     await expect(asyncIterableToArray(store.listObjects(keyPrefix))).resolves.toHaveLength(0);
   });
 
   test('Error reading existing key prefix should be propagated', async () => {
-    const store = new FileStore(tempAppDirs);
     const readError = new Error('oh no');
     const readdirSpy = jest.spyOn(fs, 'readdir');
     readdirSpy.mockRejectedValueOnce(readError);
@@ -163,15 +132,13 @@ describe('listObjects', () => {
   });
 
   test('No objects should be output if there are none', async () => {
-    const store = new FileStore(tempAppDirs);
-    const subdirectoryPath = join(tempAppDirs.data, keyPrefix);
+    const subdirectoryPath = join(getTempAppDirs().data, keyPrefix);
     await fs.mkdir(subdirectoryPath, { recursive: true });
 
     await expect(asyncIterableToArray(store.listObjects(keyPrefix))).resolves.toHaveLength(0);
   });
 
   test('Objects at the root should be output', async () => {
-    const store = new FileStore(tempAppDirs);
     const key = join(keyPrefix, 'thingy');
     await store.putObject(OBJECT_CONTENT, key);
 
@@ -179,7 +146,6 @@ describe('listObjects', () => {
   });
 
   test('Objects in subdirectories should be output', async () => {
-    const store = new FileStore(tempAppDirs);
     const key = join(keyPrefix, 'another-sub', 'thingy');
     await store.putObject(OBJECT_CONTENT, key);
 
@@ -187,8 +153,6 @@ describe('listObjects', () => {
   });
 
   test('Relative key outside app dir should be refused', async () => {
-    const store = new FileStore(tempAppDirs);
-
     await expect(asyncIterableToArray(store.listObjects('..'))).rejects.toBeInstanceOf(
       FileStoreError,
     );
