@@ -2,7 +2,7 @@ import { PassThrough } from 'stream';
 
 import runStartup from './startup';
 import subprocessEntrypoint from './subprocessEntrypoint';
-import runParcelCollection from './sync/publicGateway/parcelDelivery/subprocess';
+import runParcelDelivery from './sync/publicGateway/parcelDelivery/subprocess';
 import { getMockInstance, mockSpy } from './testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from './testUtils/logging';
 import * as parentSubprocess from './utils/subprocess/parent';
@@ -29,13 +29,13 @@ test('Startup routine should be called', async () => {
 test('Parent stream should be passed to subprocess', async () => {
   await subprocessEntrypoint(STUB_SUBPROCESS_NAME);
 
-  expect(runParcelCollection).toBeCalledWith(stubParentStream);
-  expect(runParcelCollection).toHaveBeenCalledAfter(runStartup as any);
+  expect(runParcelDelivery).toBeCalledWith(stubParentStream);
+  expect(runParcelDelivery).toHaveBeenCalledAfter(runStartup as any);
 });
 
 test('Subprocess return code should be used as exit code', async () => {
   const exitCode = 42;
-  getMockInstance(runParcelCollection).mockResolvedValue(exitCode);
+  getMockInstance(runParcelDelivery).mockResolvedValue(exitCode);
 
   await subprocessEntrypoint(STUB_SUBPROCESS_NAME);
 
@@ -44,7 +44,7 @@ test('Subprocess return code should be used as exit code', async () => {
 
 test('Subprocess exceptions should be handled and exit with 128 code', async () => {
   const error = new Error('oh noes');
-  getMockInstance(runParcelCollection).mockRejectedValue(error);
+  getMockInstance(runParcelDelivery).mockRejectedValue(error);
 
   await subprocessEntrypoint(STUB_SUBPROCESS_NAME);
 

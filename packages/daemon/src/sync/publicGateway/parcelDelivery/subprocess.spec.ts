@@ -11,10 +11,9 @@ import { setUpPKIFixture } from '../../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../../testUtils/db';
 import { mockSpy } from '../../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
-import * as parentSubprocess from '../../../utils/subprocess/parent';
 import { GatewayRegistrar } from '../GatewayRegistrar';
 import * as gscClient from '../gscClient';
-import runParcelCollection from './subprocess';
+import runParcelDelivery from './subprocess';
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
@@ -41,7 +40,6 @@ let parentStream: PassThrough;
 beforeEach(async () => {
   parentStream = new PassThrough({ objectMode: true });
 });
-mockSpy(jest.spyOn(parentSubprocess, 'makeParentStream'), () => parentStream);
 
 let gatewayCertificate: Certificate;
 let endpointPrivateKey: CryptoKey;
@@ -56,28 +54,28 @@ setUpPKIFixture((keyPairSet, certPath) => {
 test('Subprocess should abort if the gateway is unregistered', async () => {
   mockGetPublicGateway.mockResolvedValue(null);
 
-  await expect(runParcelCollection(parentStream)).resolves.toEqual(1);
+  await expect(runParcelDelivery(parentStream)).resolves.toEqual(1);
 
   expect(mockMakeGSCClient).not.toBeCalled();
 });
 
 test('Client should connect to appropriate public gateway', async () => {
   setImmediate(endParentStream);
-  await runParcelCollection(parentStream);
+  await runParcelDelivery(parentStream);
 
   expect(mockMakeGSCClient).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
 });
 
 test('Subprocess should record a log when it is ready', async () => {
   setImmediate(endParentStream);
-  await runParcelCollection(parentStream);
+  await runParcelDelivery(parentStream);
 
   expect(mockLogs).toContainEqual(partialPinoLog('info', 'Ready to deliver parcels'));
 });
 
 test('Subprocess should exit with code 2 if it ends normally', async () => {
   setImmediate(endParentStream);
-  await expect(runParcelCollection(parentStream)).resolves.toEqual(2);
+  await expect(runParcelDelivery(parentStream)).resolves.toEqual(2);
 });
 
 describe('Parcel delivery', () => {
@@ -93,7 +91,7 @@ describe('Parcel delivery', () => {
     mockGSCClient = new MockGSCClient([parcelDeliveryCall]);
 
     setImmediate(endParentStream);
-    await runParcelCollection(parentStream);
+    await runParcelDelivery(parentStream);
 
     expect(parcelDeliveryCall.wasCalled).toBeTrue();
     expect(Buffer.from(parcelDeliveryCall.arguments!.parcelSerialized)).toEqual(parcelSerialized);
@@ -111,7 +109,7 @@ describe('Parcel delivery', () => {
       parentStream.write(parcelKey);
       parentStream.end();
     });
-    await runParcelCollection(parentStream);
+    await runParcelDelivery(parentStream);
 
     expect(parcelDeliveryCall.wasCalled).toBeTrue();
     expect(Buffer.from(parcelDeliveryCall.arguments!.parcelSerialized)).toEqual(parcelSerialized);
@@ -127,7 +125,7 @@ describe('Parcel delivery', () => {
     mockGSCClient = new MockGSCClient([parcelDeliveryCall]);
 
     setImmediate(endParentStream);
-    await runParcelCollection(parentStream);
+    await runParcelDelivery(parentStream);
 
     expect(parcelDeliveryCall.wasCalled).toBeTrue();
     expect(
@@ -141,7 +139,7 @@ describe('Parcel delivery', () => {
     mockGSCClient = new MockGSCClient([new DeliverParcelCall()]);
 
     setImmediate(endParentStream);
-    await runParcelCollection(parentStream);
+    await runParcelDelivery(parentStream);
 
     await expect(parcelStore.retrieveInternetBoundParcel(parcelKey)).resolves.toBeNull();
   });
@@ -154,7 +152,7 @@ describe('Parcel delivery', () => {
       parentStream.write(parcelKey);
       parentStream.end();
     });
-    await runParcelCollection(parentStream);
+    await runParcelDelivery(parentStream);
 
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Skipping non-existing parcel', { parcelKey }),
@@ -167,7 +165,7 @@ describe('Parcel delivery', () => {
     mockGSCClient = new MockGSCClient([new DeliverParcelCall(new RefusedParcelError())]);
 
     setImmediate(endParentStream);
-    await runParcelCollection(parentStream);
+    await runParcelDelivery(parentStream);
 
     await expect(parcelStore.retrieveInternetBoundParcel(parcelKey)).resolves.toBeNull();
     expect(mockLogs).toContainEqual(
@@ -182,7 +180,7 @@ describe('Parcel delivery', () => {
     mockGSCClient = new MockGSCClient([new DeliverParcelCall(serverError)]);
 
     setImmediate(endParentStream);
-    await runParcelCollection(parentStream);
+    await runParcelDelivery(parentStream);
 
     await expect(parcelStore.retrieveInternetBoundParcel(parcelKey)).resolves.not.toBeNull();
     expect(mockLogs).toContainEqual(
@@ -200,7 +198,7 @@ describe('Parcel delivery', () => {
     mockGSCClient = new MockGSCClient([new DeliverParcelCall(error)]);
 
     setImmediate(endParentStream);
-    await runParcelCollection(parentStream);
+    await runParcelDelivery(parentStream);
 
     await expect(parcelStore.retrieveInternetBoundParcel(parcelKey)).resolves.not.toBeNull();
     expect(mockLogs).toContainEqual(
