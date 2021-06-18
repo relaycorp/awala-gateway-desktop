@@ -2,12 +2,12 @@ import { Duplex } from 'stream';
 import { Container } from 'typedi';
 
 import runStartup from './startup';
-import runParcelCollection from './sync/publicGateway/parcelDelivery/subprocess';
+import runParcelDelivery from './sync/publicGateway/parcelDelivery/subprocess';
 import { LOGGER } from './tokens';
 import { makeParentStream } from './utils/subprocess/parent';
 
 const SUBPROCESSES: { readonly [key: string]: (s: Duplex) => Promise<number> } = {
-  'parcel-delivery': runParcelCollection,
+  'parcel-delivery': runParcelDelivery,
 };
 
 export default async function subprocessEntrypoint(subprocessName: string): Promise<void> {
