@@ -1,14 +1,10 @@
-// tslint:disable:max-classes-per-file
-
-import { Parcel, RecipientAddressType } from '@relaycorp/relaynet-core';
+import { Parcel } from '@relaycorp/relaynet-core';
 import { deserialize, Document, serialize } from 'bson';
-import bufferToArray from 'buffer-to-arraybuffer';
 import { createHash } from 'crypto';
 import pipe from 'it-pipe';
 import { join } from 'path';
 import { Inject, Service } from 'typedi';
 
-import { PrivateGatewayError } from './errors';
 import { FileStore } from './fileStore';
 import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 
@@ -34,29 +30,14 @@ export class ParcelStore {
   /**
    *
    * @param parcelSerialized
+   * @param parcel
    * @param direction The direction of the parcel
-   * @throws MalformedParcelError if the parcel is malformed
-   * @throws InvalidParcelError if the parcel is well-formed yet invalid
    */
-  public async store(parcelSerialized: Buffer, direction: ParcelDirection): Promise<string> {
-    let parcel: Parcel;
-    try {
-      parcel = await Parcel.deserialize(bufferToArray(parcelSerialized));
-    } catch (err) {
-      throw new MalformedParcelError(err);
-    }
-
-    const recipientAddressType =
-      direction === ParcelDirection.INTERNET_TO_ENDPOINT ? RecipientAddressType.PRIVATE : undefined;
-    const trustedCertificates =
-      direction === ParcelDirection.INTERNET_TO_ENDPOINT
-        ? await this.privateKeyStore.fetchNodeCertificates()
-        : undefined;
-    try {
-      await parcel.validate(recipientAddressType, trustedCertificates);
-    } catch (err) {
-      throw new InvalidParcelError(err);
-    }
+  public async store(
+    parcelSerialized: Buffer,
+    parcel: Parcel,
+    direction: ParcelDirection,
+  ): Promise<string> {
     const parcelRelativeKey = await getRelativeParcelKey(parcel, direction);
     const parcelAbsoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
     await this.fileStore.putObject(parcelSerialized, parcelAbsoluteKey);
@@ -152,10 +133,6 @@ export class ParcelStore {
     return new Date(expiryTimestamp);
   }
 }
-
-export class MalformedParcelError extends PrivateGatewayError {}
-
-export class InvalidParcelError extends PrivateGatewayError {}
 
 function sha256Hex(plaintext: string): string {
   return createHash('sha256').update(plaintext).digest('hex');

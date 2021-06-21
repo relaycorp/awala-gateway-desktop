@@ -1,13 +1,15 @@
-import { Certificate, DETACHED_SIGNATURE_TYPES } from '@relaycorp/relaynet-core';
+import {
+  Certificate,
+  DETACHED_SIGNATURE_TYPES,
+  InvalidMessageError,
+  Parcel,
+  RAMFSyntaxError,
+} from '@relaycorp/relaynet-core';
+import { subSeconds } from 'date-fns';
 import { FastifyInstance } from 'fastify';
 import { Response as LightMyRequestResponse } from 'light-my-request';
 
-import {
-  InvalidParcelError,
-  MalformedParcelError,
-  ParcelDirection,
-  ParcelStore,
-} from '../../parcelStore';
+import { ParcelDirection, ParcelStore } from '../../parcelStore';
 import { ParcelDeliveryManager } from '../../sync/publicGateway/parcelDelivery/ParcelDeliveryManager';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { arrayBufferFrom } from '../../testUtils/buffer';
@@ -128,8 +130,6 @@ describe('Authorization errors', () => {
 test('Malformed parcels should be refused with an HTTP 400 response', async () => {
   const fastify = await makeServer(mockLogging.logger);
   const parcelSerialized = arrayBufferFrom('malformed');
-  const error = new MalformedParcelError('yup, malformed');
-  mockStoreInternetBoundParcel.mockRejectedValue(error);
 
   const response = await postParcel(
     parcelSerialized,
@@ -141,16 +141,18 @@ test('Malformed parcels should be refused with an HTTP 400 response', async () =
   expect(JSON.parse(response.payload)).toHaveProperty('message', 'Parcel is malformed');
   expect(mockLogging.logs).toContainEqual(
     partialPinoLog('info', 'Rejected malformed parcel', {
-      err: expect.objectContaining({ message: error.message }),
+      err: expect.objectContaining({ type: RAMFSyntaxError.name }),
     }),
   );
 });
 
 test('Well-formed yet invalid parcels should be refused with an HTTP 422 response', async () => {
   const fastify = await makeServer(mockLogging.logger);
-  const parcelSerialized = arrayBufferFrom('invalid');
-  const error = new InvalidParcelError('Well-formed but invalid');
-  mockStoreInternetBoundParcel.mockRejectedValue(error);
+  const parcel = new Parcel('https://example.com', endpointCertificate, Buffer.from([]), {
+    creationDate: subSeconds(new Date(), 2),
+    ttl: 1,
+  });
+  const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
 
   const response = await postParcel(
     parcelSerialized,
@@ -165,14 +167,15 @@ test('Well-formed yet invalid parcels should be refused with an HTTP 422 respons
   );
   expect(mockLogging.logs).toContainEqual(
     partialPinoLog('info', 'Rejected invalid parcel', {
-      err: expect.objectContaining({ message: error.message }),
+      err: expect.objectContaining({ type: InvalidMessageError.name }),
     }),
   );
 });
 
 test('Valid parcels should result in an HTTP 202 response', async () => {
   const fastify = await makeServer(mockLogging.logger);
-  const parcelSerialized = Buffer.from('valid parcel');
+  const parcel = new Parcel('https://example.com', endpointCertificate, Buffer.from([]));
+  const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
 
   const response = await postParcel(
     parcelSerialized,
@@ -182,6 +185,7 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
 
   expect(mockStoreInternetBoundParcel).toBeCalledWith(
     parcelSerialized,
+    expect.toSatisfy((p) => p.id === parcel.id),
     ParcelDirection.ENDPOINT_TO_INTERNET,
   );
   expect(mockParcelDeliveryManagerNotifier).toBeCalledWith(
@@ -197,7 +201,8 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
 
 test('Failing to save a valid parcel should result in an HTTP 500 response', async () => {
   const fastify = await makeServer(mockLogging.logger);
-  const parcelSerialized = arrayBufferFrom('this is a parcel');
+  const parcel = new Parcel('https://example.com', endpointCertificate, Buffer.from([]));
+  const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
   const error = new Error('whoops');
   mockStoreInternetBoundParcel.mockRejectedValue(error);
 
