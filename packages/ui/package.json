@@ -41,7 +41,7 @@
     "@types/react": "^17.0.11",
     "@types/react-dom": "^17.0.8",
     "@types/verror": "^1.10.4",
-    "@types/ws": "^7.4.4",
+    "@types/ws": "^7.4.5",
     "abort-controller": "^3.0.0",
     "copy-webpack-plugin": "^9.0.0",
     "css-loader": "^5.2.6",
