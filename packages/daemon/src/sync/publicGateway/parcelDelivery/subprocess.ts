@@ -2,6 +2,7 @@ import { Signer } from '@relaycorp/relaynet-core';
 import { RefusedParcelError, ServerError } from '@relaycorp/relaynet-poweb';
 import bufferToArray from 'buffer-to-arraybuffer';
 import pipe from 'it-pipe';
+import { Logger } from 'pino';
 import { Duplex } from 'stream';
 import { source } from 'stream-to-it';
 import { Container } from 'typedi';
@@ -9,26 +10,44 @@ import { Container } from 'typedi';
 import { DBPrivateKeyStore } from '../../../keystores/DBPrivateKeyStore';
 import { ParcelDirection, ParcelStore } from '../../../parcelStore';
 import { LOGGER } from '../../../tokens';
-import { makeParentStream } from '../../../utils/subprocess/parent';
 import { GatewayRegistrar } from '../GatewayRegistrar';
 import { makeGSCClient } from '../gscClient';
 
-export default async function runParcelDelivery(_parentStream: Duplex): Promise<number> {
+export default async function runParcelDelivery(parentStream: Duplex): Promise<number> {
   const gatewayRegistrar = Container.get(GatewayRegistrar);
   const publicGateway = await gatewayRegistrar.getPublicGateway();
   if (!publicGateway) {
     // The gateway isn't registered.
     return 1;
   }
-  const gcsClient = await makeGSCClient(publicGateway.publicAddress);
 
   const parcelStore = Container.get(ParcelStore);
   const logger = Container.get(LOGGER);
 
-  async function deliverParcels(parcelKeys: AsyncIterable<string>): Promise<void> {
-    const privateKeyStore = Container.get(DBPrivateKeyStore);
-    const currentKey = await privateKeyStore.getCurrentKey();
-    const signer = new Signer(currentKey!.certificate, currentKey!.privateKey);
+  logger.info('Ready to deliver parcels');
+  await pipe(async function* (): AsyncIterable<string> {
+    // Deliver the queued parcels before delivering parcels streamed by the parent process
+    yield* await parcelStore.listActiveBoundForInternet();
+    yield* source(parentStream);
+  }, await deliverParcels(publicGateway.publicAddress, parcelStore, logger));
+
+  // This should never end, so ending "normally" should actually be an error
+  return 2;
+}
+
+async function deliverParcels(
+  publicGatewayAddress: string,
+  parcelStore: ParcelStore,
+  logger: Logger,
+): Promise<(parcelKeys: AsyncIterable<string>) => Promise<void>> {
+  const gcsClient = await makeGSCClient(publicGatewayAddress);
+
+  const privateKeyStore = Container.get(DBPrivateKeyStore);
+  const currentKey = await privateKeyStore.getCurrentKey();
+
+  const signer = new Signer(currentKey!.certificate, currentKey!.privateKey);
+
+  return async (parcelKeys: AsyncIterable<string>) => {
     for await (const parcelKey of parcelKeys) {
       const parcelSerialized = await parcelStore.retrieve(
         parcelKey,
@@ -60,16 +79,5 @@ export default async function runParcelDelivery(_parentStream: Duplex): Promise<
         parcelAwareLogger.info('Skipping non-existing parcel');
       }
     }
-  }
-
-  logger.info('Ready to deliver parcels');
-  const parentStream = await makeParentStream();
-  await pipe(async function* (): AsyncIterable<string> {
-    // Deliver the queued parcels before delivering parcels streamed by the parent process
-    yield* await parcelStore.listActiveBoundForInternet();
-    yield* source(parentStream);
-  }, deliverParcels);
-
-  // This should never end, so ending "normally" should actually be an error
-  return 2;
+  };
 }

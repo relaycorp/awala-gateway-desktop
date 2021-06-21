@@ -12,7 +12,6 @@ import { setUpTestDBConnection } from '../../../testUtils/db';
 import { mockSpy } from '../../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
 import { GeneratedParcel, makeParcel } from '../../../testUtils/ramf';
-import * as parentSubprocess from '../../../utils/subprocess/parent';
 import { GatewayRegistrar } from '../GatewayRegistrar';
 import * as gscClient from '../gscClient';
 import runParcelDelivery from './subprocess';
@@ -42,7 +41,6 @@ let parentStream: PassThrough;
 beforeEach(async () => {
   parentStream = new PassThrough({ objectMode: true });
 });
-mockSpy(jest.spyOn(parentSubprocess, 'makeParentStream'), () => parentStream);
 
 let gatewayCertificate: Certificate;
 const pkiFixtureRetriever = setUpPKIFixture((_keyPairSet, certPath) => {
