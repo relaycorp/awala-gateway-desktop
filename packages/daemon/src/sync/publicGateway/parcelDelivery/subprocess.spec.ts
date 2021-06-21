@@ -1,4 +1,4 @@
-import { Certificate, Parcel } from '@relaycorp/relaynet-core';
+import { Certificate } from '@relaycorp/relaynet-core';
 import { RefusedParcelError, ServerError } from '@relaycorp/relaynet-poweb';
 import { DeliverParcelCall, MockGSCClient } from '@relaycorp/relaynet-testing';
 import { PassThrough } from 'stream';
@@ -11,6 +11,7 @@ import { setUpPKIFixture } from '../../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../../testUtils/db';
 import { mockSpy } from '../../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
+import { GeneratedParcel, makeParcel } from '../../../testUtils/ramf';
 import * as parentSubprocess from '../../../utils/subprocess/parent';
 import { GatewayRegistrar } from '../GatewayRegistrar';
 import * as gscClient from '../gscClient';
@@ -44,13 +45,8 @@ beforeEach(async () => {
 mockSpy(jest.spyOn(parentSubprocess, 'makeParentStream'), () => parentStream);
 
 let gatewayCertificate: Certificate;
-let endpointPrivateKey: CryptoKey;
-let endpointCertificate: Certificate;
-setUpPKIFixture((keyPairSet, certPath) => {
+const pkiFixtureRetriever = setUpPKIFixture((_keyPairSet, certPath) => {
   gatewayCertificate = certPath.privateGateway;
-
-  endpointPrivateKey = keyPairSet.privateEndpoint.privateKey;
-  endpointCertificate = certPath.privateEndpoint;
 });
 
 test('Subprocess should abort if the gateway is unregistered', async () => {
@@ -87,9 +83,10 @@ describe('Parcel delivery', () => {
   });
 
   test('Pre-existing parcels should be delivered', async () => {
-    const parcelSerialized = await makeDummyParcel();
+    const { parcel, parcelSerialized } = await makeDummyParcel();
     const parcelKey = await parcelStore.store(
       parcelSerialized,
+      parcel,
       ParcelDirection.ENDPOINT_TO_INTERNET,
     );
     const parcelDeliveryCall = new DeliverParcelCall();
@@ -104,13 +101,17 @@ describe('Parcel delivery', () => {
   });
 
   test('New parcels should be delivered', async () => {
-    const parcelSerialized = await makeDummyParcel();
+    const { parcel, parcelSerialized } = await makeDummyParcel();
     const parcelDeliveryCall = new DeliverParcelCall();
     mockGSCClient = new MockGSCClient([parcelDeliveryCall]);
 
     let parcelKey: string;
     setImmediate(async () => {
-      parcelKey = await parcelStore.store(parcelSerialized, ParcelDirection.ENDPOINT_TO_INTERNET);
+      parcelKey = await parcelStore.store(
+        parcelSerialized,
+        parcel,
+        ParcelDirection.ENDPOINT_TO_INTERNET,
+      );
       parentStream.write(parcelKey);
       parentStream.end();
     });
@@ -124,8 +125,8 @@ describe('Parcel delivery', () => {
   });
 
   test('Delivery should be signed with the right key', async () => {
-    const parcelSerialized = await makeDummyParcel();
-    await parcelStore.store(parcelSerialized, ParcelDirection.ENDPOINT_TO_INTERNET);
+    const { parcel, parcelSerialized } = await makeDummyParcel();
+    await parcelStore.store(parcelSerialized, parcel, ParcelDirection.ENDPOINT_TO_INTERNET);
     const parcelDeliveryCall = new DeliverParcelCall();
     mockGSCClient = new MockGSCClient([parcelDeliveryCall]);
 
@@ -139,9 +140,10 @@ describe('Parcel delivery', () => {
   });
 
   test('Successfully delivered parcels should be deleted', async () => {
-    const parcelSerialized = await makeDummyParcel();
+    const { parcel, parcelSerialized } = await makeDummyParcel();
     const parcelKey = await parcelStore.store(
       parcelSerialized,
+      parcel,
       ParcelDirection.ENDPOINT_TO_INTERNET,
     );
     mockGSCClient = new MockGSCClient([new DeliverParcelCall()]);
@@ -170,9 +172,10 @@ describe('Parcel delivery', () => {
   });
 
   test('Parcels refused as invalid should be deleted', async () => {
-    const parcelSerialized = await makeDummyParcel();
+    const { parcel, parcelSerialized } = await makeDummyParcel();
     const parcelKey = await parcelStore.store(
       parcelSerialized,
+      parcel,
       ParcelDirection.ENDPOINT_TO_INTERNET,
     );
     mockGSCClient = new MockGSCClient([new DeliverParcelCall(new RefusedParcelError())]);
@@ -189,9 +192,10 @@ describe('Parcel delivery', () => {
   });
 
   test('Parcel should be temporarily ignored if there was a server error', async () => {
-    const parcelSerialized = await makeDummyParcel();
+    const { parcel, parcelSerialized } = await makeDummyParcel();
     const parcelKey = await parcelStore.store(
       parcelSerialized,
+      parcel,
       ParcelDirection.ENDPOINT_TO_INTERNET,
     );
     const serverError = new ServerError('Planets are not aligned yet');
@@ -212,9 +216,10 @@ describe('Parcel delivery', () => {
   });
 
   test('Parcel should be temporarily ignored if there was an expected error', async () => {
-    const parcelSerialized = await makeDummyParcel();
+    const { parcel, parcelSerialized } = await makeDummyParcel();
     const parcelKey = await parcelStore.store(
       parcelSerialized,
+      parcel,
       ParcelDirection.ENDPOINT_TO_INTERNET,
     );
     const error = new Error('This is not really expected');
@@ -234,9 +239,9 @@ describe('Parcel delivery', () => {
     );
   });
 
-  async function makeDummyParcel(): Promise<Buffer> {
-    const parcel = new Parcel('https://endpoint.com', endpointCertificate, Buffer.from([]));
-    return Buffer.from(await parcel.serialize(endpointPrivateKey));
+  async function makeDummyParcel(): Promise<GeneratedParcel> {
+    const { certPath, keyPairSet } = pkiFixtureRetriever();
+    return makeParcel(ParcelDirection.ENDPOINT_TO_INTERNET, certPath, keyPairSet);
   }
 });
 

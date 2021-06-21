@@ -18,6 +18,7 @@ import { useTemporaryAppDirs } from './testUtils/appDirs';
 import { setUpPKIFixture, sha256Hex } from './testUtils/crypto';
 import { setUpTestDBConnection } from './testUtils/db';
 import { asyncIterableToArray } from './testUtils/iterables';
+import { GeneratedParcel } from './testUtils/ramf';
 
 setUpTestDBConnection();
 
@@ -487,11 +488,6 @@ describe('delete', () => {
     await expect(fs.stat(parcelMetadataPath)).toReject();
   });
 });
-
-interface GeneratedParcel {
-  readonly parcel: Parcel;
-  readonly parcelSerialized: Buffer;
-}
 
 async function makeInternetBoundParcel(): Promise<GeneratedParcel> {
   const parcel = new Parcel(PUBLIC_ENDPOINT_ADDRESS, localEndpointCertificate, Buffer.from([]));
