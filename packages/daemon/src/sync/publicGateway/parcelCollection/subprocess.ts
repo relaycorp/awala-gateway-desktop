@@ -49,16 +49,30 @@ async function streamParcelCollections(
   const currentKey = await privateKeyStore.getCurrentKey();
   const signer = new Signer(currentKey!.certificate, currentKey!.privateKey);
 
-  return async function* (): AsyncIterable<ParcelCollection> {
-    const gscClient = await makeGSCClientAndRetryIfNeeded(
-      publicGatewayAddress,
-      parentStream,
-      logger,
-    );
+  const handshakeCallback = () => {
+    logger.debug('Handshake completed successfully');
+  };
 
-    yield* await gscClient.collectParcels([signer], StreamingMode.KEEP_ALIVE, () => {
-      logger.debug('Handshake completed successfully');
-    });
+  return async function* (): AsyncIterable<ParcelCollection> {
+    let hasCollectionFailed = false;
+    do {
+      const gscClient = await makeGSCClientAndRetryIfNeeded(
+        publicGatewayAddress,
+        parentStream,
+        logger,
+      );
+      hasCollectionFailed = false;
+      try {
+        yield* await gscClient.collectParcels(
+          [signer],
+          StreamingMode.KEEP_ALIVE,
+          handshakeCallback,
+        );
+      } catch (err) {
+        hasCollectionFailed = true;
+        logger.warn({ err }, 'Collection failed; will retry...');
+      }
+    } while (hasCollectionFailed);
   };
 }
 

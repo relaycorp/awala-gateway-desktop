@@ -18,7 +18,7 @@ import { setUpTestDBConnection } from '../../../testUtils/db';
 import { arrayToAsyncIterable } from '../../../testUtils/iterables';
 import { mockSpy } from '../../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
-import { makeParcel } from '../../../testUtils/ramf';
+import { GeneratedParcel, makeParcel } from '../../../testUtils/ramf';
 import { mockSleepSeconds } from '../../../testUtils/timing';
 import { GatewayRegistrar } from '../GatewayRegistrar';
 import * as gscClient from '../gscClient';
@@ -29,12 +29,9 @@ useTemporaryAppDirs();
 
 const mockLogs = mockLoggerToken();
 
-let mockGSCClient: MockGSCClient;
-beforeEach(() => {
-  const call = new CollectParcelsCall(arrayToAsyncIterable([]));
-  mockGSCClient = new MockGSCClient([call]);
+const mockMakeGSCClient = mockSpy(jest.spyOn(gscClient, 'makeGSCClient'), () => {
+  throw new Error('Define the client explicitly in each test');
 });
-const mockMakeGSCClient = mockSpy(jest.spyOn(gscClient, 'makeGSCClient'), () => mockGSCClient);
 
 const mockGetPublicGateway = mockSpy(
   jest.spyOn(GatewayRegistrar.prototype, 'getPublicGateway'),
@@ -68,18 +65,24 @@ test('Subprocess should abort if the gateway is unregistered', async () => {
 });
 
 test('Client should connect to appropriate public gateway', async () => {
+  addEmptyParcelCollectionCall();
+
   await runParcelCollection(parentStream);
 
   expect(mockMakeGSCClient).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
 });
 
 test('Subprocess should record a log when it is ready', async () => {
+  addEmptyParcelCollectionCall();
+
   await runParcelCollection(parentStream);
 
   expect(mockLogs).toContainEqual(partialPinoLog('info', 'Ready to collect parcels'));
 });
 
 test('Subprocess should exit with code 2 if it ends normally', async () => {
+  addEmptyParcelCollectionCall();
+
   await expect(runParcelCollection(parentStream)).resolves.toEqual(2);
 
   expect(mockLogs).toContainEqual(partialPinoLog('fatal', 'Parcel collection ended unexpectedly'));
@@ -87,8 +90,7 @@ test('Subprocess should exit with code 2 if it ends normally', async () => {
 
 describe('Parcel collection', () => {
   test('Collection should be signed with the right key', async () => {
-    const call = new CollectParcelsCall(arrayToAsyncIterable([]));
-    mockGSCClient = new MockGSCClient([call]);
+    const call = addEmptyParcelCollectionCall();
 
     await runParcelCollection(parentStream);
 
@@ -100,8 +102,7 @@ describe('Parcel collection', () => {
   });
 
   test('Connection should be kept alive', async () => {
-    const call = new CollectParcelsCall(arrayToAsyncIterable([]));
-    mockGSCClient = new MockGSCClient([call]);
+    const call = addEmptyParcelCollectionCall();
 
     await runParcelCollection(parentStream);
 
@@ -110,8 +111,7 @@ describe('Parcel collection', () => {
   });
 
   test('Debug log should be recorded when handshake completes successfully', async () => {
-    const call = new CollectParcelsCall(arrayToAsyncIterable([]));
-    mockGSCClient = new MockGSCClient([call]);
+    const call = addEmptyParcelCollectionCall();
 
     await runParcelCollection(parentStream);
 
@@ -123,17 +123,7 @@ describe('Parcel collection', () => {
   test('Malformed parcels should be ACKed and ignored', async () => {
     const malformedParcelSerialized = Buffer.from('malformed');
     const collectionAck = jest.fn();
-    mockGSCClient = new MockGSCClient([
-      new CollectParcelsCall(
-        arrayToAsyncIterable([
-          new ParcelCollection(
-            bufferToArray(malformedParcelSerialized),
-            [privateGatewayCertificate],
-            collectionAck,
-          ),
-        ]),
-      ),
-    ]);
+    addParcelCollectionCall(malformedParcelSerialized, collectionAck);
 
     await runParcelCollection(parentStream);
 
@@ -147,24 +137,11 @@ describe('Parcel collection', () => {
   });
 
   test('Well-formed yet invalid parcel should be ACKed and ignored', async () => {
-    const { certPath, keyPairSet } = retrievePKIFixture();
-    const { parcelSerialized: invalidParcelSerialized } = await makeParcel(
+    const { parcelSerialized: invalidParcelSerialized } = await makeDummyParcel(
       ParcelDirection.ENDPOINT_TO_INTERNET, // Wrong direction
-      certPath,
-      keyPairSet,
     );
     const collectionAck = jest.fn();
-    mockGSCClient = new MockGSCClient([
-      new CollectParcelsCall(
-        arrayToAsyncIterable([
-          new ParcelCollection(
-            bufferToArray(invalidParcelSerialized),
-            [privateGatewayCertificate],
-            collectionAck,
-          ),
-        ]),
-      ),
-    ]);
+    addParcelCollectionCall(invalidParcelSerialized, collectionAck);
 
     await runParcelCollection(parentStream);
 
@@ -178,24 +155,9 @@ describe('Parcel collection', () => {
   });
 
   test('Valid parcels should be stored and parent process should be notified', async () => {
-    const { certPath, keyPairSet } = retrievePKIFixture();
-    const { parcel, parcelSerialized } = await makeParcel(
-      ParcelDirection.INTERNET_TO_ENDPOINT,
-      certPath,
-      keyPairSet,
-    );
+    const { parcel, parcelSerialized } = await makeDummyParcel();
     const collectionAck = jest.fn();
-    mockGSCClient = new MockGSCClient([
-      new CollectParcelsCall(
-        arrayToAsyncIterable([
-          new ParcelCollection(
-            bufferToArray(parcelSerialized),
-            [privateGatewayCertificate],
-            collectionAck,
-          ),
-        ]),
-      ),
-    ]);
+    addParcelCollectionCall(parcelSerialized, collectionAck);
 
     await runParcelCollection(parentStream);
 
@@ -222,7 +184,7 @@ describe('Public gateway resolution failures', () => {
   test('Parent process should be notified about failure', async (cb) => {
     const error = new Error('oh noes');
     mockMakeGSCClient.mockRejectedValueOnce(error);
-    mockMakeGSCClient.mockResolvedValueOnce(mockGSCClient);
+    addEmptyParcelCollectionCall();
 
     parentStream.once('data', (message) => {
       expect(message).toEqual({ type: 'status', status: 'disconnected' });
@@ -233,7 +195,7 @@ describe('Public gateway resolution failures', () => {
 
   test('Parent process should be notified about successful reconnect', async () => {
     mockMakeGSCClient.mockRejectedValueOnce(new Error('oh noes'));
-    mockMakeGSCClient.mockResolvedValueOnce(mockGSCClient);
+    addEmptyParcelCollectionCall();
     // tslint:disable-next-line:readonly-array
     const parentMessages: any[] = [];
     const consumer = new Writable({
@@ -253,7 +215,7 @@ describe('Public gateway resolution failures', () => {
   test('Reconnection should be attempted after 3 seconds if DNS lookup failed', async () => {
     const error = new PublicAddressingError('we probably do not have access to the Internet');
     mockMakeGSCClient.mockRejectedValueOnce(error);
-    mockMakeGSCClient.mockResolvedValueOnce(mockGSCClient);
+    addEmptyParcelCollectionCall();
 
     await runParcelCollection(parentStream);
 
@@ -269,7 +231,7 @@ describe('Public gateway resolution failures', () => {
   test('Reconnection should be attempted after 10 seconds if DNS record does not exist', async () => {
     const error = new gscClient.NonExistingAddressError('Not found');
     mockMakeGSCClient.mockRejectedValueOnce(error);
-    mockMakeGSCClient.mockResolvedValueOnce(mockGSCClient);
+    addEmptyParcelCollectionCall();
 
     await runParcelCollection(parentStream);
 
@@ -287,24 +249,8 @@ describe('Public gateway resolution failures', () => {
     // Collection #1
     mockMakeGSCClient.mockRejectedValueOnce(new Error('oh noes'));
     // Collection #2
-    const { certPath, keyPairSet } = retrievePKIFixture();
-    const { parcel, parcelSerialized } = await makeParcel(
-      ParcelDirection.INTERNET_TO_ENDPOINT,
-      certPath,
-      keyPairSet,
-    );
-    mockGSCClient = new MockGSCClient([
-      new CollectParcelsCall(
-        arrayToAsyncIterable([
-          new ParcelCollection(
-            bufferToArray(parcelSerialized),
-            [privateGatewayCertificate],
-            jest.fn(),
-          ),
-        ]),
-      ),
-    ]);
-    mockMakeGSCClient.mockResolvedValueOnce(mockGSCClient);
+    const { parcel, parcelSerialized } = await makeDummyParcel();
+    addParcelCollectionCall(parcelSerialized);
 
     await runParcelCollection(parentStream);
 
@@ -317,7 +263,71 @@ describe('Public gateway resolution failures', () => {
 });
 
 describe('Collection errors', () => {
-  test.todo('Reconnection should be attempted immediately after failure');
+  test('Reconnection should be attempted immediately after failure', async () => {
+    // Collection #1
+    const collectionError = new Error('Try again');
+    const failingGSCClient = new MockGSCClient([new CollectParcelsCall(collectionError)]);
+    mockMakeGSCClient.mockResolvedValueOnce(failingGSCClient);
+    // Collection #2
+    const call2 = addEmptyParcelCollectionCall();
 
-  test.todo('New parcels should continue to be processed after reconnect');
+    await runParcelCollection(parentStream);
+
+    expect(call2.wasCalled).toBeTrue();
+    expect(mockMakeGSCClient).toBeCalledTimes(2);
+    expect(mockLogs).toContainEqual(
+      partialPinoLog('warn', 'Collection failed; will retry...', {
+        err: expect.objectContaining({ message: collectionError.message }),
+      }),
+    );
+  });
+
+  test('New parcels should continue to be processed after reconnect', async () => {
+    // Collection #1
+    const failingGSCClient = new MockGSCClient([new CollectParcelsCall(new Error('Try again'))]);
+    mockMakeGSCClient.mockResolvedValueOnce(failingGSCClient);
+    // Collection #2
+    const { parcel, parcelSerialized } = await makeDummyParcel();
+    addParcelCollectionCall(parcelSerialized);
+
+    await runParcelCollection(parentStream);
+
+    expect(mockParcelStore).toBeCalledWith(
+      parcelSerialized,
+      expect.toSatisfy((p) => p.id === parcel.id),
+      ParcelDirection.INTERNET_TO_ENDPOINT,
+    );
+  });
 });
+
+function addEmptyParcelCollectionCall(): CollectParcelsCall {
+  const call = new CollectParcelsCall(arrayToAsyncIterable([]));
+  const mockGSCClient = new MockGSCClient([call]);
+  mockMakeGSCClient.mockResolvedValueOnce(mockGSCClient);
+  return call;
+}
+
+function addParcelCollectionCall(
+  parcelSerialized: Buffer,
+  ackCallback?: () => Promise<void>,
+): void {
+  const mockGSCClient = new MockGSCClient([
+    new CollectParcelsCall(
+      arrayToAsyncIterable([
+        new ParcelCollection(
+          bufferToArray(parcelSerialized),
+          [privateGatewayCertificate],
+          ackCallback ?? jest.fn(),
+        ),
+      ]),
+    ),
+  ]);
+  mockMakeGSCClient.mockResolvedValueOnce(mockGSCClient);
+}
+
+async function makeDummyParcel(
+  direction: ParcelDirection = ParcelDirection.INTERNET_TO_ENDPOINT,
+): Promise<GeneratedParcel> {
+  const { certPath, keyPairSet } = retrievePKIFixture();
+  return makeParcel(direction, certPath, keyPairSet);
+}
