@@ -2,12 +2,13 @@ import {
   Certificate,
   InvalidMessageError,
   ParcelCollection,
+  PublicAddressingError,
   RAMFSyntaxError,
   StreamingMode,
 } from '@relaycorp/relaynet-core';
 import { CollectParcelsCall, MockGSCClient } from '@relaycorp/relaynet-testing';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { PassThrough } from 'stream';
+import { PassThrough, Writable } from 'stream';
 
 import { DEFAULT_PUBLIC_GATEWAY } from '../../../constants';
 import { ParcelDirection, ParcelStore } from '../../../parcelStore';
@@ -18,6 +19,7 @@ import { arrayToAsyncIterable } from '../../../testUtils/iterables';
 import { mockSpy } from '../../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
 import { makeParcel } from '../../../testUtils/ramf';
+import { mockSleepSeconds } from '../../../testUtils/timing';
 import { GatewayRegistrar } from '../GatewayRegistrar';
 import * as gscClient from '../gscClient';
 import runParcelCollection from './subprocess';
@@ -39,14 +41,17 @@ const mockGetPublicGateway = mockSpy(
   () => ({ publicAddress: DEFAULT_PUBLIC_GATEWAY }),
 );
 
-let parentStream: PassThrough;
-beforeEach(async () => {
-  parentStream = new PassThrough({ objectMode: true });
-});
-
 let privateGatewayCertificate: Certificate;
 const retrievePKIFixture = setUpPKIFixture((_keyPairSet, certPath) => {
   privateGatewayCertificate = certPath.privateGateway;
+});
+
+let parentStream: PassThrough;
+beforeEach(() => {
+  parentStream = new PassThrough({ objectMode: true });
+});
+afterEach(() => {
+  parentStream.destroy();
 });
 
 const mockParcelStore = mockSpy(jest.spyOn(ParcelStore.prototype, 'store'), () => {
@@ -59,6 +64,7 @@ test('Subprocess should abort if the gateway is unregistered', async () => {
   await expect(runParcelCollection(parentStream)).resolves.toEqual(1);
 
   expect(mockMakeGSCClient).not.toBeCalled();
+  expect(mockLogs).toContainEqual(partialPinoLog('fatal', 'Private gateway is not registered'));
 });
 
 test('Client should connect to appropriate public gateway', async () => {
@@ -75,6 +81,8 @@ test('Subprocess should record a log when it is ready', async () => {
 
 test('Subprocess should exit with code 2 if it ends normally', async () => {
   await expect(runParcelCollection(parentStream)).resolves.toEqual(2);
+
+  expect(mockLogs).toContainEqual(partialPinoLog('fatal', 'Parcel collection ended unexpectedly'));
 });
 
 describe('Parcel collection', () => {
@@ -101,18 +109,15 @@ describe('Parcel collection', () => {
     expect(call.arguments!.streamingMode).toEqual(StreamingMode.KEEP_ALIVE);
   });
 
-  test('Parent process should be notified when handshake completes successfully', async (cb) => {
+  test('Debug log should be recorded when handshake completes successfully', async () => {
     const call = new CollectParcelsCall(arrayToAsyncIterable([]));
     mockGSCClient = new MockGSCClient([call]);
 
     await runParcelCollection(parentStream);
 
-    parentStream.on('data', (chunk) => {
-      expect(chunk).toEqual({ type: 'status', status: 'connected' });
-      cb();
-    });
     expect(call.wasCalled).toBeTrue();
     call.arguments?.handshakeCallback!();
+    expect(mockLogs).toContainEqual(partialPinoLog('debug', 'Handshake completed successfully'));
   });
 
   test('Malformed parcels should be ACKed and ignored', async () => {
@@ -211,12 +216,108 @@ describe('Parcel collection', () => {
   });
 });
 
-test.todo('Parent process should be notified about failure to resolve public gateway address');
+describe('Public gateway resolution failures', () => {
+  const sleepSeconds = mockSleepSeconds();
 
-describe('Reconnections', () => {
-  test.todo('Reconnection should be attempted 3 seconds after failure');
+  test('Parent process should be notified about failure', async (cb) => {
+    const error = new Error('oh noes');
+    mockMakeGSCClient.mockRejectedValueOnce(error);
+    mockMakeGSCClient.mockResolvedValueOnce(mockGSCClient);
 
-  test.todo('Parent process should be notified about successful reconnects');
+    parentStream.once('data', (message) => {
+      expect(message).toEqual({ type: 'status', status: 'disconnected' });
+      cb();
+    });
+    await runParcelCollection(parentStream);
+  });
+
+  test('Parent process should be notified about successful reconnect', async () => {
+    mockMakeGSCClient.mockRejectedValueOnce(new Error('oh noes'));
+    mockMakeGSCClient.mockResolvedValueOnce(mockGSCClient);
+    // tslint:disable-next-line:readonly-array
+    const parentMessages: any[] = [];
+    const consumer = new Writable({
+      objectMode: true,
+      write(chunk, _encoding, callback): void {
+        parentMessages.push(chunk);
+        callback();
+      },
+    });
+    parentStream.pipe(consumer);
+
+    await runParcelCollection(parentStream);
+
+    expect(parentMessages).toContainEqual({ type: 'status', status: 'connected' });
+  });
+
+  test('Reconnection should be attempted after 3 seconds if DNS lookup failed', async () => {
+    const error = new PublicAddressingError('we probably do not have access to the Internet');
+    mockMakeGSCClient.mockRejectedValueOnce(error);
+    mockMakeGSCClient.mockResolvedValueOnce(mockGSCClient);
+
+    await runParcelCollection(parentStream);
+
+    expect(sleepSeconds).toBeCalledWith(3);
+    expect(mockMakeGSCClient).toBeCalledTimes(2);
+    expect(mockLogs).toContainEqual(
+      partialPinoLog('info', 'Failed to resolve DNS record for public gateway', {
+        err: expect.objectContaining({ message: error.message }),
+      }),
+    );
+  });
+
+  test('Reconnection should be attempted after 10 seconds if DNS record does not exist', async () => {
+    const error = new gscClient.NonExistingAddressError('Not found');
+    mockMakeGSCClient.mockRejectedValueOnce(error);
+    mockMakeGSCClient.mockResolvedValueOnce(mockGSCClient);
+
+    await runParcelCollection(parentStream);
+
+    expect(sleepSeconds).toBeCalledWith(10);
+    expect(mockMakeGSCClient).toBeCalledTimes(2);
+    expect(mockLogs).toContainEqual(
+      partialPinoLog('warn', 'Public gateway does not appear to exist', {
+        err: expect.objectContaining({ message: error.message }),
+        publicGatewayAddress: DEFAULT_PUBLIC_GATEWAY,
+      }),
+    );
+  });
+
+  test('New parcels should continue to be processed after reconnect', async () => {
+    // Collection #1
+    mockMakeGSCClient.mockRejectedValueOnce(new Error('oh noes'));
+    // Collection #2
+    const { certPath, keyPairSet } = retrievePKIFixture();
+    const { parcel, parcelSerialized } = await makeParcel(
+      ParcelDirection.INTERNET_TO_ENDPOINT,
+      certPath,
+      keyPairSet,
+    );
+    mockGSCClient = new MockGSCClient([
+      new CollectParcelsCall(
+        arrayToAsyncIterable([
+          new ParcelCollection(
+            bufferToArray(parcelSerialized),
+            [privateGatewayCertificate],
+            jest.fn(),
+          ),
+        ]),
+      ),
+    ]);
+    mockMakeGSCClient.mockResolvedValueOnce(mockGSCClient);
+
+    await runParcelCollection(parentStream);
+
+    expect(mockParcelStore).toBeCalledWith(
+      parcelSerialized,
+      expect.toSatisfy((p) => p.id === parcel.id),
+      ParcelDirection.INTERNET_TO_ENDPOINT,
+    );
+  });
+});
+
+describe('Collection errors', () => {
+  test.todo('Reconnection should be attempted immediately after failure');
 
   test.todo('New parcels should continue to be processed after reconnect');
 });
