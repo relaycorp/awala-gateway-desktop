@@ -16,16 +16,21 @@ export async function makeParcel(
   let recipientAddress: string;
   let senderCertificate: Certificate;
   let senderPrivateKey: CryptoKey;
+  let senderCaCertificateChain: readonly Certificate[];
   if (direction === ParcelDirection.ENDPOINT_TO_INTERNET) {
     recipientAddress = 'https://example.com';
     senderCertificate = certPath.privateEndpoint;
     senderPrivateKey = keyPairSet.privateEndpoint.privateKey;
+    senderCaCertificateChain = [];
   } else {
     recipientAddress = await certPath.privateEndpoint.calculateSubjectPrivateAddress();
     senderCertificate = certPath.pdaGrantee;
     senderPrivateKey = keyPairSet.pdaGrantee.privateKey;
+    senderCaCertificateChain = [certPath.privateGateway, certPath.privateEndpoint];
   }
-  const parcel = new Parcel(recipientAddress, senderCertificate, Buffer.from([]));
+  const parcel = new Parcel(recipientAddress, senderCertificate, Buffer.from([]), {
+    senderCaCertificateChain,
+  });
   const parcelSerialized = Buffer.from(await parcel.serialize(senderPrivateKey));
   return { parcel, parcelSerialized };
 }
