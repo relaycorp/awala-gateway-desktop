@@ -65,7 +65,7 @@ async function* streamStatus(subprocess: Duplex): AsyncIterable<PublicGatewayCol
   const readonlySubprocessStream = new PassThrough({ objectMode: true });
   subprocess.pipe(readonlySubprocessStream);
   const endReadonlyStream = () => {
-    readonlySubprocessStream.end();
+    readonlySubprocessStream.end({ type: 'status', status: 'disconnected' });
   };
   subprocess.once('close', endReadonlyStream);
   try {

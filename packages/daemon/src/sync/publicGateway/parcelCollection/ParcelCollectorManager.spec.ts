@@ -164,7 +164,7 @@ describe('streamStatus', () => {
     expect(getSubprocessStream().listenerCount('data')).toEqual(0);
   });
 
-  test('New stream should be picked up when subprocess is restarted', async () => {
+  test('Reconnection should be reported when subprocess is restarted', async () => {
     const subprocess1 = new PassThrough({ objectMode: true });
     mockFork.mockResolvedValueOnce(subprocess1);
     const subprocess2 = new PassThrough({ objectMode: true });
@@ -172,14 +172,18 @@ describe('streamStatus', () => {
     await manager.start();
 
     setImmediate(async () => {
-      subprocess1.write({ type: 'status', status: 'disconnected' });
+      subprocess1.write({ type: 'status', status: 'connected' });
       await manager.restart();
       subprocess2.write({ type: 'status', status: 'connected' });
     });
     await expect(
-      pipe(manager.streamStatus(), iterableTake(2), asyncIterableToArray),
+      pipe(manager.streamStatus(), iterableTake(3), asyncIterableToArray),
     ).resolves.toEqual([
+      PublicGatewayCollectionStatus.CONNECTED,
+
+      // Reconnect being reported:
       PublicGatewayCollectionStatus.DISCONNECTED,
+
       PublicGatewayCollectionStatus.CONNECTED,
     ]);
   });
