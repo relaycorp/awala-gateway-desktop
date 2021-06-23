@@ -33,7 +33,7 @@ export async function fork(subprocessName: string): Promise<Duplex> {
   childProcess.once('exit', (code) => {
     const error =
       code && 0 < code
-        ? new SubprocessError(`Subprocess errored out with code ${code}`)
+        ? new SubprocessError(`Subprocess "${subprocessName}" errored out with code ${code}`)
         : undefined;
     duplex.destroy(error);
   });
