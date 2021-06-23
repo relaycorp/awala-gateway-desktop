@@ -6,6 +6,7 @@ import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { GatewayRegistrar } from '../../sync/publicGateway/GatewayRegistrar';
 import { NonExistingAddressError } from '../../sync/publicGateway/gscClient';
+import { ParcelCollectorManager } from '../../sync/publicGateway/parcelCollection/ParcelCollectorManager';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { getMockInstance, mockSpy } from '../../testUtils/jest';
@@ -65,6 +66,13 @@ describe('Get public gateway', () => {
 });
 
 describe('Set public gateway', () => {
+  const mockParcelCollectorManagerRestart = mockSpy(
+    jest.spyOn(ParcelCollectorManager.prototype, 'restart'),
+    () => {
+      // Do nothing
+    },
+  );
+
   test('Request should be refused if content type is not JSON', async () => {
     const fastify = await makeServer(AUTH_TOKEN);
 
@@ -76,6 +84,7 @@ describe('Set public gateway', () => {
     });
 
     expect(response.statusCode).toEqual(415);
+    expect(mockParcelCollectorManagerRestart).not.toBeCalled();
   });
 
   test('Request should be refused if address is missing', async () => {
@@ -85,6 +94,7 @@ describe('Set public gateway', () => {
     expect(JSON.parse(response.body)).toHaveProperty('code', 'MALFORMED_ADDRESS');
     expect(mockLogs).toContainEqual(partialPinoLog('warn', 'Malformed public address'));
     expect(mockRegister).not.toBeCalled();
+    expect(mockParcelCollectorManagerRestart).not.toBeCalled();
   });
 
   test('Change should be refused if address is syntactically invalid', async () => {
@@ -98,6 +108,7 @@ describe('Set public gateway', () => {
       partialPinoLog('warn', 'Malformed public address', { publicAddress: malformedPublicAddress }),
     );
     expect(mockRegister).not.toBeCalled();
+    expect(mockParcelCollectorManagerRestart).not.toBeCalled();
   });
 
   test('Change should be refused if the address does not exist', async () => {
@@ -114,6 +125,7 @@ describe('Set public gateway', () => {
         publicAddress: NEW_PUBLIC_ADDRESS,
       }),
     );
+    expect(mockParcelCollectorManagerRestart).not.toBeCalled();
   });
 
   test('Change should be refused if DNS lookup or DNSSEC verification failed', async () => {
@@ -131,6 +143,7 @@ describe('Set public gateway', () => {
         publicAddress: NEW_PUBLIC_ADDRESS,
       }),
     );
+    expect(mockParcelCollectorManagerRestart).not.toBeCalled();
   });
 
   test('Change should be refused if the address was valid but registration failed', async () => {
@@ -148,6 +161,7 @@ describe('Set public gateway', () => {
         publicAddress: NEW_PUBLIC_ADDRESS,
       }),
     );
+    expect(mockParcelCollectorManagerRestart).not.toBeCalled();
   });
 
   test('Change should be accepted if registration succeeds', async () => {
@@ -160,6 +174,7 @@ describe('Set public gateway', () => {
         publicAddress: NEW_PUBLIC_ADDRESS,
       }),
     );
+    expect(mockParcelCollectorManagerRestart).toBeCalled();
   });
 
   test('Trailing dots should be removed from final address', async () => {
@@ -188,6 +203,7 @@ describe('Set public gateway', () => {
     expect(response.statusCode).toEqual(401);
     expect(mockLogs).toContainEqual(partialPinoLog('warn', 'Refusing unauthenticated request'));
     expect(mockRegister).not.toBeCalled();
+    expect(mockParcelCollectorManagerRestart).not.toBeCalled();
   });
 
   async function requestPublicAddressChange(

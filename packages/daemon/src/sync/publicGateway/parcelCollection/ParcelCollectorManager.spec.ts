@@ -6,6 +6,7 @@ import { asyncIterableToArray, iterableTake } from '../../../testUtils/iterables
 import { mockSpy } from '../../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
 import { makeStubPassThrough } from '../../../testUtils/stream';
+import { setImmediateAsync } from '../../../testUtils/timing';
 import { LOGGER } from '../../../tokens';
 import * as child from '../../../utils/subprocess/child';
 import { PublicGatewayCollectionStatus } from '../PublicGatewayCollectionStatus';
@@ -55,13 +56,24 @@ describe('restart', () => {
     expect(subprocess2.destroyed).toBeFalse();
   });
 
-  test('Process should be started if it was not already running', async () => {
+  test('Nothing should happen if subprocess was not already running', async () => {
     const startSpy = jest.spyOn(manager, 'start');
 
     await manager.restart();
 
-    expect(startSpy).toBeCalledTimes(1);
-    expect(getSubprocessStream().destroyed).toBeFalse();
+    expect(startSpy).not.toBeCalled();
+  });
+
+  test('Nothing should happen if subprocess is undergoing a restart', async () => {
+    await manager.start();
+
+    // Mimic a restart
+    getSubprocessStream().destroy();
+    await setImmediateAsync();
+
+    await manager.restart();
+
+    expect(mockFork).toBeCalledTimes(1);
   });
 });
 

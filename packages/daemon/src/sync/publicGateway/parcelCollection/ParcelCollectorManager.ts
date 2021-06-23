@@ -32,13 +32,16 @@ export class ParcelCollectorManager {
   }
 
   public async restart(): Promise<void> {
-    this.subprocess?.destroy();
-    return new Promise((resolve) => {
-      setImmediate(async () => {
-        await this.start();
-        resolve();
+    if (this.subprocess?.destroyed === false) {
+      this.subprocess.destroy();
+
+      return new Promise((resolve) => {
+        setImmediate(async () => {
+          await this.start();
+          resolve();
+        });
       });
-    });
+    }
   }
 
   public async *streamStatus(): AsyncIterable<PublicGatewayCollectionStatus> {
