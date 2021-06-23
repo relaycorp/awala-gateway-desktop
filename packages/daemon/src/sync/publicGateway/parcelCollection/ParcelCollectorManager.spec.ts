@@ -66,11 +66,15 @@ describe('restart', () => {
 });
 
 describe('streamStatus', () => {
-  test('Error should be thrown if subprocess has not been started', async () => {
-    await expect(asyncIterableToArray(manager.streamStatus())).rejects.toHaveProperty(
-      'message',
-      'Parcel collection subprocess is not yet running',
-    );
+  test('It should wait for subprocess to start if it is not already running', async () => {
+    setImmediate(async () => {
+      await manager.start();
+      getSubprocessStream().write({ type: 'status', status: 'disconnected' });
+    });
+
+    await expect(
+      pipe(manager.streamStatus(), iterableTake(1), asyncIterableToArray),
+    ).resolves.toEqual([PublicGatewayCollectionStatus.DISCONNECTED]);
   });
 
   test('DISCONNECTED should be returned if subprocess reports disconnection', async () => {

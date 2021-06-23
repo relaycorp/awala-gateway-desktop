@@ -42,16 +42,18 @@ export class ParcelCollectorManager {
   }
 
   public async *streamStatus(): AsyncIterable<PublicGatewayCollectionStatus> {
-    if (!this.subprocess) {
-      throw new Error('Parcel collection subprocess is not yet running');
-    }
     while (true) {
-      if (this.subprocess.destroyed) {
-        await new Promise((resolve) => {
-          this.events.once('started', resolve);
-        });
-      }
-      yield* await streamStatus(this.subprocess);
+      await this.waitForSubprocessToBeRunning();
+      yield* await streamStatus(this.subprocess!);
+    }
+  }
+
+  private async waitForSubprocessToBeRunning(): Promise<void> {
+    if (!this.subprocess || this.subprocess.destroyed) {
+      // The subprocess either hasn't been started or it's in the middle of a restart
+      await new Promise((resolve) => {
+        this.events.once('started', resolve);
+      });
     }
   }
 }
