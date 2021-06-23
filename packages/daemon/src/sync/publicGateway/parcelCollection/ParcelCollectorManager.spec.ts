@@ -23,16 +23,16 @@ beforeEach(() => {
 });
 
 describe('start', () => {
-  test('Subprocess parcel-collection should be started', async () => {
-    await manager.start();
+  test('Subprocess parcel-collection should be started', () => {
+    manager.start();
 
     expect(mockFork).toBeCalledWith('parcel-collection');
     expect(mockLogs).toContainEqual(partialPinoLog('info', 'Started parcel collection subprocess'));
   });
 
-  test('Subprocess should not be started if it is already running', async () => {
-    await manager.start();
-    await manager.start();
+  test('Subprocess should not be started if it is already running', () => {
+    manager.start();
+    manager.start();
 
     expect(mockFork).toBeCalledTimes(1);
     expect(mockLogs).toContainEqual(
@@ -44,10 +44,10 @@ describe('start', () => {
 describe('restart', () => {
   test('Process should be killed and then started if it is already running', async () => {
     const subprocess1 = new PassThrough({ objectMode: true });
-    mockFork.mockResolvedValueOnce(subprocess1);
+    mockFork.mockReturnValueOnce(subprocess1);
     const subprocess2 = new PassThrough({ objectMode: true });
-    mockFork.mockResolvedValueOnce(subprocess2);
-    await manager.start();
+    mockFork.mockReturnValueOnce(subprocess2);
+    manager.start();
 
     await manager.restart();
 
@@ -65,7 +65,7 @@ describe('restart', () => {
   });
 
   test('Nothing should happen if subprocess is undergoing a restart', async () => {
-    await manager.start();
+    manager.start();
 
     // Mimic a restart
     getSubprocessStream().destroy();
@@ -80,7 +80,7 @@ describe('restart', () => {
 describe('streamStatus', () => {
   test('It should wait for subprocess to start if it is not already running', async () => {
     setImmediate(async () => {
-      await manager.start();
+      manager.start();
       getSubprocessStream().write({ type: 'status', status: 'disconnected' });
     });
 
@@ -90,7 +90,7 @@ describe('streamStatus', () => {
   });
 
   test('DISCONNECTED should be returned if subprocess reports disconnection', async () => {
-    await manager.start();
+    manager.start();
     setImmediate(() => {
       getSubprocessStream().write({ type: 'status', status: 'disconnected' });
     });
@@ -101,7 +101,7 @@ describe('streamStatus', () => {
   });
 
   test('CONNECTED should be returned if subprocess reports connection', async () => {
-    await manager.start();
+    manager.start();
     setImmediate(() => {
       getSubprocessStream().write({ type: 'status', status: 'connected' });
     });
@@ -112,7 +112,7 @@ describe('streamStatus', () => {
   });
 
   test('Subsequent connection changes should be reflected', async () => {
-    await manager.start();
+    manager.start();
     setImmediate(() => {
       getSubprocessStream().write({ type: 'status', status: 'connected' });
       getSubprocessStream().write({ type: 'status', status: 'disconnected' });
@@ -129,7 +129,7 @@ describe('streamStatus', () => {
   });
 
   test('Messages without types should be ignored', async () => {
-    await manager.start();
+    manager.start();
     setImmediate(() => {
       getSubprocessStream().write({ foo: 'bar' });
       getSubprocessStream().write({ type: 'status', status: 'connected' });
@@ -141,7 +141,7 @@ describe('streamStatus', () => {
   });
 
   test('Non-connection messages should be ignored', async () => {
-    await manager.start();
+    manager.start();
     setImmediate(() => {
       getSubprocessStream().write({ type: 'invalid' });
       getSubprocessStream().write({ type: 'status', status: 'connected' });
@@ -153,7 +153,7 @@ describe('streamStatus', () => {
   });
 
   test('Breaking the iterable should not destroy the underlying stream', async () => {
-    await manager.start();
+    manager.start();
     setImmediate(() => {
       getSubprocessStream().write({ type: 'status', status: 'connected' });
     });
@@ -166,10 +166,10 @@ describe('streamStatus', () => {
 
   test('Reconnection should be reported when subprocess is restarted', async () => {
     const subprocess1 = new PassThrough({ objectMode: true });
-    mockFork.mockResolvedValueOnce(subprocess1);
+    mockFork.mockReturnValueOnce(subprocess1);
     const subprocess2 = new PassThrough({ objectMode: true });
-    mockFork.mockResolvedValueOnce(subprocess2);
-    await manager.start();
+    mockFork.mockReturnValueOnce(subprocess2);
+    manager.start();
 
     setImmediate(async () => {
       subprocess1.write({ type: 'status', status: 'connected' });

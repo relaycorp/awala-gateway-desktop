@@ -17,8 +17,6 @@ async function startSubprocesses(): Promise<void> {
 
   const parcelDeliveryManager = Container.get(ParcelDeliveryManager);
   const parcelCollectorManager = Container.get(ParcelCollectorManager);
-  await Promise.all([
-    parcelCollectorManager.start(),
-    parcelDeliveryManager.deliverWhileConnected(),
-  ]);
+  parcelCollectorManager.start();
+  await parcelDeliveryManager.deliverWhileConnected();
 }

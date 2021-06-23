@@ -1,6 +1,7 @@
 import { fork as forkChildProcess } from 'child_process';
 import { dirname, join } from 'path';
 import { Duplex } from 'stream';
+
 import { SubprocessError } from './SubprocessError';
 
 const IS_TYPESCRIPT = __filename.endsWith('.ts');
@@ -9,16 +10,14 @@ const SUBPROCESS_SCRIPT_NAME = IS_TYPESCRIPT ? 'subprocess.ts' : 'subprocess.js'
 const ROOT_DIR = dirname(dirname(__dirname));
 const SUBPROCESS_SCRIPT_PATH = join(ROOT_DIR, 'bin', SUBPROCESS_SCRIPT_NAME);
 
-export async function fork(subprocessName: string): Promise<Duplex> {
+export function fork(subprocessName: string): Duplex {
   const childProcess = forkChildProcess(SUBPROCESS_SCRIPT_PATH, [subprocessName], {
     env: { ...process.env, LOG_FILES: 'true' },
   });
   const duplex = new Duplex({
     objectMode: true,
     read(): void {
-      childProcess.on('message', (message) => {
-        this.push(message);
-      });
+      // Messages will be pushed as and when they're received
     },
     write(chunk, _encoding, cb): void {
       childProcess.send(chunk);
@@ -30,6 +29,10 @@ export async function fork(subprocessName: string): Promise<Duplex> {
     },
   });
 
+  childProcess.once('error', (err) => {
+    duplex.destroy(err);
+  });
+
   childProcess.once('exit', (code) => {
     const error =
       code && 0 < code
@@ -38,16 +41,10 @@ export async function fork(subprocessName: string): Promise<Duplex> {
     duplex.destroy(error);
   });
 
-  return new Promise((resolve, reject) => {
-    childProcess.once('spawn', () => {
-      childProcess.once('error', (err) => {
-        duplex.destroy(err);
-      });
-      resolve(duplex);
-    });
-
-    childProcess.once('error', (err) => {
-      reject(new SubprocessError(err, 'Failed to spawn subprocess'));
-    });
+  childProcess.on('message', (message) => {
+    duplex.push(message);
   });
+
+  // TODO: When we support Node.js >= 16, return the duplex once the 'spawn' event has been emitted
+  return duplex;
 }
