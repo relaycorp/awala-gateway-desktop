@@ -147,4 +147,24 @@ describe('streamStatus', () => {
     expect(getSubprocessStream().destroyed).toBeFalse();
     expect(getSubprocessStream().listenerCount('data')).toEqual(0);
   });
+
+  test('New stream should be picked up when subprocess is restarted', async () => {
+    const subprocess1 = new PassThrough({ objectMode: true });
+    mockFork.mockResolvedValueOnce(subprocess1);
+    const subprocess2 = new PassThrough({ objectMode: true });
+    mockFork.mockResolvedValueOnce(subprocess2);
+    await manager.start();
+
+    setImmediate(async () => {
+      subprocess1.write({ type: 'status', status: 'disconnected' });
+      await manager.restart();
+      subprocess2.write({ type: 'status', status: 'connected' });
+    });
+    await expect(
+      pipe(manager.streamStatus(), iterableTake(2), asyncIterableToArray),
+    ).resolves.toEqual([
+      PublicGatewayCollectionStatus.DISCONNECTED,
+      PublicGatewayCollectionStatus.CONNECTED,
+    ]);
+  });
 });

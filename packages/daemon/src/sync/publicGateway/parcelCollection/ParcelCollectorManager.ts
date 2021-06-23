@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events';
 import pipe from 'it-pipe';
 import { Logger } from 'pino';
 import { Duplex, PassThrough } from 'stream';
@@ -13,6 +14,8 @@ export class ParcelCollectorManager {
   // tslint:disable-next-line:readonly-keyword
   protected subprocess: Duplex | null = null;
 
+  protected readonly events = new EventEmitter();
+
   constructor(@Inject(LOGGER) protected logger: Logger) {}
 
   public async start(): Promise<void> {
@@ -21,6 +24,8 @@ export class ParcelCollectorManager {
     } else {
       // tslint:disable-next-line:no-object-mutation
       this.subprocess = await fork('parcel-collection');
+
+      this.events.emit('started');
 
       this.logger.info('Started parcel collection subprocess');
     }
@@ -40,24 +45,41 @@ export class ParcelCollectorManager {
     if (!this.subprocess) {
       throw new Error('Parcel collection subprocess is not yet running');
     }
-    const readonlySubprocessStream = new PassThrough({ objectMode: true });
-    this.subprocess.pipe(readonlySubprocessStream);
-    try {
-      yield* await pipe(
-        source(readonlySubprocessStream),
-        async function* (messages): AsyncIterable<PublicGatewayCollectionStatus> {
-          for await (const message of messages) {
-            if (message?.type !== 'status') {
-              continue;
-            }
-            yield message.status === 'connected'
-              ? PublicGatewayCollectionStatus.CONNECTED
-              : PublicGatewayCollectionStatus.DISCONNECTED;
-          }
-        },
-      );
-    } finally {
-      this.subprocess.unpipe(readonlySubprocessStream);
+    while (true) {
+      if (this.subprocess.destroyed) {
+        await new Promise((resolve) => {
+          this.events.once('started', resolve);
+        });
+      }
+      yield* await streamStatus(this.subprocess);
     }
+  }
+}
+
+async function* streamStatus(subprocess: Duplex): AsyncIterable<PublicGatewayCollectionStatus> {
+  const readonlySubprocessStream = new PassThrough({ objectMode: true });
+  subprocess.pipe(readonlySubprocessStream);
+  const endReadonlyStream = () => {
+    readonlySubprocessStream.end();
+  };
+  subprocess.once('close', endReadonlyStream);
+  try {
+    yield* await pipe(source(readonlySubprocessStream), reportStatusChanges);
+  } finally {
+    subprocess.unpipe(readonlySubprocessStream);
+    subprocess.removeListener('close', endReadonlyStream);
+  }
+}
+
+async function* reportStatusChanges(
+  messages: AsyncIterable<any>,
+): AsyncIterable<PublicGatewayCollectionStatus> {
+  for await (const message of messages) {
+    if (message?.type !== 'status') {
+      continue;
+    }
+    yield message.status === 'connected'
+      ? PublicGatewayCollectionStatus.CONNECTED
+      : PublicGatewayCollectionStatus.DISCONNECTED;
   }
 }
