@@ -5,20 +5,16 @@ import { ConnectionStatus, StatusMonitor } from '../../sync/StatusMonitor';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { restoreStatusMonitor } from '../../testUtils/connectionStatus';
 import { setUpTestDBConnection } from '../../testUtils/db';
-import { makeMockLogging, MockLogging } from '../../testUtils/logging';
+import { mockLoggerToken } from '../../testUtils/logging';
 import { MockAuthClient, mockWebsocketStream } from '../../testUtils/websocket';
 import makeConnectionStatusServer from './connectionStatus';
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
+mockLoggerToken();
 
 mockWebsocketStream();
 restoreStatusMonitor();
-
-let mockLogging: MockLogging;
-beforeEach(() => {
-  mockLogging = makeMockLogging();
-});
 
 beforeEach(async () => {
   const statusMonitor = Container.get(StatusMonitor);
@@ -28,7 +24,7 @@ beforeEach(async () => {
 const AUTH_TOKEN = 'token';
 
 test('Status changes should be streamed', async () => {
-  const server = makeConnectionStatusServer(mockLogging.logger, AUTH_TOKEN);
+  const server = makeConnectionStatusServer(AUTH_TOKEN);
   const client = new MockAuthClient(server, AUTH_TOKEN);
 
   await client.connect();
@@ -43,7 +39,7 @@ test('Status changes should be streamed', async () => {
 });
 
 test('The connection should be closed when the client closes it', async () => {
-  const server = makeConnectionStatusServer(mockLogging.logger, AUTH_TOKEN);
+  const server = makeConnectionStatusServer(AUTH_TOKEN);
   const client = new MockAuthClient(server, AUTH_TOKEN);
 
   await client.connect();
@@ -54,7 +50,7 @@ test('The connection should be closed when the client closes it', async () => {
 });
 
 test('Auth should be required', async () => {
-  const server = makeConnectionStatusServer(mockLogging.logger, AUTH_TOKEN);
+  const server = makeConnectionStatusServer(AUTH_TOKEN);
   const client = new MockClient(server);
 
   await client.connect();
@@ -64,7 +60,7 @@ test('Auth should be required', async () => {
 });
 
 test('CORS should be allowed', async () => {
-  const server = makeConnectionStatusServer(mockLogging.logger, AUTH_TOKEN);
+  const server = makeConnectionStatusServer(AUTH_TOKEN);
   const client = new MockAuthClient(server, AUTH_TOKEN, { origin: 'https://example.com' });
 
   await client.connect();

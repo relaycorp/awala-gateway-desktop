@@ -3,27 +3,27 @@ import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { testDisallowedMethods } from '../../testUtils/http';
 import { mockSpy } from '../../testUtils/jest';
-import { makeMockLoggingFixture, partialPinoLog } from '../../testUtils/logging';
+import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
 import { makeServer } from '../index';
 import { CONTENT_TYPES } from './contentTypes';
 
 const ENDPOINT_URL = '/v1/nodes';
 
-const mockLogging = makeMockLoggingFixture();
-
 setUpTestDBConnection();
 useTemporaryAppDirs();
+
+const mockLogs = mockLoggerToken();
 
 const mockCompleteRegistration = mockSpy(
   jest.spyOn(EndpointRegistrar.prototype, 'completeRegistration'),
 );
 
 describe('Disallowed methods', () => {
-  testDisallowedMethods(['POST'], ENDPOINT_URL, () => makeServer(mockLogging.logger));
+  testDisallowedMethods(['POST'], ENDPOINT_URL, () => makeServer());
 });
 
 test('HTTP 415 should be returned if the request Content-Type is not a PNRR', async () => {
-  const fastify = await makeServer(mockLogging.logger);
+  const fastify = await makeServer();
 
   const response = await fastify.inject({
     headers: { 'content-type': 'application/json' },
@@ -37,7 +37,7 @@ test('HTTP 415 should be returned if the request Content-Type is not a PNRR', as
 });
 
 test('HTTP 400 should be returned if the PNRR is not valid', async () => {
-  const fastify = await makeServer(mockLogging.logger);
+  const fastify = await makeServer();
   const pnrrSerialized = Buffer.from('the request');
   mockCompleteRegistration.mockRejectedValue(new InvalidRegistrationRequestError());
 
@@ -54,13 +54,13 @@ test('HTTP 400 should be returned if the PNRR is not valid', async () => {
     'message',
     'Registration request is malformed/invalid',
   );
-  expect(mockLogging.logs).toContainEqual(
+  expect(mockLogs).toContainEqual(
     partialPinoLog('warn', 'Refusing registration due to malformed/invalid request'),
   );
 });
 
 test('HTTP 200 with the registration should be returned if successful', async () => {
-  const fastify = await makeServer(mockLogging.logger);
+  const fastify = await makeServer();
   const pnrrSerialized = Buffer.from('the request');
   const authorizationSerialized = Buffer.from('the auth');
   mockCompleteRegistration.mockResolvedValue(authorizationSerialized);
@@ -79,13 +79,11 @@ test('HTTP 200 with the registration should be returned if successful', async ()
     'content-type',
     CONTENT_TYPES.GATEWAY_REGISTRATION.REGISTRATION,
   );
-  expect(mockLogging.logs).toContainEqual(
-    partialPinoLog('info', 'Completed endpoint registration'),
-  );
+  expect(mockLogs).toContainEqual(partialPinoLog('info', 'Completed endpoint registration'));
 });
 
 test('HTTP 500 should be returned if an unexpected error occurs', async () => {
-  const fastify = await makeServer(mockLogging.logger);
+  const fastify = await makeServer();
   const error = new Error('whoops');
   mockCompleteRegistration.mockRejectedValue(error);
 
@@ -98,7 +96,7 @@ test('HTTP 500 should be returned if an unexpected error occurs', async () => {
 
   expect(response).toHaveProperty('statusCode', 500);
   expect(JSON.parse(response.payload)).toHaveProperty('message', 'Internal server error');
-  expect(mockLogging.logs).toContainEqual(
+  expect(mockLogs).toContainEqual(
     partialPinoLog('error', 'Endpoint registration failed', {
       err: expect.objectContaining({
         message: error.message,

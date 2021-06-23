@@ -75,7 +75,7 @@ async function* reportStatusChanges(
   messages: AsyncIterable<any>,
 ): AsyncIterable<PublicGatewayCollectionStatus> {
   for await (const message of messages) {
-    if (message?.type !== 'status') {
+    if (message.type !== 'status') {
       continue;
     }
     yield message.status === 'connected'

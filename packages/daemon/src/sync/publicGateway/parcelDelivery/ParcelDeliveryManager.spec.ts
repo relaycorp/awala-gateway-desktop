@@ -4,6 +4,7 @@ import { useTemporaryAppDirs } from '../../../testUtils/appDirs';
 import { setUpTestDBConnection } from '../../../testUtils/db';
 import { arrayToAsyncIterable } from '../../../testUtils/iterables';
 import { mockSpy } from '../../../testUtils/jest';
+import { mockLoggerToken } from '../../../testUtils/logging';
 import { makeStubPassThrough } from '../../../testUtils/stream';
 import { setImmediateAsync } from '../../../testUtils/timing';
 import * as child from '../../../utils/subprocess/child';
@@ -13,6 +14,8 @@ import { ParcelDeliveryManager } from './ParcelDeliveryManager';
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
+
+mockLoggerToken();
 
 const mockPubGatewayStatusStream = mockSpy(
   jest.spyOn(ParcelCollectorManager.prototype, 'streamStatus'),

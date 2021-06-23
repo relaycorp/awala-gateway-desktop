@@ -1,11 +1,13 @@
 import { MAX_RAMF_MESSAGE_LENGTH } from '@relaycorp/relaynet-core';
 import { fastify, FastifyInstance } from 'fastify';
-import pino from 'pino';
+import { Container } from 'typedi';
 import uuid from 'uuid-random';
 import WebSocket from 'ws';
 
 import { getMockContext, getMockInstance, mockSpy } from '../testUtils/jest';
+import { mockLoggerToken } from '../testUtils/logging';
 import { makeProcessSendMock } from '../testUtils/process';
+import { LOGGER } from '../tokens';
 import controlRoutes, { CONTROL_API_PREFIX } from './control';
 import makeConnectionStatusServer from './control/connectionStatus';
 import makeCourierSyncServer from './control/courierSync';
@@ -35,36 +37,33 @@ afterAll(() => {
   jest.restoreAllMocks();
 });
 
-const customLogger = pino();
+mockLoggerToken();
 
 const mockProcessSend = makeProcessSendMock();
 
 describe('makeServer', () => {
   test('Logger should be honoured', async () => {
-    await makeServer(customLogger);
+    await makeServer();
 
-    expect(fastify).toBeCalledWith(
-      expect.objectContaining({
-        logger: customLogger,
-      }),
-    );
+    const logger = Container.get(LOGGER);
+    expect(fastify).toBeCalledWith(expect.objectContaining({ logger }));
   });
 
   test('Maximum request body should allow for the largest RAMF message', async () => {
-    await makeServer(customLogger);
+    await makeServer();
 
     const fastifyCallArgs = getMockContext(fastify).calls[0];
     expect(fastifyCallArgs[0]).toHaveProperty('bodyLimit', MAX_RAMF_MESSAGE_LENGTH);
   });
 
   test('CORS should be disabled', async () => {
-    await makeServer(customLogger);
+    await makeServer();
 
     expect(mockFastify.addHook).toBeCalledWith('onRequest', disableCors);
   });
 
   test('Control routes should be loaded', async () => {
-    await makeServer(customLogger);
+    await makeServer();
 
     expect(mockFastify.register).toBeCalledWith(
       controlRoutes,
@@ -73,7 +72,7 @@ describe('makeServer', () => {
   });
 
   test('PoWeb routes should be loaded', async () => {
-    await makeServer(customLogger);
+    await makeServer();
 
     expect(mockFastify.register).toBeCalledWith(powebRoutes, expect.anything());
   });
@@ -86,17 +85,17 @@ describe('makeServer', () => {
       }
     });
 
-    await expect(makeServer(customLogger)).rejects.toEqual(error);
+    await expect(makeServer()).rejects.toEqual(error);
   });
 
   test('It should wait for the Fastify server to be ready', async () => {
-    await makeServer(customLogger);
+    await makeServer();
 
     expect(mockFastify.ready).toBeCalledTimes(1);
   });
 
   test('Server instance should be returned', async () => {
-    const serverInstance = await makeServer(customLogger);
+    const serverInstance = await makeServer();
 
     expect(serverInstance).toBe(mockFastify);
   });
@@ -109,7 +108,7 @@ describe('makeServer', () => {
         return true;
       });
 
-      await makeServer(customLogger);
+      await makeServer();
 
       expect(passedMessage).toBeTruthy();
       expect(passedMessage).toHaveProperty('type', 'controlAuthToken');
@@ -127,14 +126,14 @@ describe('makeServer', () => {
         return true;
       });
 
-      await makeServer(customLogger, token);
+      await makeServer(token);
 
       expect(passedMessage).toBeTruthy();
       expect(passedMessage).toHaveProperty('value', token);
     });
 
     test('Token should not be shared if process was not forked', async () => {
-      await makeServer(customLogger);
+      await makeServer();
     });
   });
 });
@@ -187,7 +186,7 @@ describe('WebSocket servers', () => {
   test('Unrecognised paths should result in the socket destroyed', async () => {
     const mockWSServer = mockWebsocketServer();
     getMockInstance(makeConnectionStatusServer).mockReturnValue(mockWSServer);
-    const fastifyInstance = await makeServer(customLogger);
+    const fastifyInstance = await makeServer();
     const mockRequest = { url: '/non-existing' };
     const mockSocket = { destroy: jest.fn() };
 
@@ -205,7 +204,7 @@ describe('WebSocket servers', () => {
   ): Promise<void> {
     const mockWSServer = mockWebsocketServer();
     getMockInstance(websocketServerFactory).mockReturnValue(mockWSServer);
-    const fastifyInstance = await makeServer(customLogger);
+    const fastifyInstance = await makeServer();
     const mockRequest = { url: `${websocketEndpointPath}?auth=secret` };
     const mockSocket = { what: 'the socket' };
     const mockHeaders = { key: 'value' };
@@ -226,10 +225,7 @@ describe('WebSocket servers', () => {
     expect(mockWSServer.emit).toBeCalledWith('connection', mockSocket, mockRequest);
     expect(mockWSServer.handleUpgrade).toHaveBeenCalledBefore(mockWSServer.emit as any);
 
-    expect(websocketServerFactory).toBeCalledWith(
-      customLogger,
-      expect.toSatisfy((token) => uuid.test(token)),
-    );
+    expect(websocketServerFactory).toBeCalledWith(expect.toSatisfy((token) => uuid.test(token)));
   }
 });
 

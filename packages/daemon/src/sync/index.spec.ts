@@ -1,6 +1,7 @@
 import { useTemporaryAppDirs } from '../testUtils/appDirs';
 import { setUpTestDBConnection } from '../testUtils/db';
 import { mockSpy } from '../testUtils/jest';
+import { mockLoggerToken } from '../testUtils/logging';
 import runSync from './index';
 import { GatewayRegistrar } from './publicGateway/GatewayRegistrar';
 import { ParcelDeliveryManager } from './publicGateway/parcelDelivery/ParcelDeliveryManager';
@@ -8,6 +9,7 @@ import { StatusMonitor } from './StatusMonitor';
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
+mockLoggerToken();
 
 const noOp = () => {
   // Do nothing

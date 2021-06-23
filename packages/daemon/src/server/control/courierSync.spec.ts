@@ -7,7 +7,7 @@ import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { arrayToAsyncIterable } from '../../testUtils/iterables';
 import { mockSpy } from '../../testUtils/jest';
-import { makeMockLogging, MockLogging, partialPinoLog } from '../../testUtils/logging';
+import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
 import { MockAuthClient, mockWebsocketStream } from '../../testUtils/websocket';
 import makeCourierSyncServer from './courierSync';
 
@@ -16,10 +16,7 @@ useTemporaryAppDirs();
 
 mockWebsocketStream();
 
-let mockLogging: MockLogging;
-beforeEach(() => {
-  mockLogging = makeMockLogging();
-});
+const mockLogs = mockLoggerToken();
 
 const mockSync = mockSpy(jest.spyOn(CourierSync.prototype, 'sync'));
 
@@ -29,7 +26,7 @@ test('Stages should be streamed', async () => {
   mockSync.mockReturnValue(
     arrayToAsyncIterable([CourierSyncStage.COLLECTION, CourierSyncStage.WAIT]),
   );
-  const server = makeCourierSyncServer(mockLogging.logger, AUTH_TOKEN);
+  const server = makeCourierSyncServer(AUTH_TOKEN);
   const client = new MockAuthClient(server, AUTH_TOKEN);
 
   await client.connect();
@@ -42,7 +39,7 @@ test('Stages should be streamed', async () => {
 
 test('Connection should be closed with 1000 when sync completes normally', async () => {
   mockSync.mockReturnValue(arrayToAsyncIterable([]));
-  const server = makeCourierSyncServer(mockLogging.logger, AUTH_TOKEN);
+  const server = makeCourierSyncServer(AUTH_TOKEN);
   const client = new MockAuthClient(server, AUTH_TOKEN);
 
   await client.connect();
@@ -54,7 +51,7 @@ test('Connection should be closed with 4000 when gateway is not yet registered',
   mockSync.mockImplementation(() => {
     throw new UnregisteredGatewayError();
   });
-  const server = makeCourierSyncServer(mockLogging.logger, AUTH_TOKEN);
+  const server = makeCourierSyncServer(AUTH_TOKEN);
   const client = new MockAuthClient(server, AUTH_TOKEN);
 
   await client.connect();
@@ -63,7 +60,7 @@ test('Connection should be closed with 4000 when gateway is not yet registered',
     code: 4000,
     reason: 'Gateway is not yet registered',
   });
-  expect(mockLogging.logs).toContainEqual(
+  expect(mockLogs).toContainEqual(
     partialPinoLog('warn', 'Aborting courier sync because gateway is unregistered'),
   );
 });
@@ -72,7 +69,7 @@ test('Connection should be closed with 4001 when disconnected from the courier',
   mockSync.mockImplementation(() => {
     throw new DisconnectedFromCourierError();
   });
-  const server = makeCourierSyncServer(mockLogging.logger, AUTH_TOKEN);
+  const server = makeCourierSyncServer(AUTH_TOKEN);
   const client = new MockAuthClient(server, AUTH_TOKEN);
 
   await client.connect();
@@ -81,7 +78,7 @@ test('Connection should be closed with 4001 when disconnected from the courier',
     code: 4001,
     reason: 'Device is not connected to a courier',
   });
-  expect(mockLogging.logs).toContainEqual(
+  expect(mockLogs).toContainEqual(
     partialPinoLog('warn', 'Aborting courier sync because device is not connected to a courier'),
   );
 });
@@ -91,7 +88,7 @@ test('Connection should be closed with 1011 when an unexpected error occurs', as
   mockSync.mockImplementation(() => {
     throw err;
   });
-  const server = makeCourierSyncServer(mockLogging.logger, AUTH_TOKEN);
+  const server = makeCourierSyncServer(AUTH_TOKEN);
   const client = new MockAuthClient(server, AUTH_TOKEN);
 
   await client.connect();
@@ -100,7 +97,7 @@ test('Connection should be closed with 1011 when an unexpected error occurs', as
     code: 1011,
     reason: 'Internal server error',
   });
-  expect(mockLogging.logs).toContainEqual(
+  expect(mockLogs).toContainEqual(
     partialPinoLog('error', 'Unexpected error when syncing with courier', {
       err: expect.objectContaining({
         message: err.message,
@@ -111,7 +108,7 @@ test('Connection should be closed with 1011 when an unexpected error occurs', as
 
 test('Authentication should be required', async () => {
   mockSync.mockReturnValue(arrayToAsyncIterable([]));
-  const server = makeCourierSyncServer(mockLogging.logger, AUTH_TOKEN);
+  const server = makeCourierSyncServer(AUTH_TOKEN);
   const client = new MockClient(server);
 
   await client.connect();
@@ -121,7 +118,7 @@ test('Authentication should be required', async () => {
 
 test('CORS should be allowed', async () => {
   mockSync.mockReturnValue(arrayToAsyncIterable([]));
-  const server = makeCourierSyncServer(mockLogging.logger, AUTH_TOKEN);
+  const server = makeCourierSyncServer(AUTH_TOKEN);
   const client = new MockAuthClient(server, AUTH_TOKEN, { origin: 'https://example.com' });
 
   await client.connect();

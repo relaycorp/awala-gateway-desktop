@@ -1,14 +1,10 @@
-import { Container } from 'typedi';
-
 import { makeServer, runServer } from './server';
 import startup from './startup';
 import runSync from './sync';
-import { LOGGER } from './tokens';
 
 export default async function (): Promise<void> {
   await startup('daemon');
 
-  const logger = Container.get(LOGGER);
-  const server = await makeServer(logger);
+  const server = await makeServer();
   await Promise.all([runServer(server), runSync()]);
 }
