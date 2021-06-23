@@ -1,12 +1,13 @@
-import { Logger } from 'pino';
 import { Duplex } from 'stream';
+import { Container } from 'typedi';
 import WebSocket, { createWebSocketStream, Server } from 'ws';
 
-export type WebsocketServerFactory = (logger: Logger, controlAuthToken: string) => Server;
+import { LOGGER } from '../tokens';
+
+export type WebsocketServerFactory = (controlAuthToken: string) => Server;
 
 export function makeWebSocketServer(
   handler: (connectionStream: Duplex, socket: WebSocket) => void,
-  logger: Logger,
   authToken?: string,
 ): WebSocket.Server {
   const wsServer = new WebSocket.Server({
@@ -15,6 +16,7 @@ export function makeWebSocketServer(
   });
 
   const isAuthRequired = !!authToken;
+  const logger = Container.get(LOGGER);
 
   wsServer.on('connection', (socket, request) => {
     const url = new URL(request.url!!, 'http://127.0.0.1');

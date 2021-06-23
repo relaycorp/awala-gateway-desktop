@@ -143,7 +143,7 @@ describe('register', () => {
   });
 });
 
-describe('registerIfUnregistered', () => {
+describe('waitForRegistration', () => {
   let mockRegister: jest.SpyInstance;
   beforeEach(() => {
     mockRegister = jest.spyOn(registrar, 'register');
@@ -167,7 +167,7 @@ describe('registerIfUnregistered', () => {
     mockIsRegistered.mockResolvedValueOnce(true);
     mockRegister.mockResolvedValueOnce(undefined);
 
-    await registrar.registerIfUnregistered();
+    await registrar.waitForRegistration();
 
     expect(mockRegister).toBeCalledTimes(1);
     expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
@@ -178,7 +178,7 @@ describe('registerIfUnregistered', () => {
     mockIsRegistered.mockResolvedValueOnce(true);
     mockRegister.mockResolvedValueOnce(undefined);
 
-    await registrar.registerIfUnregistered();
+    await registrar.waitForRegistration();
 
     expect(mockRegister).toBeCalledTimes(0);
     expect(sleepSeconds).not.toBeCalled();
@@ -191,7 +191,7 @@ describe('registerIfUnregistered', () => {
     mockRegister.mockRejectedValueOnce(new PublicAddressingError());
     mockRegister.mockResolvedValueOnce(undefined);
 
-    await registrar.registerIfUnregistered();
+    await registrar.waitForRegistration();
 
     expect(mockRegister).toBeCalledTimes(2);
     expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
@@ -204,33 +204,39 @@ describe('registerIfUnregistered', () => {
     );
   });
 
-  test('Registration should not be reattempted if public address does not exist', async () => {
+  test('Registration should be reattempted if public address does not exist', async () => {
     mockIsRegistered.mockResolvedValueOnce(false);
+    mockIsRegistered.mockResolvedValueOnce(false);
+    mockIsRegistered.mockResolvedValueOnce(true);
     mockRegister.mockRejectedValueOnce(new gscClient.NonExistingAddressError());
+    mockRegister.mockResolvedValueOnce(undefined);
 
-    await registrar.registerIfUnregistered();
+    await registrar.waitForRegistration();
 
-    expect(mockRegister).toBeCalledTimes(1);
+    expect(mockRegister).toBeCalledTimes(2);
     expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
-    expect(sleepSeconds).not.toBeCalled();
+    expect(sleepSeconds).toBeCalledWith(60);
     expect(logs).toContainEqual(
-      partialPinoLog('warn', 'Failed to register with public gateway', {
+      partialPinoLog('error', 'Failed to register with public gateway', {
         err: expect.objectContaining({ type: gscClient.NonExistingAddressError.name }),
       }),
     );
   });
 
-  test('Registration should not be reattempted if unexpected error happens', async () => {
+  test('Registration should be reattempted if unexpected error happens', async () => {
     mockIsRegistered.mockResolvedValueOnce(false);
+    mockIsRegistered.mockResolvedValueOnce(false);
+    mockIsRegistered.mockResolvedValueOnce(true);
     mockRegister.mockRejectedValueOnce(new Error());
+    mockRegister.mockResolvedValueOnce(undefined);
 
-    await registrar.registerIfUnregistered();
+    await registrar.waitForRegistration();
 
-    expect(mockRegister).toBeCalledTimes(1);
+    expect(mockRegister).toBeCalledTimes(2);
     expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
-    expect(sleepSeconds).not.toBeCalled();
+    expect(sleepSeconds).toBeCalledWith(60);
     expect(logs).toContainEqual(
-      partialPinoLog('warn', 'Failed to register with public gateway', {
+      partialPinoLog('error', 'Failed to register with public gateway', {
         err: expect.objectContaining({ type: 'Error' }),
       }),
     );

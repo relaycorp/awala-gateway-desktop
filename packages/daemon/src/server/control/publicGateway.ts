@@ -7,6 +7,7 @@ import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { GatewayRegistrar } from '../../sync/publicGateway/GatewayRegistrar';
 import { NonExistingAddressError } from '../../sync/publicGateway/gscClient';
+import { ParcelCollectorManager } from '../../sync/publicGateway/parcelCollection/ParcelCollectorManager';
 import { getBearerTokenFromAuthHeader } from '../../utils/auth';
 import RouteOptions from '../RouteOptions';
 
@@ -25,6 +26,7 @@ export default async function registerRoutes(
 ): Promise<void> {
   const config = Container.get(Config);
   const registrar = Container.get(GatewayRegistrar);
+  const parcelCollectorManager = Container.get(ParcelCollectorManager);
 
   fastify.route<{ readonly Body: string }>({
     method: 'GET',
@@ -62,6 +64,7 @@ export default async function registerRoutes(
         return abortFailedMigration(err, request, publicAddress, reply);
       }
 
+      await parcelCollectorManager.restart();
       request.log.info({ publicAddress }, 'Gateway migration completed');
       return reply.header('Content-Type', 'application/json').code(204).send({});
     },

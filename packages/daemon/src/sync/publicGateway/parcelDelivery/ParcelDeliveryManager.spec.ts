@@ -1,10 +1,11 @@
-import { PassThrough } from 'stream';
 import { Container } from 'typedi';
 
 import { useTemporaryAppDirs } from '../../../testUtils/appDirs';
 import { setUpTestDBConnection } from '../../../testUtils/db';
 import { arrayToAsyncIterable } from '../../../testUtils/iterables';
 import { mockSpy } from '../../../testUtils/jest';
+import { mockLoggerToken } from '../../../testUtils/logging';
+import { makeStubPassThrough } from '../../../testUtils/stream';
 import { setImmediateAsync } from '../../../testUtils/timing';
 import * as child from '../../../utils/subprocess/child';
 import { ParcelCollectorManager } from '../parcelCollection/ParcelCollectorManager';
@@ -14,19 +15,15 @@ import { ParcelDeliveryManager } from './ParcelDeliveryManager';
 setUpTestDBConnection();
 useTemporaryAppDirs();
 
+mockLoggerToken();
+
 const mockPubGatewayStatusStream = mockSpy(
   jest.spyOn(ParcelCollectorManager.prototype, 'streamStatus'),
   () => arrayToAsyncIterable([]),
 );
 
-let subprocessStream: PassThrough;
-beforeEach(() => {
-  subprocessStream = new PassThrough({ objectMode: true });
-});
-afterEach(async () => {
-  subprocessStream.destroy();
-});
-const mockFork = mockSpy(jest.spyOn(child, 'fork'), () => subprocessStream);
+const getSubprocessStream = makeStubPassThrough();
+const mockFork = mockSpy(jest.spyOn(child, 'fork'), getSubprocessStream);
 
 let parcelDeliveryManager: ParcelDeliveryManager;
 beforeEach(() => {
@@ -58,7 +55,7 @@ describe('deliverWhileConnected', () => {
 
     await setImmediateAsync();
     expect(mockFork).toBeCalledWith('parcel-delivery');
-    expect(subprocessStream.destroyed).toBeFalse();
+    expect(getSubprocessStream().destroyed).toBeFalse();
   });
 
   test('Subprocess should not be started again if an instance is running', async () => {
@@ -87,7 +84,7 @@ describe('deliverWhileConnected', () => {
     await parcelDeliveryManager.deliverWhileConnected();
 
     await setImmediateAsync();
-    expect(subprocessStream.destroyed).toBeTrue();
+    expect(getSubprocessStream().destroyed).toBeTrue();
   });
 
   test('Subprocess should not be attempted to be killed if it is not running', async () => {
@@ -102,14 +99,14 @@ describe('deliverWhileConnected', () => {
     await parcelDeliveryManager.deliverWhileConnected();
 
     await setImmediateAsync();
-    expect(subprocessStream.destroyed).toBeTrue();
+    expect(getSubprocessStream().destroyed).toBeTrue();
   });
 });
 
 describe('notifyAboutNewParcel', () => {
   test('Notification should be skipped while disconnected', async () => {
     let notificationsCount = 0;
-    subprocessStream.on('data', () => {
+    getSubprocessStream().on('data', () => {
       notificationsCount += 1;
     });
 
@@ -129,7 +126,7 @@ describe('notifyAboutNewParcel', () => {
     );
     // tslint:disable-next-line:readonly-array
     const notifications: string[] = [];
-    subprocessStream.on('data', (data) => {
+    getSubprocessStream().on('data', (data) => {
       notifications.push(data);
     });
     const parcelKey = 'whatever';

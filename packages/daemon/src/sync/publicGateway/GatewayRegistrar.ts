@@ -57,20 +57,21 @@ export class GatewayRegistrar {
     await this.saveRegistration(registration, identityKeyPair, publicGatewayAddress);
   }
 
-  public async registerIfUnregistered(): Promise<void> {
+  public async waitForRegistration(): Promise<void> {
     const logger = Container.get(LOGGER);
     while (!(await this.isRegistered())) {
       try {
         await this.register(DEFAULT_PUBLIC_GATEWAY);
       } catch (err) {
         if (err instanceof PublicAddressingError) {
+          // DNS lookup failed. The device may be disconnected from the Internet.
           logger.info(
             'Failed to register with public gateway due to DNS failure; will retry later',
           );
           await sleepSeconds(5);
         } else {
-          logger.warn({ err }, 'Failed to register with public gateway');
-          break;
+          logger.error({ err }, 'Failed to register with public gateway');
+          await sleepSeconds(60);
         }
       }
     }

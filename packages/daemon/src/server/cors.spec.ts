@@ -1,20 +1,16 @@
 import { useTemporaryAppDirs } from '../testUtils/appDirs';
 import { setUpTestDBConnection } from '../testUtils/db';
-import { makeMockLogging, MockLogging } from '../testUtils/logging';
+import { mockLoggerToken } from '../testUtils/logging';
 import { CONTROL_API_PREFIX } from './control';
 import { makeServer } from './index';
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
-
-let mockLogging: MockLogging;
-beforeEach(() => {
-  mockLogging = makeMockLogging();
-});
+mockLoggerToken();
 
 describe('disableCors', () => {
   test('Request with Origin header should be refused', async () => {
-    const fastify = await makeServer(mockLogging.logger);
+    const fastify = await makeServer();
 
     const response = await fastify.inject({ url: '/', headers: { origin: 'https://example.com' } });
 
@@ -23,7 +19,7 @@ describe('disableCors', () => {
   });
 
   test('Request with Origin header should be allowed if it belongs to control API', async () => {
-    const fastify = await makeServer(mockLogging.logger);
+    const fastify = await makeServer();
 
     const response = await fastify.inject({ url: `${CONTROL_API_PREFIX}/foo` });
 
@@ -31,7 +27,7 @@ describe('disableCors', () => {
   });
 
   test('Request without Origin header should be allowed', async () => {
-    const fastify = await makeServer(mockLogging.logger);
+    const fastify = await makeServer();
 
     const response = await fastify.inject({ url: '/' });
 

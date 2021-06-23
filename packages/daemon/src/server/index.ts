@@ -1,10 +1,11 @@
 import { MAX_RAMF_MESSAGE_LENGTH } from '@relaycorp/relaynet-core';
 import { fastify, FastifyInstance, FastifyPluginCallback } from 'fastify';
 import { Server } from 'http';
-import { Logger } from 'pino';
+import { Container } from 'typedi';
 import uuid from 'uuid-random';
 import { Server as WSServer } from 'ws';
 
+import { LOGGER } from '../tokens';
 import controlRoutes from './control';
 import makeConnectionStatusServer, {
   PATH as CONNECTION_STATUS_PATH,
@@ -25,7 +26,8 @@ const WS_SERVER_BY_PATH: { readonly [key: string]: WebsocketServerFactory } = {
   [COURIER_SYNC_PATH]: makeCourierSyncServer,
 };
 
-export async function makeServer(logger: Logger, authToken?: string): Promise<FastifyInstance> {
+export async function makeServer(authToken?: string): Promise<FastifyInstance> {
+  const logger = Container.get(LOGGER);
   const server = fastify({
     bodyLimit: MAX_RAMF_MESSAGE_LENGTH,
     logger,
@@ -41,7 +43,7 @@ export async function makeServer(logger: Logger, authToken?: string): Promise<Fa
   const options: RouteOptions = { controlAuthToken };
   await Promise.all(ROUTES.map((route) => server.register(route, options)));
 
-  registerWebsocketEndpoints(server, logger, controlAuthToken);
+  registerWebsocketEndpoints(server, controlAuthToken);
 
   await server.ready();
 
@@ -54,12 +56,11 @@ export async function runServer(fastifyInstance: FastifyInstance): Promise<void>
 
 function registerWebsocketEndpoints(
   server: FastifyInstance<Server>,
-  logger: Logger,
   controlAuthToken: string,
 ): void {
   const serversByPath: { readonly [k: string]: WSServer } = Object.entries(
     WS_SERVER_BY_PATH,
-  ).reduce((acc, [path, factory]) => ({ ...acc, [path]: factory(logger, controlAuthToken) }), {});
+  ).reduce((acc, [path, factory]) => ({ ...acc, [path]: factory(controlAuthToken) }), {});
 
   server.server.on('upgrade', (request, socket, headers) => {
     const url = new URL(request.url, 'https://127.0.0.0.1');

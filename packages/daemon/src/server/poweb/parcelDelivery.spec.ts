@@ -17,16 +17,15 @@ import { setUpPKIFixture } from '../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { testDisallowedMethods } from '../../testUtils/http';
 import { mockSpy } from '../../testUtils/jest';
-import { makeMockLoggingFixture, partialPinoLog } from '../../testUtils/logging';
+import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
 import { makeServer } from '../index';
 import { CONTENT_TYPES } from './contentTypes';
 
 const ENDPOINT_URL = '/v1/parcels';
 
-const mockLogging = makeMockLoggingFixture();
-
 setUpTestDBConnection();
 useTemporaryAppDirs();
+const mockLogs = mockLoggerToken();
 
 const mockStoreInternetBoundParcel = mockSpy(jest.spyOn(ParcelStore.prototype, 'store'));
 const mockParcelDeliveryManagerNotifier = mockSpy(
@@ -44,11 +43,11 @@ setUpPKIFixture((keyPairSet, certPath) => {
 });
 
 describe('Disallowed methods', () => {
-  testDisallowedMethods(['POST'], ENDPOINT_URL, () => makeServer(mockLogging.logger));
+  testDisallowedMethods(['POST'], ENDPOINT_URL, () => makeServer());
 });
 
 test('Invalid request Content-Type should be refused with an HTTP 415 response', async () => {
-  const fastify = await makeServer(mockLogging.logger);
+  const fastify = await makeServer();
 
   const response = await fastify.inject({
     headers: { 'content-type': 'application/json' },
@@ -63,7 +62,7 @@ test('Invalid request Content-Type should be refused with an HTTP 415 response',
 
 describe('Authorization errors', () => {
   test('Requests without Authorization header should result in HTTP 401', async () => {
-    const fastify = await makeServer(mockLogging.logger);
+    const fastify = await makeServer();
 
     const response = await postParcel(arrayBufferFrom(''), fastify);
 
@@ -72,7 +71,7 @@ describe('Authorization errors', () => {
   });
 
   test('Requests with the wrong Authorization type should result in HTTP 401', async () => {
-    const fastify = await makeServer(mockLogging.logger);
+    const fastify = await makeServer();
 
     const response = await postParcel(arrayBufferFrom(''), fastify, 'InvalidType value');
 
@@ -81,7 +80,7 @@ describe('Authorization errors', () => {
   });
 
   test('Requests with missing Authorization value should result in HTTP 401', async () => {
-    const fastify = await makeServer(mockLogging.logger);
+    const fastify = await makeServer();
 
     const response = await postParcel(arrayBufferFrom(''), fastify, 'Relaynet-Countersignature ');
 
@@ -90,7 +89,7 @@ describe('Authorization errors', () => {
   });
 
   test('Malformed base64-encoded countersignatures should result in HTTP 401', async () => {
-    const fastify = await makeServer(mockLogging.logger);
+    const fastify = await makeServer();
 
     const response = await postParcel(arrayBufferFrom(''), fastify, 'Relaynet-Countersignature .');
 
@@ -99,7 +98,7 @@ describe('Authorization errors', () => {
   });
 
   test('Invalid parcel delivery countersignatures should result in HTTP 401', async () => {
-    const fastify = await makeServer(mockLogging.logger);
+    const fastify = await makeServer();
     const parcelSerialized = arrayBufferFrom('the parcel');
     const countersignature = await DETACHED_SIGNATURE_TYPES.PARCEL_DELIVERY.sign(
       parcelSerialized,
@@ -128,7 +127,7 @@ describe('Authorization errors', () => {
 });
 
 test('Malformed parcels should be refused with an HTTP 400 response', async () => {
-  const fastify = await makeServer(mockLogging.logger);
+  const fastify = await makeServer();
   const parcelSerialized = arrayBufferFrom('malformed');
 
   const response = await postParcel(
@@ -139,7 +138,7 @@ test('Malformed parcels should be refused with an HTTP 400 response', async () =
 
   expect(response).toHaveProperty('statusCode', 400);
   expect(JSON.parse(response.payload)).toHaveProperty('message', 'Parcel is malformed');
-  expect(mockLogging.logs).toContainEqual(
+  expect(mockLogs).toContainEqual(
     partialPinoLog('info', 'Rejected malformed parcel', {
       err: expect.objectContaining({ type: RAMFSyntaxError.name }),
     }),
@@ -147,7 +146,7 @@ test('Malformed parcels should be refused with an HTTP 400 response', async () =
 });
 
 test('Well-formed yet invalid parcels should be refused with an HTTP 422 response', async () => {
-  const fastify = await makeServer(mockLogging.logger);
+  const fastify = await makeServer();
   const parcel = new Parcel('https://example.com', endpointCertificate, Buffer.from([]), {
     creationDate: subSeconds(new Date(), 2),
     ttl: 1,
@@ -165,7 +164,7 @@ test('Well-formed yet invalid parcels should be refused with an HTTP 422 respons
     'message',
     'Parcel is well-formed but invalid',
   );
-  expect(mockLogging.logs).toContainEqual(
+  expect(mockLogs).toContainEqual(
     partialPinoLog('info', 'Rejected invalid parcel', {
       err: expect.objectContaining({ type: InvalidMessageError.name }),
     }),
@@ -173,7 +172,7 @@ test('Well-formed yet invalid parcels should be refused with an HTTP 422 respons
 });
 
 test('Valid parcels should result in an HTTP 202 response', async () => {
-  const fastify = await makeServer(mockLogging.logger);
+  const fastify = await makeServer();
   const parcel = new Parcel('https://example.com', endpointCertificate, Buffer.from([]));
   const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
 
@@ -196,11 +195,11 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
     'message',
     'Parcel is well-formed but invalid',
   );
-  expect(mockLogging.logs).toContainEqual(partialPinoLog('info', 'Parcel was successfully saved'));
+  expect(mockLogs).toContainEqual(partialPinoLog('info', 'Parcel was successfully saved'));
 });
 
 test('Failing to save a valid parcel should result in an HTTP 500 response', async () => {
-  const fastify = await makeServer(mockLogging.logger);
+  const fastify = await makeServer();
   const parcel = new Parcel('https://example.com', endpointCertificate, Buffer.from([]));
   const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
   const error = new Error('whoops');
@@ -214,7 +213,7 @@ test('Failing to save a valid parcel should result in an HTTP 500 response', asy
 
   expect(response).toHaveProperty('statusCode', 500);
   expect(JSON.parse(response.payload)).toHaveProperty('message', 'Internal server error');
-  expect(mockLogging.logs).toContainEqual(
+  expect(mockLogs).toContainEqual(
     partialPinoLog('error', 'Failed to store parcel', {
       err: expect.objectContaining({ message: error.message }),
     }),

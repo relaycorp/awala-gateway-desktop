@@ -22,7 +22,7 @@ export class ParcelDeliveryManager {
           this.subprocess = null;
         } else if (!this.subprocess) {
           // tslint:disable-next-line:no-object-mutation
-          this.subprocess = await fork('parcel-delivery');
+          this.subprocess = fork('parcel-delivery');
         }
       }
     });
