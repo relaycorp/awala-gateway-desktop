@@ -1,10 +1,15 @@
-import { Certificate, DETACHED_SIGNATURE_TYPES } from '@relaycorp/relaynet-core';
+import {
+  Certificate,
+  DETACHED_SIGNATURE_TYPES,
+  Parcel,
+  RAMFSyntaxError,
+} from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyLoggerInstance, FastifyReply } from 'fastify';
 import { Container } from 'typedi';
 
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
-import { InvalidParcelError, MalformedParcelError, ParcelStore } from '../../parcelStore';
+import { ParcelDirection, ParcelStore } from '../../parcelStore';
 import { ParcelDeliveryManager } from '../../sync/publicGateway/parcelDelivery/ParcelDeliveryManager';
 import { registerAllowedMethods } from '../http';
 import RouteOptions from '../RouteOptions';
@@ -49,11 +54,23 @@ export default async function registerRoutes(
           .send({ message: 'Parcel delivery countersignature is either missing or invalid' });
       }
 
-      let parcelKey: string;
+      let parcel: Parcel;
       try {
-        parcelKey = await parcelStore.storeInternetBoundParcel(request.body);
+        parcel = await parseAndValidateParcel(request.body);
       } catch (err) {
         return replyWithParcelRejection(err, reply, request.log);
+      }
+
+      let parcelKey: string;
+      try {
+        parcelKey = await parcelStore.store(
+          request.body,
+          parcel,
+          ParcelDirection.ENDPOINT_TO_INTERNET,
+        );
+      } catch (err) {
+        request.log.error({ err }, 'Failed to store parcel');
+        return reply.code(500).send({ message: 'Internal server error' });
       }
 
       parcelDeliveryManager.notifyAboutNewParcel(parcelKey);
@@ -61,6 +78,12 @@ export default async function registerRoutes(
       return reply.code(202).send({ message: 'Parcel is well-formed but invalid' });
     },
   });
+}
+
+async function parseAndValidateParcel(parcelSerialized: Buffer): Promise<Parcel> {
+  const parcel = await Parcel.deserialize(bufferToArray(parcelSerialized));
+  await parcel.validate();
+  return parcel;
 }
 
 function replyWithParcelRejection(
@@ -72,18 +95,14 @@ function replyWithParcelRejection(
 
   let statusCode: number;
   let message: string;
-  if (error instanceof MalformedParcelError) {
+  if (error instanceof RAMFSyntaxError) {
     statusCode = 400;
     message = 'Parcel is malformed';
     errorAwareLogger.info('Rejected malformed parcel');
-  } else if (error instanceof InvalidParcelError) {
+  } else {
     statusCode = 422;
     message = 'Parcel is well-formed but invalid';
     errorAwareLogger.info('Rejected invalid parcel');
-  } else {
-    statusCode = 500;
-    message = 'Internal server error';
-    errorAwareLogger.error('Failed to store parcel');
   }
   return reply.code(statusCode).send({ message });
 }
