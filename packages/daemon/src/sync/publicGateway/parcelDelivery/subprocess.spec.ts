@@ -1,16 +1,17 @@
-import { Certificate, Parcel } from '@relaycorp/relaynet-core';
+import { Certificate } from '@relaycorp/relaynet-core';
 import { RefusedParcelError, ServerError } from '@relaycorp/relaynet-poweb';
 import { DeliverParcelCall, MockGSCClient } from '@relaycorp/relaynet-testing';
 import { PassThrough } from 'stream';
 import { Container } from 'typedi';
 
 import { DEFAULT_PUBLIC_GATEWAY } from '../../../constants';
-import { ParcelStore } from '../../../parcelStore';
+import { ParcelDirection, ParcelStore } from '../../../parcelStore';
 import { useTemporaryAppDirs } from '../../../testUtils/appDirs';
 import { setUpPKIFixture } from '../../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../../testUtils/db';
 import { mockSpy } from '../../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
+import { GeneratedParcel, makeParcel } from '../../../testUtils/ramf';
 import { GatewayRegistrar } from '../GatewayRegistrar';
 import * as gscClient from '../gscClient';
 import runParcelDelivery from './subprocess';
@@ -42,13 +43,8 @@ beforeEach(async () => {
 });
 
 let gatewayCertificate: Certificate;
-let endpointPrivateKey: CryptoKey;
-let endpointCertificate: Certificate;
-setUpPKIFixture((keyPairSet, certPath) => {
+const pkiFixtureRetriever = setUpPKIFixture((_keyPairSet, certPath) => {
   gatewayCertificate = certPath.privateGateway;
-
-  endpointPrivateKey = keyPairSet.privateEndpoint.privateKey;
-  endpointCertificate = certPath.privateEndpoint;
 });
 
 test('Subprocess should abort if the gateway is unregistered', async () => {
@@ -85,8 +81,12 @@ describe('Parcel delivery', () => {
   });
 
   test('Pre-existing parcels should be delivered', async () => {
-    const parcelSerialized = await makeDummyParcel();
-    const parcelKey = await parcelStore.storeInternetBoundParcel(parcelSerialized);
+    const { parcel, parcelSerialized } = await makeDummyParcel();
+    const parcelKey = await parcelStore.store(
+      parcelSerialized,
+      parcel,
+      ParcelDirection.ENDPOINT_TO_INTERNET,
+    );
     const parcelDeliveryCall = new DeliverParcelCall();
     mockGSCClient = new MockGSCClient([parcelDeliveryCall]);
 
@@ -99,13 +99,17 @@ describe('Parcel delivery', () => {
   });
 
   test('New parcels should be delivered', async () => {
-    const parcelSerialized = await makeDummyParcel();
+    const { parcel, parcelSerialized } = await makeDummyParcel();
     const parcelDeliveryCall = new DeliverParcelCall();
     mockGSCClient = new MockGSCClient([parcelDeliveryCall]);
 
     let parcelKey: string;
     setImmediate(async () => {
-      parcelKey = await parcelStore.storeInternetBoundParcel(parcelSerialized);
+      parcelKey = await parcelStore.store(
+        parcelSerialized,
+        parcel,
+        ParcelDirection.ENDPOINT_TO_INTERNET,
+      );
       parentStream.write(parcelKey);
       parentStream.end();
     });
@@ -119,8 +123,8 @@ describe('Parcel delivery', () => {
   });
 
   test('Delivery should be signed with the right key', async () => {
-    const parcelSerialized = await makeDummyParcel();
-    await parcelStore.storeInternetBoundParcel(parcelSerialized);
+    const { parcel, parcelSerialized } = await makeDummyParcel();
+    await parcelStore.store(parcelSerialized, parcel, ParcelDirection.ENDPOINT_TO_INTERNET);
     const parcelDeliveryCall = new DeliverParcelCall();
     mockGSCClient = new MockGSCClient([parcelDeliveryCall]);
 
@@ -134,14 +138,20 @@ describe('Parcel delivery', () => {
   });
 
   test('Successfully delivered parcels should be deleted', async () => {
-    const parcelSerialized = await makeDummyParcel();
-    const parcelKey = await parcelStore.storeInternetBoundParcel(parcelSerialized);
+    const { parcel, parcelSerialized } = await makeDummyParcel();
+    const parcelKey = await parcelStore.store(
+      parcelSerialized,
+      parcel,
+      ParcelDirection.ENDPOINT_TO_INTERNET,
+    );
     mockGSCClient = new MockGSCClient([new DeliverParcelCall()]);
 
     setImmediate(endParentStream);
     await runParcelDelivery(parentStream);
 
-    await expect(parcelStore.retrieveInternetBoundParcel(parcelKey)).resolves.toBeNull();
+    await expect(
+      parcelStore.retrieve(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET),
+    ).resolves.toBeNull();
   });
 
   test('Parcels that are no longer available should be ignored', async () => {
@@ -160,29 +170,41 @@ describe('Parcel delivery', () => {
   });
 
   test('Parcels refused as invalid should be deleted', async () => {
-    const parcelSerialized = await makeDummyParcel();
-    const parcelKey = await parcelStore.storeInternetBoundParcel(parcelSerialized);
+    const { parcel, parcelSerialized } = await makeDummyParcel();
+    const parcelKey = await parcelStore.store(
+      parcelSerialized,
+      parcel,
+      ParcelDirection.ENDPOINT_TO_INTERNET,
+    );
     mockGSCClient = new MockGSCClient([new DeliverParcelCall(new RefusedParcelError())]);
 
     setImmediate(endParentStream);
     await runParcelDelivery(parentStream);
 
-    await expect(parcelStore.retrieveInternetBoundParcel(parcelKey)).resolves.toBeNull();
+    await expect(
+      parcelStore.retrieve(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET),
+    ).resolves.toBeNull();
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Parcel was refused by the public gateway', { parcelKey }),
     );
   });
 
   test('Parcel should be temporarily ignored if there was a server error', async () => {
-    const parcelSerialized = await makeDummyParcel();
-    const parcelKey = await parcelStore.storeInternetBoundParcel(parcelSerialized);
+    const { parcel, parcelSerialized } = await makeDummyParcel();
+    const parcelKey = await parcelStore.store(
+      parcelSerialized,
+      parcel,
+      ParcelDirection.ENDPOINT_TO_INTERNET,
+    );
     const serverError = new ServerError('Planets are not aligned yet');
     mockGSCClient = new MockGSCClient([new DeliverParcelCall(serverError)]);
 
     setImmediate(endParentStream);
     await runParcelDelivery(parentStream);
 
-    await expect(parcelStore.retrieveInternetBoundParcel(parcelKey)).resolves.not.toBeNull();
+    await expect(
+      parcelStore.retrieve(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET),
+    ).resolves.not.toBeNull();
     expect(mockLogs).toContainEqual(
       partialPinoLog('warn', 'Parcel delivery failed due to server error', {
         err: expect.objectContaining({ message: serverError.message }),
@@ -192,15 +214,21 @@ describe('Parcel delivery', () => {
   });
 
   test('Parcel should be temporarily ignored if there was an expected error', async () => {
-    const parcelSerialized = await makeDummyParcel();
-    const parcelKey = await parcelStore.storeInternetBoundParcel(parcelSerialized);
+    const { parcel, parcelSerialized } = await makeDummyParcel();
+    const parcelKey = await parcelStore.store(
+      parcelSerialized,
+      parcel,
+      ParcelDirection.ENDPOINT_TO_INTERNET,
+    );
     const error = new Error('This is not really expected');
     mockGSCClient = new MockGSCClient([new DeliverParcelCall(error)]);
 
     setImmediate(endParentStream);
     await runParcelDelivery(parentStream);
 
-    await expect(parcelStore.retrieveInternetBoundParcel(parcelKey)).resolves.not.toBeNull();
+    await expect(
+      parcelStore.retrieve(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET),
+    ).resolves.not.toBeNull();
     expect(mockLogs).toContainEqual(
       partialPinoLog('fatal', 'Parcel delivery failed due to unexpected error', {
         err: expect.objectContaining({ message: error.message }),
@@ -209,9 +237,9 @@ describe('Parcel delivery', () => {
     );
   });
 
-  async function makeDummyParcel(): Promise<Buffer> {
-    const parcel = new Parcel('https://endpoint.com', endpointCertificate, Buffer.from([]));
-    return Buffer.from(await parcel.serialize(endpointPrivateKey));
+  async function makeDummyParcel(): Promise<GeneratedParcel> {
+    const { certPath, keyPairSet } = pkiFixtureRetriever();
+    return makeParcel(ParcelDirection.ENDPOINT_TO_INTERNET, certPath, keyPairSet);
   }
 });
 

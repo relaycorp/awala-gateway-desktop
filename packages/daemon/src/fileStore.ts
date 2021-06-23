@@ -1,7 +1,7 @@
 // tslint:disable:max-classes-per-file
 import { Paths } from 'env-paths';
 import { Dirent, promises as fs } from 'fs';
-import { dirname, join } from 'path';
+import { dirname, join, resolve } from 'path';
 import { Inject, Service } from 'typedi';
 
 import { PrivateGatewayError } from './errors';
@@ -71,6 +71,13 @@ export class FileStore {
   }
 
   protected getObjectPath(key: string): string {
-    return join(this.dataPath, key);
+    const path = resolve(join(this.dataPath, key));
+
+    // For security reasons, make sure we're not asked to operate outside the data directory
+    if (!path.startsWith(this.dataPath)) {
+      throw new FileStoreError(`Object key "${key}" resolves outside data directory`);
+    }
+
+    return path;
   }
 }

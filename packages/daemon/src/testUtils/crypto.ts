@@ -18,24 +18,31 @@ export function sha256Hex(plaintext: string): string {
   return makeSHA256Hash(plaintext).digest('hex');
 }
 
+export type PKIFixtureRetriever = () => {
+  readonly keyPairSet: NodeKeyPairSet;
+  readonly certPath: PDACertPath;
+};
+
 export function setUpPKIFixture(
   cb: (keyPairSet: NodeKeyPairSet, certPath: PDACertPath) => void,
-): void {
-  let gatewayPrivateKey: CryptoKey;
-  let gatewayCertificate: Certificate;
+): PKIFixtureRetriever {
+  let keyPairSet: NodeKeyPairSet;
+  let certPath: PDACertPath;
 
   beforeAll(async () => {
-    const keyPairSet = await generateNodeKeyPairSet();
-    const certPath = await generatePDACertificationPath(keyPairSet);
-
-    gatewayPrivateKey = keyPairSet.privateGateway.privateKey;
-    gatewayCertificate = certPath.privateGateway;
+    keyPairSet = await generateNodeKeyPairSet();
+    certPath = await generatePDACertificationPath(keyPairSet);
 
     cb(keyPairSet, certPath);
   });
 
   beforeEach(async () => {
-    await mockGatewayRegistration(gatewayCertificate, gatewayPrivateKey);
+    await mockGatewayRegistration(certPath.privateGateway, keyPairSet.privateGateway.privateKey);
+  });
+
+  return () => ({
+    certPath,
+    keyPairSet,
   });
 }
 

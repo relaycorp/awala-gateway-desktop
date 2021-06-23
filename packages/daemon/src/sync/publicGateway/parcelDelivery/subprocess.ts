@@ -8,7 +8,7 @@ import { source } from 'stream-to-it';
 import { Container } from 'typedi';
 
 import { DBPrivateKeyStore } from '../../../keystores/DBPrivateKeyStore';
-import { ParcelStore } from '../../../parcelStore';
+import { ParcelDirection, ParcelStore } from '../../../parcelStore';
 import { LOGGER } from '../../../tokens';
 import { GatewayRegistrar } from '../GatewayRegistrar';
 import { makeGSCClient } from '../gscClient';
@@ -27,7 +27,7 @@ export default async function runParcelDelivery(parentStream: Duplex): Promise<n
   logger.info('Ready to deliver parcels');
   await pipe(async function* (): AsyncIterable<string> {
     // Deliver the queued parcels before delivering parcels streamed by the parent process
-    yield* await parcelStore.listActiveInternetBoundParcels();
+    yield* await parcelStore.listActiveBoundForInternet();
     yield* source(parentStream);
   }, await deliverParcels(publicGateway.publicAddress, parcelStore, logger));
 
@@ -49,7 +49,10 @@ async function deliverParcels(
 
   return async (parcelKeys: AsyncIterable<string>) => {
     for await (const parcelKey of parcelKeys) {
-      const parcelSerialized = await parcelStore.retrieveInternetBoundParcel(parcelKey);
+      const parcelSerialized = await parcelStore.retrieve(
+        parcelKey,
+        ParcelDirection.ENDPOINT_TO_INTERNET,
+      );
       const parcelAwareLogger = logger.child({ parcelKey });
       if (parcelSerialized) {
         let deleteParcel = false;
@@ -70,7 +73,7 @@ async function deliverParcels(
         }
 
         if (deleteParcel) {
-          await parcelStore.deleteInternetBoundParcel(parcelKey);
+          await parcelStore.delete(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET);
         }
       } else {
         parcelAwareLogger.info('Skipping non-existing parcel');
