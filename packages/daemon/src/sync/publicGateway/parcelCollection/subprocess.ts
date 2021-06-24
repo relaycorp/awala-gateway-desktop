@@ -8,7 +8,7 @@ import {
 } from '@relaycorp/relaynet-core';
 import pipe from 'it-pipe';
 import { Logger } from 'pino';
-import { Duplex } from 'stream';
+import { Duplex, Writable } from 'stream';
 import { Container } from 'typedi';
 
 import { DBPrivateKeyStore } from '../../../keystores/DBPrivateKeyStore';
@@ -28,6 +28,8 @@ export default async function runParcelCollection(parentStream: Duplex): Promise
     logger.fatal('Private gateway is not registered');
     return 1;
   }
+
+  notifyStatusToParent('disconnected', parentStream);
 
   logger.info('Ready to collect parcels');
 
@@ -87,8 +89,7 @@ async function makeGSCClientAndRetryIfNeeded(
     try {
       client = await makeGSCClient(publicGatewayAddress);
     } catch (err) {
-      const disconnectedStatus: ParcelCollectorStatus = { type: 'status', status: 'disconnected' };
-      parentStream.write(disconnectedStatus);
+      notifyStatusToParent('disconnected', parentStream);
       if (err instanceof PublicAddressingError) {
         logger.info({ err }, 'Failed to resolve DNS record for public gateway');
         await sleepSeconds(3);
@@ -99,8 +100,7 @@ async function makeGSCClientAndRetryIfNeeded(
     }
   }
 
-  const status: ParcelCollectorStatus = { type: 'status', status: 'connected' };
-  parentStream.write(status);
+  notifyStatusToParent('connected', parentStream);
   return client;
 }
 
@@ -140,4 +140,9 @@ function processParcels(
       );
     }
   };
+}
+
+function notifyStatusToParent(status: 'connected' | 'disconnected', parentStream: Writable): void {
+  const message: ParcelCollectorStatus = { status, type: 'status' };
+  parentStream.write(message);
 }

@@ -82,6 +82,16 @@ test('Subprocess should record a log when it is ready', async () => {
   expect(mockLogs).toContainEqual(partialPinoLog('info', 'Ready to collect parcels'));
 });
 
+test('Subprocess should initially mark the status as disconnected', async () => {
+  addEmptyParcelCollectionCall();
+  const getParentMessages = recordReadableStreamMessages(parentStream);
+
+  await runParcelCollection(parentStream);
+
+  const expectedStatus: ParcelCollectorStatus = { status: 'disconnected', type: 'status' };
+  expect(getParentMessages()[0]).toEqual(expectedStatus);
+});
+
 test('Subprocess should exit with code 2 if it ends normally', async () => {
   addEmptyParcelCollectionCall();
 
