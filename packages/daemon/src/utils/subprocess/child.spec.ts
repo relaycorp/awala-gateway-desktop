@@ -40,7 +40,7 @@ describe('fork', () => {
     );
   });
 
-  test('Subprocess name should be passed as argument', async () => {
+  test('Subprocess name should be passed as argument', () => {
     const subprocessName = SUBPROCESS_NAME;
 
     fork(subprocessName);
@@ -52,7 +52,7 @@ describe('fork', () => {
     );
   });
 
-  test('Subprocess should be run with LOG_FILES=true', async () => {
+  test('Subprocess should be run with LOG_FILES=true', () => {
     fork(SUBPROCESS_NAME);
 
     expect(childProcess.fork).toBeCalledWith(
@@ -64,13 +64,13 @@ describe('fork', () => {
     );
   });
 
-  test('Stream should be returned as soon as the process is spawn', async () => {
+  test('Stream should be returned as soon as the process is spawn', () => {
     const subprocess = fork(SUBPROCESS_NAME);
 
     expect(subprocess).toBeInstanceOf(Duplex);
   });
 
-  test('Stream should be destroyed with an error when one is emitted', async (cb) => {
+  test('Stream should be destroyed with an error when one is emitted', (cb) => {
     const originalError = new Error('denied.png');
 
     const subprocess = fork(SUBPROCESS_NAME);
@@ -82,7 +82,7 @@ describe('fork', () => {
     mockChildProcess.emit('error', originalError);
   });
 
-  test('Stream should be destroyed with an error when the subprocess errors out', async (cb) => {
+  test('Stream should be destroyed with an error when the subprocess errors out', (cb) => {
     const exitCode = 12;
 
     const subprocess = fork(SUBPROCESS_NAME);
@@ -97,7 +97,7 @@ describe('fork', () => {
     mockChildProcess.emit('exit', exitCode, null);
   });
 
-  test('Stream should end normally when the subprocess is killed', async (cb) => {
+  test('Stream should end normally when the subprocess is killed', (cb) => {
     const signal = 'SIGTERM';
 
     const subprocess = fork(SUBPROCESS_NAME);
@@ -107,7 +107,7 @@ describe('fork', () => {
     mockChildProcess.emit('exit', null, signal);
   });
 
-  test('Stream should end normally when subprocess ends normally', async (cb) => {
+  test('Stream should end normally when subprocess ends normally', (cb) => {
     const subprocess = fork(SUBPROCESS_NAME);
 
     subprocess.on('error', cb);
