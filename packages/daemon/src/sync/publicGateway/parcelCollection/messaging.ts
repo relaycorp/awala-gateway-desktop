@@ -10,3 +10,5 @@ export interface ParcelCollectorStatus extends IPCMessage {
   readonly status: 'connected' | 'disconnected';
   readonly type: 'status';
 }
+
+export type ParcelCollectorMessage = ParcelCollectionNotification | ParcelCollectorStatus;
