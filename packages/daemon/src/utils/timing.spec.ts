@@ -1,6 +1,6 @@
 import { sleepSeconds } from './timing';
 
-jest.useFakeTimers("legacy");
+jest.useFakeTimers('legacy');
 
 describe('sleepSeconds', () => {
   test('Should wait for the specified number of seconds', async () => {
