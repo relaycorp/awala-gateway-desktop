@@ -8,7 +8,7 @@ import {
 } from '@relaycorp/relaynet-core';
 import { CollectParcelsCall, MockGSCClient } from '@relaycorp/relaynet-testing';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { PassThrough, Writable } from 'stream';
+import { PassThrough } from 'stream';
 
 import { DEFAULT_PUBLIC_GATEWAY } from '../../../constants';
 import { ParcelDirection, ParcelStore } from '../../../parcelStore';
@@ -19,6 +19,7 @@ import { arrayToAsyncIterable } from '../../../testUtils/iterables';
 import { mockSpy } from '../../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
 import { GeneratedParcel, makeParcel } from '../../../testUtils/ramf';
+import { recordReadableStreamMessages } from '../../../testUtils/stream';
 import { mockSleepSeconds } from '../../../testUtils/timing';
 import { GatewayRegistrar } from '../GatewayRegistrar';
 import * as gscClient from '../gscClient';
@@ -157,6 +158,9 @@ describe('Parcel collection', () => {
   test('Valid parcels should be stored and parent process should be notified', async () => {
     const { parcel, parcelSerialized } = await makeDummyParcel();
     const collectionAck = jest.fn();
+    const getParentMessages = recordReadableStreamMessages(parentStream);
+    const parcelKey = 'foo/bar';
+    mockParcelStore.mockResolvedValueOnce(parcelKey);
     addParcelCollectionCall(parcelSerialized, collectionAck);
 
     await runParcelCollection(parentStream);
@@ -166,6 +170,7 @@ describe('Parcel collection', () => {
       expect.toSatisfy((p) => p.id === parcel.id),
       ParcelDirection.INTERNET_TO_ENDPOINT,
     );
+    expect(getParentMessages()).toContainEqual({ key: parcelKey, type: 'parcelCollection' });
     expect(collectionAck).toBeCalled();
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Saved new parcel', {
@@ -196,20 +201,11 @@ describe('Public gateway resolution failures', () => {
   test('Parent process should be notified about successful reconnect', async () => {
     mockMakeGSCClient.mockRejectedValueOnce(new Error('oh noes'));
     addEmptyParcelCollectionCall();
-    // tslint:disable-next-line:readonly-array
-    const parentMessages: any[] = [];
-    const consumer = new Writable({
-      objectMode: true,
-      write(chunk, _encoding, callback): void {
-        parentMessages.push(chunk);
-        callback();
-      },
-    });
-    parentStream.pipe(consumer);
+    const getParentMessages = recordReadableStreamMessages(parentStream);
 
     await runParcelCollection(parentStream);
 
-    expect(parentMessages).toContainEqual({ type: 'status', status: 'connected' });
+    expect(getParentMessages()).toContainEqual({ type: 'status', status: 'connected' });
   });
 
   test('Reconnection should be attempted after 3 seconds if DNS lookup failed', async () => {

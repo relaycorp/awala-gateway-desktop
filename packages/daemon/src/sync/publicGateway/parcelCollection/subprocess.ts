@@ -32,7 +32,7 @@ export default async function runParcelCollection(parentStream: Duplex): Promise
 
   await pipe(
     await streamParcelCollections(publicGateway.publicAddress, parentStream, logger),
-    processParcels(logger),
+    processParcels(logger, parentStream),
   );
 
   // This should never end, so ending "normally" should actually be an error
@@ -103,6 +103,7 @@ async function makeGSCClientAndRetryIfNeeded(
 
 function processParcels(
   logger: Logger,
+  parentStream: Duplex,
 ): (parcelCollections: AsyncIterable<ParcelCollection>) => Promise<void> {
   const parcelStore = Container.get(ParcelStore);
 
@@ -117,12 +118,13 @@ function processParcels(
         continue;
       }
 
-      await parcelStore.store(
+      const key = await parcelStore.store(
         Buffer.from(collection.parcelSerialized),
         parcel,
         ParcelDirection.INTERNET_TO_ENDPOINT,
       );
       await collection.ack();
+      parentStream.write({ type: 'parcelCollection', key });
       logger.info(
         { parcel: { id: parcel.id, recipient: parcel.recipientAddress } },
         'Saved new parcel',
