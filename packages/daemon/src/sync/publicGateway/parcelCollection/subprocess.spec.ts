@@ -181,7 +181,7 @@ describe('Parcel collection', () => {
 describe('Public gateway resolution failures', () => {
   const sleepSeconds = mockSleepSeconds();
 
-  test('Parent process should be notified about failure', async (cb) => {
+  test('Parent process should be notified about failure', (cb) => {
     const error = new Error('oh noes');
     mockMakeGSCClient.mockRejectedValueOnce(error);
     addEmptyParcelCollectionCall();
@@ -190,7 +190,7 @@ describe('Public gateway resolution failures', () => {
       expect(message).toEqual({ type: 'status', status: 'disconnected' });
       cb();
     });
-    await runParcelCollection(parentStream);
+    runParcelCollection(parentStream).catch(cb);
   });
 
   test('Parent process should be notified about successful reconnect', async () => {
