@@ -17,6 +17,7 @@ import { LOGGER } from '../../../tokens';
 import { sleepSeconds } from '../../../utils/timing';
 import { GatewayRegistrar } from '../GatewayRegistrar';
 import { makeGSCClient } from '../gscClient';
+import { ParcelCollectionNotification, ParcelCollectorStatus } from './messaging';
 
 export default async function runParcelCollection(parentStream: Duplex): Promise<number> {
   const logger = Container.get(LOGGER);
@@ -86,7 +87,8 @@ async function makeGSCClientAndRetryIfNeeded(
     try {
       client = await makeGSCClient(publicGatewayAddress);
     } catch (err) {
-      parentStream.write({ type: 'status', status: 'disconnected' });
+      const disconnectedStatus: ParcelCollectorStatus = { type: 'status', status: 'disconnected' };
+      parentStream.write(disconnectedStatus);
       if (err instanceof PublicAddressingError) {
         logger.info({ err }, 'Failed to resolve DNS record for public gateway');
         await sleepSeconds(3);
@@ -97,7 +99,8 @@ async function makeGSCClientAndRetryIfNeeded(
     }
   }
 
-  parentStream.write({ type: 'status', status: 'connected' });
+  const status: ParcelCollectorStatus = { type: 'status', status: 'connected' };
+  parentStream.write(status);
   return client;
 }
 
@@ -118,15 +121,21 @@ function processParcels(
         continue;
       }
 
-      const key = await parcelStore.store(
+      const parcelKey = await parcelStore.store(
         Buffer.from(collection.parcelSerialized),
         parcel,
         ParcelDirection.INTERNET_TO_ENDPOINT,
       );
       await collection.ack();
-      parentStream.write({ type: 'parcelCollection', key });
+
+      const collectionMessage: ParcelCollectionNotification = {
+        parcelKey,
+        recipientAddress: parcel.recipientAddress,
+        type: 'parcelCollection',
+      };
+      parentStream.write(collectionMessage);
       logger.info(
-        { parcel: { id: parcel.id, recipient: parcel.recipientAddress } },
+        { parcel: { id: parcel.id, recipientAddress: parcel.recipientAddress } },
         'Saved new parcel',
       );
     }

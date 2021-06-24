@@ -8,6 +8,9 @@ import { Inject, Service } from 'typedi';
 import { LOGGER } from '../../../tokens';
 import { fork } from '../../../utils/subprocess/child';
 import { PublicGatewayCollectionStatus } from '../PublicGatewayCollectionStatus';
+import { ParcelCollectionNotification, ParcelCollectorStatus } from './messaging';
+
+type ParcelCollectionMessage = ParcelCollectionNotification | ParcelCollectorStatus;
 
 @Service()
 export class ParcelCollectorManager {
@@ -45,6 +48,7 @@ export class ParcelCollectorManager {
   }
 
   public async *streamStatus(): AsyncIterable<PublicGatewayCollectionStatus> {
+    // Continue streaming across restarts
     while (true) {
       await this.waitForSubprocessToBeRunning();
       yield* await streamStatus(this.subprocess!);
@@ -77,7 +81,7 @@ async function* streamStatus(subprocess: Duplex): AsyncIterable<PublicGatewayCol
 }
 
 async function* reportStatusChanges(
-  messages: AsyncIterable<any>,
+  messages: AsyncIterable<ParcelCollectionMessage>,
 ): AsyncIterable<PublicGatewayCollectionStatus> {
   for await (const message of messages) {
     if (message.type !== 'status') {

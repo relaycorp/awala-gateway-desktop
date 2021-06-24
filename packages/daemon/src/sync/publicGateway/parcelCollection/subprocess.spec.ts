@@ -23,6 +23,7 @@ import { recordReadableStreamMessages } from '../../../testUtils/stream';
 import { mockSleepSeconds } from '../../../testUtils/timing';
 import { GatewayRegistrar } from '../GatewayRegistrar';
 import * as gscClient from '../gscClient';
+import { ParcelCollectionNotification, ParcelCollectorStatus } from './messaging';
 import runParcelCollection from './subprocess';
 
 setUpTestDBConnection();
@@ -170,13 +171,17 @@ describe('Parcel collection', () => {
       expect.toSatisfy((p) => p.id === parcel.id),
       ParcelDirection.INTERNET_TO_ENDPOINT,
     );
-    expect(getParentMessages()).toContainEqual({ key: parcelKey, type: 'parcelCollection' });
+    expect(getParentMessages()).toContainEqual<ParcelCollectionNotification>({
+      parcelKey,
+      recipientAddress: parcel.recipientAddress,
+      type: 'parcelCollection',
+    });
     expect(collectionAck).toBeCalled();
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Saved new parcel', {
         parcel: expect.objectContaining({
           id: parcel.id,
-          recipient: parcel.recipientAddress,
+          recipientAddress: parcel.recipientAddress,
         }),
       }),
     );
@@ -192,7 +197,7 @@ describe('Public gateway resolution failures', () => {
     addEmptyParcelCollectionCall();
 
     parentStream.once('data', (message) => {
-      expect(message).toEqual({ type: 'status', status: 'disconnected' });
+      expect(message).toEqual<ParcelCollectorStatus>({ type: 'status', status: 'disconnected' });
       cb();
     });
     runParcelCollection(parentStream).catch(cb);
@@ -205,7 +210,10 @@ describe('Public gateway resolution failures', () => {
 
     await runParcelCollection(parentStream);
 
-    expect(getParentMessages()).toContainEqual({ type: 'status', status: 'connected' });
+    expect(getParentMessages()).toContainEqual<ParcelCollectorStatus>({
+      status: 'connected',
+      type: 'status',
+    });
   });
 
   test('Reconnection should be attempted after 3 seconds if DNS lookup failed', async () => {
