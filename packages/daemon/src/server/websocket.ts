@@ -6,6 +6,12 @@ import { LOGGER } from '../tokens';
 
 export type WebsocketServerFactory = (controlAuthToken: string) => Server;
 
+export enum WebSocketCode {
+  NORMAL = 1000,
+  CANNOT_ACCEPT = 1003,
+  VIOLATED_POLICY = 1008,
+}
+
 export function makeWebSocketServer(
   handler: (connectionStream: Duplex, socket: WebSocket) => void,
   authToken?: string,
