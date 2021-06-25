@@ -1,3 +1,4 @@
+import { IncomingHttpHeaders } from 'http';
 import { Duplex } from 'stream';
 import { Container } from 'typedi';
 import WebSocket, { createWebSocketStream, Server } from 'ws';
@@ -13,7 +14,7 @@ export enum WebSocketCode {
 }
 
 export function makeWebSocketServer(
-  handler: (connectionStream: Duplex, socket: WebSocket) => void,
+  handler: (connectionStream: Duplex, socket: WebSocket, headers: IncomingHttpHeaders) => void,
   authToken?: string,
 ): WebSocket.Server {
   const wsServer = new WebSocket.Server({
@@ -29,18 +30,18 @@ export function makeWebSocketServer(
     const requestToken = url.searchParams.get('auth');
     if (isAuthRequired && authToken !== requestToken) {
       logger.info('Refusing unauthenticated request');
-      socket.close(1008, 'Authentication is required');
+      socket.close(WebSocketCode.VIOLATED_POLICY, 'Authentication is required');
       return;
     }
 
     if (!isAuthRequired && request.headers.origin) {
       logger.info('Refusing CORS request');
-      socket.close(1008, 'CORS requests are disabled');
+      socket.close(WebSocketCode.VIOLATED_POLICY, 'CORS requests are disabled');
       return;
     }
 
     const stream = createWebSocketStream(socket);
-    handler(stream, socket);
+    handler(stream, socket, request.headers);
   });
 
   return wsServer;

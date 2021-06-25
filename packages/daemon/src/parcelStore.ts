@@ -62,20 +62,25 @@ export class ParcelStore {
   }
 
   /**
-   * Yield keys for queued and recently-received parcels bound for the specified endpoints.
+   * Yield keys for parcels bound for the specified endpoints.
    *
    * @param recipientPrivateAddresses
+   * @param keepAlive Whether to watch for incoming parcels in real time
    *
-   * The returned iterable does not end as it keeps on watching for incoming parcels.
+   * If `keepAlive` is enabled, the iterable won't end unless it's ended by the consumer.
+   *
    */
   public async *streamActiveBoundForEndpoints(
     recipientPrivateAddresses: readonly string[],
+    keepAlive: boolean,
   ): AsyncIterable<string> {
     yield* await this.listQueuedParcelsBoundForEndpoints(recipientPrivateAddresses);
 
-    // TODO: Find way not to miss newly-collected parcels between listing queued ones and watching
-    const parcelCollectorManager = Container.get(ParcelCollectorManager);
-    yield* await parcelCollectorManager.watchCollectionsForRecipients(recipientPrivateAddresses);
+    if (keepAlive) {
+      // TODO: Find way not to miss newly-collected parcels between listing queued ones and watching
+      const parcelCollectorManager = Container.get(ParcelCollectorManager);
+      yield* await parcelCollectorManager.watchCollectionsForRecipients(recipientPrivateAddresses);
+    }
   }
 
   public async retrieve(

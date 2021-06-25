@@ -3,16 +3,19 @@ import {
   DETACHED_SIGNATURE_TYPES,
   HandshakeChallenge,
   HandshakeResponse,
+  ParcelDelivery,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
+import pipe from 'it-pipe';
 import { Logger } from 'pino';
 import { Duplex } from 'stream';
+import { duplex } from 'stream-to-it';
 import { Container } from 'typedi';
 import uuid from 'uuid-random';
-import WebSocket, { Server } from 'ws';
+import WebSocket, { createWebSocketStream, Server } from 'ws';
 
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
-import { ParcelStore } from '../../parcelStore';
+import { ParcelDirection, ParcelStore } from '../../parcelStore';
 import { LOGGER } from '../../tokens';
 import { makeWebSocketServer, WebSocketCode } from '../websocket';
 
@@ -20,13 +23,19 @@ export default function makeParcelCollectionServer(): Server {
   const logger = Container.get(LOGGER);
   const parcelStore = Container.get(ParcelStore);
 
-  return makeWebSocketServer(async (connectionStream, socket) => {
+  return makeWebSocketServer(async (connectionStream, socket, requestHeaders) => {
     const endpointAddresses = await doHandshake(connectionStream, socket, logger);
     if (!endpointAddresses) {
       return;
     }
-    parcelStore.streamActiveBoundForEndpoints(endpointAddresses);
-    socket.close(WebSocketCode.NORMAL);
+
+    // "keep-alive" or any value other than "close-upon-completion" should keep the connection alive
+    const keepAlive = requestHeaders['x-relaynet-streaming-mode'] !== 'close-upon-completion';
+    await pipe(
+      parcelStore.streamActiveBoundForEndpoints(endpointAddresses, keepAlive),
+      makeDeliveryStream(parcelStore, logger),
+      duplex(createWebSocketStream(socket)),
+    );
   });
 }
 
@@ -87,6 +96,27 @@ async function doHandshake(
     logger.debug('Sending handshake challenge');
     connectionStream.write(Buffer.from(handshakeChallenge.serialize()));
   });
+}
+
+function makeDeliveryStream(
+  parcelStore: ParcelStore,
+  logger: Logger,
+): (parcelKeys: AsyncIterable<string>) => AsyncIterable<Buffer> {
+  return async function* (parcelKeys): AsyncIterable<Buffer> {
+    for await (const parcelKey of parcelKeys) {
+      const parcelSerialized = await parcelStore.retrieve(
+        parcelKey,
+        ParcelDirection.INTERNET_TO_ENDPOINT,
+      );
+      if (parcelSerialized) {
+        logger.debug({ parcelKey }, 'Sending parcel');
+        const delivery = new ParcelDelivery(uuid(), bufferToArray(parcelSerialized));
+        yield Buffer.from(delivery.serialize());
+      } else {
+        logger.debug({ parcelKey }, 'Skipping missing parcel');
+      }
+    }
+  };
 }
 
 async function verifyNonceSignatures(
