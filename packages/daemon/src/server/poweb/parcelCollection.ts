@@ -51,7 +51,15 @@ async function doHandshake(
   const ownCertificates = await privateKeyStore.fetchNodeCertificates();
 
   return new Promise((resolve) => {
+    const closureHandler = () => {
+      logger.debug('Client closed the connection before completing the handshake');
+      socket.close(WebSocketCode.NORMAL);
+    };
+    socket.once('close', closureHandler);
+
     socket.once('message', async (message: Buffer) => {
+      socket.removeListener('close', closureHandler);
+
       let handshakeResponse: HandshakeResponse;
       try {
         handshakeResponse = HandshakeResponse.deserialize(bufferToArray(message));

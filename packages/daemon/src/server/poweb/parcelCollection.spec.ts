@@ -67,6 +67,21 @@ describe('Handshake', () => {
     expect(mockLogs).toContainEqual(partialPinoLog('debug', 'Sending handshake challenge'));
   });
 
+  test('Client-initiated closure before response should be handled gracefully', async () => {
+    const client = new MockParcelCollectionClient();
+    await client.connect();
+    await client.receive(); // Discard challenge
+
+    client.close(WebSocketCode.NORMAL);
+
+    await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
+      code: WebSocketCode.NORMAL,
+    });
+    expect(mockLogs).toContainEqual(
+      partialPinoLog('debug', 'Client closed the connection before completing the handshake'),
+    );
+  });
+
   test('Handshake should fail if response is malformed', async () => {
     const client = new MockParcelCollectionClient();
     await client.connect();
