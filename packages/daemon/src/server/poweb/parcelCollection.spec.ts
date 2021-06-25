@@ -196,18 +196,16 @@ describe('Handshake', () => {
 
 test('Active parcels should be sent to client', async () => {
   const parcelKey = 'parcel-key';
-  mockParcelStoreStream.mockReturnValueOnce(arrayToAsyncIterable([parcelKey]));
   const parcelSerialized = Buffer.from('the parcel');
-  mockParcelStoreRetrieve.mockResolvedValueOnce(parcelSerialized);
+  setParcelsInStore({ key: parcelKey, serialization: parcelSerialized });
   const client = new MockParcelCollectionClient();
   await client.connect();
   await client.doHandshake();
 
-  const parcelCollectionRaw = await client.receive();
+  const parcelDelivery = await client.receiveParcelDelivery();
 
-  const collection = ParcelDelivery.deserialize(bufferToArray(parcelCollectionRaw as Buffer));
-  expect(Buffer.from(collection.parcelSerialized).equals(parcelSerialized)).toBeTrue();
-  expect(uuid.test(collection.deliveryId));
+  expect(Buffer.from(parcelDelivery.parcelSerialized).equals(parcelSerialized)).toBeTrue();
+  expect(uuid.test(parcelDelivery.deliveryId));
   expect(mockLogs).toContainEqual(partialPinoLog('debug', 'Sending parcel', { parcelKey }));
   expect(mockParcelStoreStream).toBeCalledWith([trustedEndpointAddress], expect.anything());
   expect(mockParcelStoreRetrieve).toBeCalledWith(parcelKey, ParcelDirection.INTERNET_TO_ENDPOINT);
@@ -215,20 +213,15 @@ test('Active parcels should be sent to client', async () => {
 
 test('Recently-deleted parcels should be gracefully skipped', async () => {
   const missingParcelKey = 'missing parcel';
-  mockParcelStoreStream.mockReturnValueOnce(
-    arrayToAsyncIterable([missingParcelKey, 'existing parcel']),
-  );
-  mockParcelStoreRetrieve.mockResolvedValueOnce(null);
   const parcelSerialized = Buffer.from('the parcel');
-  mockParcelStoreRetrieve.mockResolvedValueOnce(parcelSerialized);
+  setParcelsInStore({ key: missingParcelKey }, { key: 'parcel2', serialization: parcelSerialized });
   const client = new MockParcelCollectionClient();
   await client.connect();
   await client.doHandshake();
 
-  const parcelCollectionRaw = await client.receive();
+  const parcelDelivery = await client.receiveParcelDelivery();
 
-  const collection = ParcelDelivery.deserialize(bufferToArray(parcelCollectionRaw as Buffer));
-  expect(Buffer.from(collection.parcelSerialized).equals(parcelSerialized)).toBeTrue();
+  expect(Buffer.from(parcelDelivery.parcelSerialized).equals(parcelSerialized)).toBeTrue();
   expect(mockLogs).toContainEqual(
     partialPinoLog('debug', 'Skipping missing parcel', { parcelKey: missingParcelKey }),
   );
@@ -248,8 +241,7 @@ describe('Keep alive', () => {
   });
 
   test('Connection should be closed upon completion if Keep-Alive is off', async () => {
-    mockParcelStoreStream.mockReturnValueOnce(arrayToAsyncIterable(['parcel-key']));
-    mockParcelStoreRetrieve.mockResolvedValueOnce(Buffer.from('the parcel'));
+    setParcelsInStore({ key: 'parcel key', serialization: Buffer.from('the parcel') });
     const client = new MockParcelCollectionClient(StreamingMode.CLOSE_UPON_COMPLETION);
     await client.connect();
     await client.doHandshake();
@@ -280,7 +272,25 @@ describe('Keep alive', () => {
 });
 
 describe('Acknowledgements', () => {
-  test.todo('Server should send parcel to client even if a previous one is unacknowledged');
+  test('Server should send parcel to client even if a previous one is unacknowledged', async () => {
+    const parcel1Key = 'parcel1 key';
+    const parcel2Key = 'parcel2 key';
+    const parcel1Serialized = Buffer.from('parcel1');
+    const parcel2Serialized = Buffer.from('parcel2');
+    setParcelsInStore(
+      { key: parcel1Key, serialization: parcel1Serialized },
+      { key: parcel2Key, serialization: parcel2Serialized },
+    );
+    const client = new MockParcelCollectionClient();
+    await client.connect();
+    await client.doHandshake();
+
+    const parcel1Delivery = await client.receiveParcelDelivery();
+    expect(Buffer.from(parcel1Delivery.parcelSerialized).equals(parcel1Serialized)).toBeTrue();
+
+    const parcel2Delivery = await client.receiveParcelDelivery();
+    expect(Buffer.from(parcel2Delivery.parcelSerialized).equals(parcel2Serialized)).toBeTrue();
+  });
 
   test.todo('Parcel should be acknowledged in store when client acknowledges it');
 
@@ -316,5 +326,24 @@ class MockParcelCollectionClient extends MockClient {
     await this.send(handshakeResponse.serialize());
 
     await setImmediateAsync();
+  }
+
+  public async receiveParcelDelivery(): Promise<ParcelDelivery> {
+    const parcelDeliveryRaw = bufferToArray((await this.receive()) as Buffer);
+    return ParcelDelivery.deserialize(parcelDeliveryRaw);
+  }
+}
+
+interface StoredParcel {
+  readonly key: string;
+  readonly serialization?: Buffer;
+}
+
+function setParcelsInStore(...storedParcels: readonly StoredParcel[]): void {
+  const keys = storedParcels.map((p) => p.key);
+  mockParcelStoreStream.mockReturnValueOnce(arrayToAsyncIterable(keys));
+
+  for (const { serialization } of storedParcels) {
+    mockParcelStoreRetrieve.mockResolvedValueOnce(serialization ?? null);
   }
 }
