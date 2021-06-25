@@ -12,10 +12,13 @@ import {
 import { CloseFrame, MockClient } from '@relaycorp/ws-mock';
 import bufferToArray from 'buffer-to-arraybuffer';
 
+import { ParcelStore } from '../../parcelStore';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { arrayBufferFrom } from '../../testUtils/buffer';
 import { setUpPKIFixture } from '../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../testUtils/db';
+import { arrayToAsyncIterable } from '../../testUtils/iterables';
+import { mockSpy } from '../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
 import { mockWebsocketStream } from '../../testUtils/websocket';
 import { WebSocketCode } from '../websocket';
@@ -40,6 +43,11 @@ setUpPKIFixture((keyPairSet, certPath) => {
   privateGatewayCertificate = certPath.privateGateway;
   privateGatewayPrivateKey = keyPairSet.privateGateway.privateKey;
 });
+
+const mockParcelStoreStream = mockSpy(
+  jest.spyOn(ParcelStore.prototype, 'streamActiveBoundForEndpoints'),
+  () => arrayToAsyncIterable([]),
+);
 
 describe('Handshake', () => {
   test('Challenge should be sent as soon as client connects', async () => {
@@ -149,6 +157,7 @@ describe('Handshake', () => {
         err: expect.objectContaining({ type: CertificateError.name }),
       }),
     );
+    expect(mockParcelStoreStream).not.toBeCalled();
   });
 
   test('Handshake should complete successfully if all signatures are valid', async () => {
@@ -159,23 +168,25 @@ describe('Handshake', () => {
       subjectPublicKey: endpoint2KeyPair.publicKey,
       validityEndDate: privateGatewayCertificate.expiryDate,
     });
-    const endpoint2Signer = new Signer(endpoint2Certificate, endpoint2KeyPair.privateKey);
+    const trustedEndpoint2Signer = new Signer(endpoint2Certificate, endpoint2KeyPair.privateKey);
     const client = new MockParcelCollectionClient();
     await client.connect();
 
-    await client.doHandshake([trustedEndpointSigner, endpoint2Signer]);
+    await client.doHandshake([trustedEndpointSigner, trustedEndpoint2Signer]);
 
     await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
       code: WebSocketCode.NORMAL,
     });
+    const endpointAddresses: readonly string[] = [
+      await trustedEndpointSigner.certificate.calculateSubjectPrivateAddress(),
+      await endpoint2Certificate.calculateSubjectPrivateAddress(),
+    ];
     expect(mockLogs).toContainEqual(
       partialPinoLog('debug', 'Handshake completed successfully', {
-        endpointAddresses: [
-          await trustedEndpointSigner.certificate.calculateSubjectPrivateAddress(),
-          await endpoint2Certificate.calculateSubjectPrivateAddress(),
-        ],
+        endpointAddresses,
       }),
     );
+    expect(mockParcelStoreStream).toBeCalledWith(endpointAddresses);
   });
 });
 

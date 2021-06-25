@@ -12,17 +12,20 @@ import uuid from 'uuid-random';
 import WebSocket, { Server } from 'ws';
 
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
+import { ParcelStore } from '../../parcelStore';
 import { LOGGER } from '../../tokens';
 import { makeWebSocketServer, WebSocketCode } from '../websocket';
 
 export default function makeParcelCollectionServer(): Server {
   const logger = Container.get(LOGGER);
+  const parcelStore = Container.get(ParcelStore);
 
   return makeWebSocketServer(async (connectionStream, socket) => {
     const endpointAddresses = await doHandshake(connectionStream, socket, logger);
     if (!endpointAddresses) {
       return;
     }
+    parcelStore.streamActiveBoundForEndpoints(endpointAddresses);
     socket.close(WebSocketCode.NORMAL);
   });
 }
@@ -58,27 +61,25 @@ async function doHandshake(
         return resolve(null);
       }
 
-      // tslint:disable-next-line:readonly-array
-      const endpointAddresses: string[] = [];
-      for (const nonceSignature of handshakeResponse.nonceSignatures) {
-        let endpointCertificate: Certificate;
-        try {
-          endpointCertificate = await DETACHED_SIGNATURE_TYPES.NONCE.verify(
-            nonceSignature,
-            nonce,
-            ownCertificates,
-          );
-        } catch (err) {
-          logger.info({ err }, 'Refusing handshake response with malformed/invalid signatures');
-          socket.close(
-            WebSocketCode.CANNOT_ACCEPT,
-            'Handshake response includes malformed/invalid signature(s)',
-          );
-          return resolve(null);
-        }
-        endpointAddresses.push(await endpointCertificate.calculateSubjectPrivateAddress());
+      let endpointCertificates: readonly Certificate[];
+      try {
+        endpointCertificates = await verifyNonceSignatures(
+          handshakeResponse.nonceSignatures,
+          nonce,
+          ownCertificates,
+        );
+      } catch (err) {
+        logger.info({ err }, 'Refusing handshake response with malformed/invalid signatures');
+        socket.close(
+          WebSocketCode.CANNOT_ACCEPT,
+          'Handshake response includes malformed/invalid signature(s)',
+        );
+        return resolve(null);
       }
 
+      const endpointAddresses = await Promise.all(
+        endpointCertificates.map((c) => c.calculateSubjectPrivateAddress()),
+      );
       logger.debug({ endpointAddresses }, 'Handshake completed successfully');
       resolve(endpointAddresses);
     });
@@ -86,4 +87,22 @@ async function doHandshake(
     logger.debug('Sending handshake challenge');
     connectionStream.write(Buffer.from(handshakeChallenge.serialize()));
   });
+}
+
+async function verifyNonceSignatures(
+  nonceSignatures: readonly ArrayBuffer[],
+  nonce: ArrayBuffer,
+  ownCertificates: readonly Certificate[],
+): Promise<readonly Certificate[]> {
+  // tslint:disable-next-line:readonly-array
+  const endpointCertificates: Certificate[] = [];
+  for (const nonceSignature of nonceSignatures) {
+    const endpointCertificate = await DETACHED_SIGNATURE_TYPES.NONCE.verify(
+      nonceSignature,
+      nonce,
+      ownCertificates,
+    );
+    endpointCertificates.push(endpointCertificate);
+  }
+  return endpointCertificates;
 }
