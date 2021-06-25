@@ -3,10 +3,11 @@ import { deserialize, Document, serialize } from 'bson';
 import { createHash } from 'crypto';
 import pipe from 'it-pipe';
 import { join } from 'path';
-import { Inject, Service } from 'typedi';
+import { Container, Inject, Service } from 'typedi';
 
 import { FileStore } from './fileStore';
 import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
+import { ParcelCollectorManager } from './sync/publicGateway/parcelCollection/ParcelCollectorManager';
 
 const PARCEL_METADATA_EXTENSION = '.pmeta';
 
@@ -60,20 +61,21 @@ export class ParcelStore {
     );
   }
 
-  public async *listActiveBoundForEndpoints(
+  /**
+   * Yield keys for queued and recently-received parcels bound for the specified endpoints.
+   *
+   * @param recipientPrivateAddresses
+   *
+   * The returned iterable does not end as it keeps on watching for incoming parcels.
+   */
+  public async *streamActiveBoundForEndpoints(
     recipientPrivateAddresses: readonly string[],
   ): AsyncIterable<string> {
-    const keyPrefixes = recipientPrivateAddresses.map((a) =>
-      getAbsoluteParcelKey(ParcelDirection.INTERNET_TO_ENDPOINT, a),
-    );
-    const endpointBoundPrefix = getAbsoluteParcelKey(ParcelDirection.INTERNET_TO_ENDPOINT);
-    const listings = keyPrefixes.map((prefix) =>
-      pipe(
-        this.fileStore.listObjects(prefix),
-        this.filterActiveParcels(endpointBoundPrefix, ParcelDirection.INTERNET_TO_ENDPOINT),
-      ),
-    );
-    yield* await concatIterables(listings);
+    yield* await this.listQueuedParcelsBoundForEndpoints(recipientPrivateAddresses);
+
+    // TODO: Find way not to miss newly-collected parcels between listing queued ones and watching
+    const parcelCollectorManager = Container.get(ParcelCollectorManager);
+    yield* await parcelCollectorManager.watchCollectionsForRecipients(recipientPrivateAddresses);
   }
 
   public async retrieve(
@@ -112,6 +114,22 @@ export class ParcelStore {
         yield relativeKey;
       }
     };
+  }
+
+  protected async *listQueuedParcelsBoundForEndpoints(
+    recipientPrivateAddresses: readonly string[],
+  ): AsyncIterable<string> {
+    const endpointBoundPrefix = getAbsoluteParcelKey(ParcelDirection.INTERNET_TO_ENDPOINT);
+    for (const recipientPrivateAddress of recipientPrivateAddresses) {
+      const keyPrefix = getAbsoluteParcelKey(
+        ParcelDirection.INTERNET_TO_ENDPOINT,
+        recipientPrivateAddress,
+      );
+      yield* await pipe(
+        this.fileStore.listObjects(keyPrefix),
+        this.filterActiveParcels(endpointBoundPrefix, ParcelDirection.INTERNET_TO_ENDPOINT),
+      );
+    }
   }
 
   protected async getParcelExpiryDate(parcelKey: string): Promise<Date | null> {
@@ -153,10 +171,4 @@ function getAbsoluteParcelKey(direction: ParcelDirection, parcelRelativeKey?: st
     direction === ParcelDirection.ENDPOINT_TO_INTERNET ? 'internet-bound' : 'endpoint-bound';
   const trailingComponents = parcelRelativeKey ? [parcelRelativeKey] : [];
   return join('parcels', subComponent, ...trailingComponents);
-}
-
-async function* concatIterables<T>(iterables: ReadonlyArray<AsyncIterable<T>>): AsyncIterable<T> {
-  for (const iterable of iterables) {
-    yield* await iterable;
-  }
 }
