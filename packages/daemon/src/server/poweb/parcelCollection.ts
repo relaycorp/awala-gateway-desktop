@@ -12,7 +12,7 @@ import { Duplex } from 'stream';
 import { duplex } from 'stream-to-it';
 import { Container } from 'typedi';
 import uuid from 'uuid-random';
-import WebSocket, { createWebSocketStream, Server } from 'ws';
+import WebSocket, { Server } from 'ws';
 
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
 import { ParcelDirection, ParcelStore } from '../../parcelStore';
@@ -24,18 +24,30 @@ export default function makeParcelCollectionServer(): Server {
   const parcelStore = Container.get(ParcelStore);
 
   return makeWebSocketServer(async (connectionStream, socket, requestHeaders) => {
+    socket.once('close', (code, reason) => {
+      logger.debug({ code, reason }, 'Closing connection');
+    });
+
     const endpointAddresses = await doHandshake(connectionStream, socket, logger);
     if (!endpointAddresses) {
       return;
     }
+    const endpointAwareLogger = logger.child({ endpointAddresses });
 
     // "keep-alive" or any value other than "close-upon-completion" should keep the connection alive
     const keepAlive = requestHeaders['x-relaynet-streaming-mode'] !== 'close-upon-completion';
-    await pipe(
-      parcelStore.streamActiveBoundForEndpoints(endpointAddresses, keepAlive),
-      makeDeliveryStream(parcelStore, logger),
-      duplex(createWebSocketStream(socket)),
-    );
+
+    const tracker = new CollectionTracker();
+    try {
+      await pipe(
+        parcelStore.streamActiveBoundForEndpoints(endpointAddresses, keepAlive),
+        makeDeliveryStream(parcelStore, tracker, socket, endpointAwareLogger),
+        duplex(connectionStream),
+        makeACKProcessor(parcelStore, tracker, socket, endpointAwareLogger),
+      );
+    } catch (err) {
+      logger.error({ err }, 'Unexpected error');
+    }
   });
 }
 
@@ -51,15 +63,7 @@ async function doHandshake(
   const ownCertificates = await privateKeyStore.fetchNodeCertificates();
 
   return new Promise((resolve) => {
-    const closureHandler = () => {
-      logger.debug('Client closed the connection before completing the handshake');
-      socket.close(WebSocketCode.NORMAL);
-    };
-    socket.once('close', closureHandler);
-
     socket.once('message', async (message: Buffer) => {
-      socket.removeListener('close', closureHandler);
-
       let handshakeResponse: HandshakeResponse;
       try {
         handshakeResponse = HandshakeResponse.deserialize(bufferToArray(message));
@@ -106,27 +110,6 @@ async function doHandshake(
   });
 }
 
-function makeDeliveryStream(
-  parcelStore: ParcelStore,
-  logger: Logger,
-): (parcelKeys: AsyncIterable<string>) => AsyncIterable<Buffer> {
-  return async function* (parcelKeys): AsyncIterable<Buffer> {
-    for await (const parcelKey of parcelKeys) {
-      const parcelSerialized = await parcelStore.retrieve(
-        parcelKey,
-        ParcelDirection.INTERNET_TO_ENDPOINT,
-      );
-      if (parcelSerialized) {
-        logger.debug({ parcelKey }, 'Sending parcel');
-        const delivery = new ParcelDelivery(uuid(), bufferToArray(parcelSerialized));
-        yield Buffer.from(delivery.serialize());
-      } else {
-        logger.debug({ parcelKey }, 'Skipping missing parcel');
-      }
-    }
-  };
-}
-
 async function verifyNonceSignatures(
   nonceSignatures: readonly ArrayBuffer[],
   nonce: ArrayBuffer,
@@ -143,4 +126,93 @@ async function verifyNonceSignatures(
     endpointCertificates.push(endpointCertificate);
   }
   return endpointCertificates;
+}
+
+function makeDeliveryStream(
+  parcelStore: ParcelStore,
+  tracker: CollectionTracker,
+  socket: WebSocket,
+  logger: Logger,
+): (parcelKeys: AsyncIterable<string>) => AsyncIterable<Buffer> {
+  return async function* (parcelKeys): AsyncIterable<Buffer> {
+    for await (const parcelKey of parcelKeys) {
+      const parcelSerialized = await parcelStore.retrieve(
+        parcelKey,
+        ParcelDirection.INTERNET_TO_ENDPOINT,
+      );
+      if (parcelSerialized) {
+        logger.debug({ parcelKey }, 'Sending parcel');
+        const delivery = new ParcelDelivery(uuid(), bufferToArray(parcelSerialized));
+        tracker.addPendingACK(delivery.deliveryId, parcelKey);
+        yield Buffer.from(delivery.serialize());
+      } else {
+        logger.debug({ parcelKey }, 'Skipping missing parcel');
+      }
+    }
+    tracker.markAllParcelsDelivered();
+
+    if (tracker.isCollectionComplete) {
+      logger.debug('All parcels were acknowledged shortly after the last one was sent');
+      socket.close(WebSocketCode.NORMAL);
+    }
+  };
+}
+
+function makeACKProcessor(
+  parcelStore: ParcelStore,
+  tracker: CollectionTracker,
+  socket: WebSocket,
+  logger: Logger,
+): (ackMessages: AsyncIterable<string>) => Promise<void> {
+  return async (ackMessages) => {
+    for await (const ackMessage of ackMessages) {
+      const parcelKey = tracker.popPendingParcelKey(ackMessage);
+      if (!parcelKey) {
+        logger.info('Closing connection due to unknown acknowledgement');
+        socket.close(WebSocketCode.CANNOT_ACCEPT, 'Unknown delivery id sent as acknowledgement');
+        break;
+      }
+
+      logger.info({ parcelKey }, 'Deleting acknowledged parcel');
+      await parcelStore.delete(parcelKey, ParcelDirection.INTERNET_TO_ENDPOINT);
+
+      if (tracker.isCollectionComplete) {
+        logger.debug('All parcels have been collected and acknowledged');
+        socket.close(WebSocketCode.NORMAL);
+        break;
+      }
+    }
+  };
+}
+
+class CollectionTracker {
+  // tslint:disable-next-line:readonly-keyword
+  private wereAllParcelsDelivered = false;
+  // tslint:disable-next-line:readonly-keyword
+  private pendingParcelKeyByDeliveryId: { [deliveryId: string]: string } = {};
+
+  get isCollectionComplete(): boolean {
+    return (
+      this.wereAllParcelsDelivered && Object.keys(this.pendingParcelKeyByDeliveryId).length === 0
+    );
+  }
+
+  public markAllParcelsDelivered(): void {
+    // tslint:disable-next-line:no-object-mutation
+    this.wereAllParcelsDelivered = true;
+  }
+
+  public addPendingACK(deliveryId: string, parcelKey: string): void {
+    // tslint:disable-next-line:no-object-mutation
+    this.pendingParcelKeyByDeliveryId[deliveryId] = parcelKey;
+  }
+
+  public popPendingParcelKey(deliveryId: string): string | undefined {
+    const parcelKey = this.pendingParcelKeyByDeliveryId[deliveryId];
+    if (parcelKey) {
+      // tslint:disable-next-line:no-delete no-object-mutation
+      delete this.pendingParcelKeyByDeliveryId[deliveryId];
+    }
+    return parcelKey;
+  }
 }

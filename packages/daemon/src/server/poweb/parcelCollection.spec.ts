@@ -14,6 +14,7 @@ import {
 import { CloseFrame, MockClient } from '@relaycorp/ws-mock';
 import bufferToArray from 'buffer-to-arraybuffer';
 import uuid from 'uuid-random';
+import { Data } from 'ws';
 
 import { ParcelDirection, ParcelStore } from '../../parcelStore';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
@@ -25,6 +26,7 @@ import { mockSpy } from '../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
 import { setImmediateAsync } from '../../testUtils/timing';
 import { mockWebsocketStream } from '../../testUtils/websocket';
+import { sleepSeconds } from '../../utils/timing';
 import { WebSocketCode } from '../websocket';
 import makeParcelCollectionServer from './parcelCollection';
 
@@ -55,6 +57,7 @@ const mockParcelStoreStream = mockSpy(
   () => arrayToAsyncIterable([]),
 );
 const mockParcelStoreRetrieve = mockSpy(jest.spyOn(ParcelStore.prototype, 'retrieve'), () => null);
+const mockParcelStoreDelete = mockSpy(jest.spyOn(ParcelStore.prototype, 'delete'), () => undefined);
 
 describe('Handshake', () => {
   test('Challenge should be sent as soon as client connects', async () => {
@@ -65,21 +68,6 @@ describe('Handshake', () => {
     const handshakeRaw = await client.receive();
     HandshakeChallenge.deserialize(bufferToArray(handshakeRaw as Buffer));
     expect(mockLogs).toContainEqual(partialPinoLog('debug', 'Sending handshake challenge'));
-  });
-
-  test('Client-initiated closure before response should be handled gracefully', async () => {
-    const client = new MockParcelCollectionClient();
-    await client.connect();
-    await client.receive(); // Discard challenge
-
-    client.close(WebSocketCode.NORMAL);
-
-    await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
-      code: WebSocketCode.NORMAL,
-    });
-    expect(mockLogs).toContainEqual(
-      partialPinoLog('debug', 'Client closed the connection before completing the handshake'),
-    );
   });
 
   test('Handshake should fail if response is malformed', async () => {
@@ -253,20 +241,11 @@ describe('Keep alive', () => {
     });
 
     expect(mockParcelStoreStream).toBeCalledWith(expect.anything(), false);
-  });
-
-  test('Connection should be closed upon completion if Keep-Alive is off', async () => {
-    setParcelsInStore({ key: 'parcel key', serialization: Buffer.from('the parcel') });
-    const client = new MockParcelCollectionClient(StreamingMode.CLOSE_UPON_COMPLETION);
-    await client.connect();
-    await client.doHandshake();
-    await client.receive(); // Ignore parcel collection
-
-    await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
-      code: WebSocketCode.NORMAL,
-    });
-
-    expect(mockParcelStoreStream).toBeCalledWith(expect.anything(), false);
+    expect(mockLogs).toContainEqual(
+      partialPinoLog('debug', 'All parcels were acknowledged shortly after the last one was sent', {
+        endpointAddresses: [trustedEndpointAddress],
+      }),
+    );
   });
 
   test('Connection should be kept alive indefinitely if Keep-Alive is on', async () => {
@@ -301,32 +280,160 @@ describe('Acknowledgements', () => {
     await client.doHandshake();
 
     const parcel1Delivery = await client.receiveParcelDelivery();
-    expect(Buffer.from(parcel1Delivery.parcelSerialized).equals(parcel1Serialized)).toBeTrue();
+    expect(Buffer.from(parcel1Delivery.parcelSerialized)).toEqual(parcel1Serialized);
 
     const parcel2Delivery = await client.receiveParcelDelivery();
-    expect(Buffer.from(parcel2Delivery.parcelSerialized).equals(parcel2Serialized)).toBeTrue();
+    expect(Buffer.from(parcel2Delivery.parcelSerialized)).toEqual(parcel2Serialized);
   });
 
-  test.todo('Parcel should be acknowledged in store when client acknowledges it');
+  test('Parcel should be deleted when client acknowledges it', async () => {
+    const parcelKey = 'parcel1 key';
+    setParcelsInStore({ key: parcelKey, serialization: Buffer.from('parcel1') });
+    const client = new MockParcelCollectionClient();
+    await client.connect();
+    await client.doHandshake();
+    const parcelDelivery = await client.receiveParcelDelivery();
 
-  test.todo('Parcel should not be deleted if client never acknowledges it');
+    await client.send(parcelDelivery.deliveryId);
 
-  test.todo('Connection should be closed with an error if client sends unknown ACK');
+    expect(mockParcelStoreDelete).toBeCalledWith(parcelKey, ParcelDirection.INTERNET_TO_ENDPOINT);
+    expect(mockLogs).toContainEqual(
+      partialPinoLog('info', 'Deleting acknowledged parcel', {
+        endpointAddresses: [trustedEndpointAddress],
+        parcelKey,
+      }),
+    );
+  });
 
-  test.todo('Connection should be closed with an error if client sends a binary ACK');
+  test('Parcel should not be deleted if client never acknowledges it', async () => {
+    setParcelsInStore({ key: 'parcel1 key', serialization: Buffer.from('parcel1') });
+    const client = new MockParcelCollectionClient();
+    await client.connect();
+    await client.doHandshake();
+    await client.receiveParcelDelivery();
 
-  test.todo('Connection should be closed when all parcels have been delivered and ACKed');
+    await sleepSeconds(0.5);
+
+    expect(mockParcelStoreDelete).not.toBeCalled();
+  });
+
+  test('Connection should be closed with an error if client sends unknown ACK', async () => {
+    setParcelsInStore({ key: 'parcel1 key', serialization: Buffer.from('parcel1') });
+    const client = new MockParcelCollectionClient();
+    await client.connect();
+    await client.doHandshake();
+    await client.receiveParcelDelivery();
+
+    await client.send('invalid delivery id');
+
+    await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
+      code: WebSocketCode.CANNOT_ACCEPT,
+      reason: 'Unknown delivery id sent as acknowledgement',
+    });
+    expect(mockLogs).toContainEqual(
+      partialPinoLog('info', 'Closing connection due to unknown acknowledgement', {
+        endpointAddresses: [trustedEndpointAddress],
+      }),
+    );
+  });
+
+  test('Connection should be closed with an error if client sends a binary ACK', async () => {
+    setParcelsInStore({ key: 'parcel1 key', serialization: Buffer.from('parcel1') });
+    const client = new MockParcelCollectionClient();
+    await client.connect();
+    await client.doHandshake();
+    await client.receiveParcelDelivery();
+
+    await client.send(Buffer.from('this frame should have been a string'));
+
+    await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
+      code: WebSocketCode.CANNOT_ACCEPT,
+      reason: 'Unknown delivery id sent as acknowledgement',
+    });
+    expect(mockLogs).toContainEqual(
+      partialPinoLog('info', 'Closing connection due to unknown acknowledgement', {
+        endpointAddresses: [trustedEndpointAddress],
+      }),
+    );
+  });
+
+  test.each([StreamingMode.KEEP_ALIVE, StreamingMode.CLOSE_UPON_COMPLETION])(
+    'Connection with %s should be closed when all parcels have been ACKed',
+    async (mode) => {
+      const parcel1Key = 'parcel1 key';
+      const parcel2Key = 'parcel2 key';
+      const parcel1Serialized = Buffer.from('parcel1');
+      const parcel2Serialized = Buffer.from('parcel2');
+      setParcelsInStore(
+        { key: parcel1Key, serialization: parcel1Serialized },
+        { key: parcel2Key, serialization: parcel2Serialized },
+      );
+      const client = new MockParcelCollectionClient(mode);
+      await client.connect();
+      await client.doHandshake();
+
+      const parcel1Delivery = await client.receiveParcelDelivery();
+      const parcel2Delivery = await client.receiveParcelDelivery();
+      // ACK out of order:
+      await client.send(parcel2Delivery.deliveryId);
+      await client.send(parcel1Delivery.deliveryId);
+
+      await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
+        code: WebSocketCode.NORMAL,
+      });
+      expect(mockLogs).toContainEqual(
+        partialPinoLog('debug', 'All parcels have been collected and acknowledged', {
+          endpointAddresses: [trustedEndpointAddress],
+        }),
+      );
+    },
+  );
 });
 
-test.todo('Client-initiated WebSocket connection closure should be handled gracefully');
+test('Connection closure should be logged', async () => {
+  setParcelsInStore({ key: 'parcel1 key', serialization: Buffer.from('parcel1') });
+  const client = new MockParcelCollectionClient();
+  await client.connect();
+  await client.doHandshake();
+  const closureReason = 'I have to run';
 
-test.todo('Abrupt TCP connection closure should be handled gracefully');
+  client.close(WebSocketCode.NORMAL, closureReason);
+
+  await setImmediateAsync();
+  expect(mockLogs).toContainEqual(
+    partialPinoLog('debug', 'Closing connection', {
+      code: WebSocketCode.NORMAL,
+      reason: closureReason,
+    }),
+  );
+});
+
+test('Abrupt connection closure should be logged', async () => {
+  const client = new MockParcelCollectionClient();
+  await client.connect();
+  await client.doHandshake();
+  const error = new Error('my bad');
+
+  client.abort(error);
+
+  await setImmediateAsync();
+  expect(mockLogs).toContainEqual(
+    partialPinoLog('error', 'Unexpected error', {
+      err: expect.objectContaining({ message: error.message }),
+    }),
+  );
+});
 
 class MockParcelCollectionClient extends MockClient {
   constructor(streamingMode: StreamingMode = StreamingMode.CLOSE_UPON_COMPLETION) {
     super(makeParcelCollectionServer(), {
       'x-relaynet-streaming-mode': streamingMode.toString(),
     });
+  }
+
+  public async send(message: Data): Promise<void> {
+    await super.send(message);
+    await setImmediateAsync();
   }
 
   public async doHandshake(signers?: readonly Signer[]): Promise<void> {
@@ -339,8 +446,6 @@ class MockParcelCollectionClient extends MockClient {
     );
     const handshakeResponse = new HandshakeResponse(signatures);
     await this.send(handshakeResponse.serialize());
-
-    await setImmediateAsync();
   }
 
   public async receiveParcelDelivery(): Promise<ParcelDelivery> {
@@ -356,8 +461,9 @@ interface StoredParcel {
 
 function setParcelsInStore(...storedParcels: readonly StoredParcel[]): void {
   const keys = storedParcels.map((p) => p.key);
-  mockParcelStoreStream.mockReturnValueOnce(arrayToAsyncIterable(keys));
+  mockParcelStoreStream.mockReturnValue(arrayToAsyncIterable(keys));
 
+  mockParcelStoreRetrieve.mockReset();
   for (const { serialization } of storedParcels) {
     mockParcelStoreRetrieve.mockResolvedValueOnce(serialization ?? null);
   }
