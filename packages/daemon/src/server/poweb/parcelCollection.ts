@@ -14,10 +14,13 @@ import { Container } from 'typedi';
 import uuid from 'uuid-random';
 import WebSocket, { Server } from 'ws';
 
+import { POWEB_API_PREFIX } from '.';
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
 import { ParcelDirection, ParcelStore } from '../../parcelStore';
 import { LOGGER } from '../../tokens';
 import { makeWebSocketServer, WebSocketCode } from '../websocket';
+
+export const PATH = `${POWEB_API_PREFIX}/parcel-collection`;
 
 export default function makeParcelCollectionServer(): Server {
   const logger = Container.get(LOGGER);

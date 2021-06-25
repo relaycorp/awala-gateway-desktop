@@ -13,6 +13,9 @@ import makeConnectionStatusServer, {
 import makeCourierSyncServer, { PATH as COURIER_SYNC_PATH } from './control/courierSync';
 import { disableCors } from './cors';
 import poWebRoutes from './poweb';
+import makeParcelCollectionServer, {
+  PATH as POWEB_PARCEL_COLLECTION,
+} from './poweb/parcelCollection';
 import RouteOptions from './RouteOptions';
 import { WebsocketServerFactory } from './websocket';
 
@@ -24,6 +27,7 @@ const SERVER_HOST = '127.0.0.1';
 const WS_SERVER_BY_PATH: { readonly [key: string]: WebsocketServerFactory } = {
   [CONNECTION_STATUS_PATH]: makeConnectionStatusServer,
   [COURIER_SYNC_PATH]: makeCourierSyncServer,
+  [POWEB_PARCEL_COLLECTION]: makeParcelCollectionServer,
 };
 
 export async function makeServer(authToken?: string): Promise<FastifyInstance> {
