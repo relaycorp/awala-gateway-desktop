@@ -5,7 +5,7 @@ import WebSocket from 'ws';
 
 import { mockLoggerToken, partialPinoLog } from '../testUtils/logging';
 import { mockWebsocketStream } from '../testUtils/websocket';
-import { makeWebSocketServer } from './websocket';
+import { makeWebSocketServer, WebSocketCode } from './websocket';
 
 mockWebsocketStream();
 const mockLogs = mockLoggerToken();
@@ -32,7 +32,7 @@ describe('WebSocket server configuration', () => {
 
     await mockClient.connect();
     await expect(mockClient.waitForPeerClosure()).resolves.toEqual({
-      code: 1008,
+      code: WebSocketCode.VIOLATED_POLICY,
       reason: 'CORS requests are disabled',
     });
     expect(mockLogs).toContainEqual(partialPinoLog('info', 'Refusing CORS request'));
@@ -64,7 +64,7 @@ describe('WebSocket server configuration', () => {
 
     await mockClient.connect();
     await expect(mockClient.waitForPeerClosure()).resolves.toEqual({
-      code: 1008,
+      code: WebSocketCode.VIOLATED_POLICY,
       reason: 'Authentication is required',
     });
     expect(mockLogs).toContainEqual(partialPinoLog('info', 'Refusing unauthenticated request'));
@@ -78,7 +78,7 @@ describe('WebSocket server configuration', () => {
 
     await mockClient.connect();
     await expect(mockClient.waitForPeerClosure()).resolves.toEqual({
-      code: 1008,
+      code: WebSocketCode.VIOLATED_POLICY,
       reason: 'Authentication is required',
     });
     expect(mockLogs).toContainEqual(partialPinoLog('info', 'Refusing unauthenticated request'));
@@ -88,7 +88,8 @@ describe('WebSocket server configuration', () => {
   test('Specified handler should be called when connection is established', async () => {
     const handlerSpied = jest.fn().mockImplementation(wsHandler);
     const wsServer = makeWebSocketServer(handlerSpied);
-    const mockClient = new MockClient(wsServer);
+    const headers = { foo: 'bar' };
+    const mockClient = new MockClient(wsServer, headers);
 
     await mockClient.connect();
     await mockClient.send(serverResponseFrame);
@@ -96,7 +97,7 @@ describe('WebSocket server configuration', () => {
     expect(response).toEqual(serverResponseFrame);
     await mockClient.waitForPeerClosure();
 
-    expect(handlerSpied).toBeCalledWith(expect.any(Duplex), expect.any(EventEmitter));
+    expect(handlerSpied).toBeCalledWith(expect.any(Duplex), expect.any(EventEmitter), headers);
   });
 
   async function wsHandler(connectionStream: Duplex, socket: WebSocket): Promise<void> {

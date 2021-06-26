@@ -8,7 +8,7 @@ import {
 } from '@relaycorp/relaynet-core';
 import { CollectParcelsCall, MockGSCClient } from '@relaycorp/relaynet-testing';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { PassThrough, Writable } from 'stream';
+import { PassThrough } from 'stream';
 
 import { DEFAULT_PUBLIC_GATEWAY } from '../../../constants';
 import { ParcelDirection, ParcelStore } from '../../../parcelStore';
@@ -19,9 +19,11 @@ import { arrayToAsyncIterable } from '../../../testUtils/iterables';
 import { mockSpy } from '../../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
 import { GeneratedParcel, makeParcel } from '../../../testUtils/ramf';
+import { recordReadableStreamMessages } from '../../../testUtils/stream';
 import { mockSleepSeconds } from '../../../testUtils/timing';
 import { GatewayRegistrar } from '../GatewayRegistrar';
 import * as gscClient from '../gscClient';
+import { ParcelCollectionNotification, ParcelCollectorStatus } from './messaging';
 import runParcelCollection from './subprocess';
 
 setUpTestDBConnection();
@@ -78,6 +80,16 @@ test('Subprocess should record a log when it is ready', async () => {
   await runParcelCollection(parentStream);
 
   expect(mockLogs).toContainEqual(partialPinoLog('info', 'Ready to collect parcels'));
+});
+
+test('Subprocess should initially mark the status as disconnected', async () => {
+  addEmptyParcelCollectionCall();
+  const getParentMessages = recordReadableStreamMessages(parentStream);
+
+  await runParcelCollection(parentStream);
+
+  const expectedStatus: ParcelCollectorStatus = { status: 'disconnected', type: 'status' };
+  expect(getParentMessages()[0]).toEqual(expectedStatus);
 });
 
 test('Subprocess should exit with code 2 if it ends normally', async () => {
@@ -157,6 +169,9 @@ describe('Parcel collection', () => {
   test('Valid parcels should be stored and parent process should be notified', async () => {
     const { parcel, parcelSerialized } = await makeDummyParcel();
     const collectionAck = jest.fn();
+    const getParentMessages = recordReadableStreamMessages(parentStream);
+    const parcelKey = 'foo/bar';
+    mockParcelStore.mockResolvedValueOnce(parcelKey);
     addParcelCollectionCall(parcelSerialized, collectionAck);
 
     await runParcelCollection(parentStream);
@@ -166,12 +181,17 @@ describe('Parcel collection', () => {
       expect.toSatisfy((p) => p.id === parcel.id),
       ParcelDirection.INTERNET_TO_ENDPOINT,
     );
+    expect(getParentMessages()).toContainEqual<ParcelCollectionNotification>({
+      parcelKey,
+      recipientAddress: parcel.recipientAddress,
+      type: 'parcelCollection',
+    });
     expect(collectionAck).toBeCalled();
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Saved new parcel', {
         parcel: expect.objectContaining({
           id: parcel.id,
-          recipient: parcel.recipientAddress,
+          recipientAddress: parcel.recipientAddress,
         }),
       }),
     );
@@ -187,7 +207,7 @@ describe('Public gateway resolution failures', () => {
     addEmptyParcelCollectionCall();
 
     parentStream.once('data', (message) => {
-      expect(message).toEqual({ type: 'status', status: 'disconnected' });
+      expect(message).toEqual<ParcelCollectorStatus>({ type: 'status', status: 'disconnected' });
       cb();
     });
     runParcelCollection(parentStream).catch(cb);
@@ -196,20 +216,14 @@ describe('Public gateway resolution failures', () => {
   test('Parent process should be notified about successful reconnect', async () => {
     mockMakeGSCClient.mockRejectedValueOnce(new Error('oh noes'));
     addEmptyParcelCollectionCall();
-    // tslint:disable-next-line:readonly-array
-    const parentMessages: any[] = [];
-    const consumer = new Writable({
-      objectMode: true,
-      write(chunk, _encoding, callback): void {
-        parentMessages.push(chunk);
-        callback();
-      },
-    });
-    parentStream.pipe(consumer);
+    const getParentMessages = recordReadableStreamMessages(parentStream);
 
     await runParcelCollection(parentStream);
 
-    expect(parentMessages).toContainEqual({ type: 'status', status: 'connected' });
+    expect(getParentMessages()).toContainEqual<ParcelCollectorStatus>({
+      status: 'connected',
+      type: 'status',
+    });
   });
 
   test('Reconnection should be attempted after 3 seconds if DNS lookup failed', async () => {

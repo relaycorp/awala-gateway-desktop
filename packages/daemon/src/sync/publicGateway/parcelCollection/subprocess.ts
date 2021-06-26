@@ -8,7 +8,7 @@ import {
 } from '@relaycorp/relaynet-core';
 import pipe from 'it-pipe';
 import { Logger } from 'pino';
-import { Duplex } from 'stream';
+import { Duplex, Writable } from 'stream';
 import { Container } from 'typedi';
 
 import { DBPrivateKeyStore } from '../../../keystores/DBPrivateKeyStore';
@@ -17,6 +17,7 @@ import { LOGGER } from '../../../tokens';
 import { sleepSeconds } from '../../../utils/timing';
 import { GatewayRegistrar } from '../GatewayRegistrar';
 import { makeGSCClient } from '../gscClient';
+import { ParcelCollectionNotification, ParcelCollectorStatus } from './messaging';
 
 export default async function runParcelCollection(parentStream: Duplex): Promise<number> {
   const logger = Container.get(LOGGER);
@@ -28,11 +29,13 @@ export default async function runParcelCollection(parentStream: Duplex): Promise
     return 1;
   }
 
+  notifyStatusToParent('disconnected', parentStream);
+
   logger.info('Ready to collect parcels');
 
   await pipe(
     await streamParcelCollections(publicGateway.publicAddress, parentStream, logger),
-    processParcels(logger),
+    processParcels(logger, parentStream),
   );
 
   // This should never end, so ending "normally" should actually be an error
@@ -86,7 +89,7 @@ async function makeGSCClientAndRetryIfNeeded(
     try {
       client = await makeGSCClient(publicGatewayAddress);
     } catch (err) {
-      parentStream.write({ type: 'status', status: 'disconnected' });
+      notifyStatusToParent('disconnected', parentStream);
       if (err instanceof PublicAddressingError) {
         logger.info({ err }, 'Failed to resolve DNS record for public gateway');
         await sleepSeconds(3);
@@ -97,12 +100,13 @@ async function makeGSCClientAndRetryIfNeeded(
     }
   }
 
-  parentStream.write({ type: 'status', status: 'connected' });
+  notifyStatusToParent('connected', parentStream);
   return client;
 }
 
 function processParcels(
   logger: Logger,
+  parentStream: Duplex,
 ): (parcelCollections: AsyncIterable<ParcelCollection>) => Promise<void> {
   const parcelStore = Container.get(ParcelStore);
 
@@ -117,16 +121,28 @@ function processParcels(
         continue;
       }
 
-      await parcelStore.store(
+      const parcelKey = await parcelStore.store(
         Buffer.from(collection.parcelSerialized),
         parcel,
         ParcelDirection.INTERNET_TO_ENDPOINT,
       );
       await collection.ack();
+
+      const collectionMessage: ParcelCollectionNotification = {
+        parcelKey,
+        recipientAddress: parcel.recipientAddress,
+        type: 'parcelCollection',
+      };
+      parentStream.write(collectionMessage);
       logger.info(
-        { parcel: { id: parcel.id, recipient: parcel.recipientAddress } },
+        { parcel: { id: parcel.id, recipientAddress: parcel.recipientAddress } },
         'Saved new parcel',
       );
     }
   };
+}
+
+function notifyStatusToParent(status: 'connected' | 'disconnected', parentStream: Writable): void {
+  const message: ParcelCollectorStatus = { status, type: 'status' };
+  parentStream.write(message);
 }

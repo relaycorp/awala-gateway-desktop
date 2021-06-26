@@ -14,15 +14,20 @@ import { Container } from 'typedi';
 import { FileStore } from './fileStore';
 import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 import { ParcelDirection, ParcelStore } from './parcelStore';
+import { ParcelCollectorManager } from './sync/publicGateway/parcelCollection/ParcelCollectorManager';
 import { useTemporaryAppDirs } from './testUtils/appDirs';
 import { setUpPKIFixture, sha256Hex } from './testUtils/crypto';
 import { setUpTestDBConnection } from './testUtils/db';
-import { asyncIterableToArray } from './testUtils/iterables';
+import { arrayToAsyncIterable, asyncIterableToArray } from './testUtils/iterables';
+import { mockSpy } from './testUtils/jest';
+import { mockLoggerToken } from './testUtils/logging';
 import { GeneratedParcel } from './testUtils/ramf';
 
 setUpTestDBConnection();
 
 const getAppDirs = useTemporaryAppDirs();
+
+mockLoggerToken();
 
 let localEndpointPrivateKey: CryptoKey;
 let localEndpointCertificate: Certificate;
@@ -214,7 +219,7 @@ describe('listActiveBoundForInternet', () => {
   });
 });
 
-describe('listActiveBoundForEndpoints', () => {
+describe('streamActiveBoundForEndpoints', () => {
   let localEndpoint1Address: string;
   let localEndpoint2Certificate: Certificate;
   let remoteEndpointPDA2: Certificate;
@@ -236,9 +241,16 @@ describe('listActiveBoundForEndpoints', () => {
     });
   });
 
+  const mockParcelCollectorManagerWatch = mockSpy(
+    jest.spyOn(ParcelCollectorManager.prototype, 'watchCollectionsForRecipients'),
+    () => arrayToAsyncIterable([]),
+  );
+
   test('No parcels should be output if there are none', async () => {
     await expect(
-      asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpoint1Address])),
+      asyncIterableToArray(
+        parcelStore.streamActiveBoundForEndpoints([localEndpoint1Address], true),
+      ),
     ).resolves.toHaveLength(0);
   });
 
@@ -254,7 +266,9 @@ describe('listActiveBoundForEndpoints', () => {
     await overrideMetadataFile({ expiryDate }, parcel, ParcelDirection.INTERNET_TO_ENDPOINT);
 
     await expect(
-      asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpoint1Address])),
+      asyncIterableToArray(
+        parcelStore.streamActiveBoundForEndpoints([localEndpoint1Address], true),
+      ),
     ).resolves.toHaveLength(0);
 
     await expect(
@@ -271,7 +285,7 @@ describe('listActiveBoundForEndpoints', () => {
     await parcelStore.store(parcel2Serialized, parcel2, ParcelDirection.INTERNET_TO_ENDPOINT);
 
     const parcelObjects = await asyncIterableToArray(
-      parcelStore.listActiveBoundForEndpoints([localEndpoint1Address]),
+      parcelStore.streamActiveBoundForEndpoints([localEndpoint1Address], true),
     );
 
     expect(parcelObjects).toHaveLength(2);
@@ -291,10 +305,10 @@ describe('listActiveBoundForEndpoints', () => {
     await parcelStore.store(parcel2Serialized, parcel2, ParcelDirection.INTERNET_TO_ENDPOINT);
 
     const parcelObjects = await asyncIterableToArray(
-      parcelStore.listActiveBoundForEndpoints([
-        localEndpoint1Address,
-        await localEndpoint2Certificate.calculateSubjectPrivateAddress(),
-      ]),
+      parcelStore.streamActiveBoundForEndpoints(
+        [localEndpoint1Address, await localEndpoint2Certificate.calculateSubjectPrivateAddress()],
+        true,
+      ),
     );
 
     expect(parcelObjects).toHaveLength(2);
@@ -314,11 +328,40 @@ describe('listActiveBoundForEndpoints', () => {
     await parcelStore.store(parcel2Serialized, parcel2, ParcelDirection.INTERNET_TO_ENDPOINT);
 
     const parcelObjects = await asyncIterableToArray(
-      parcelStore.listActiveBoundForEndpoints([localEndpoint1Address]),
+      parcelStore.streamActiveBoundForEndpoints([localEndpoint1Address], true),
     );
 
     expect(parcelObjects).toHaveLength(1);
     expect(parcelObjects).toContain(await computeEndpointBoundParcelKey(parcel1));
+  });
+
+  test('New parcels should be output after queued ones if keep alive is on', async () => {
+    const { parcel: parcel1, parcelSerialized: parcel1Serialized } =
+      await makeEndpointBoundParcel();
+    await parcelStore.store(parcel1Serialized, parcel1, ParcelDirection.INTERNET_TO_ENDPOINT);
+    const parcel2Key = 'parcel2';
+    mockParcelCollectorManagerWatch.mockReturnValueOnce(arrayToAsyncIterable([parcel2Key]));
+
+    const parcelObjects = await asyncIterableToArray(
+      parcelStore.streamActiveBoundForEndpoints([localEndpoint1Address], true),
+    );
+
+    expect(parcelObjects).toEqual([await computeEndpointBoundParcelKey(parcel1), parcel2Key]);
+    expect(mockParcelCollectorManagerWatch).toBeCalledWith([localEndpoint1Address]);
+  });
+
+  test('New parcels should be ignored if keep alive is off', async () => {
+    const { parcel: parcel1, parcelSerialized: parcel1Serialized } =
+      await makeEndpointBoundParcel();
+    await parcelStore.store(parcel1Serialized, parcel1, ParcelDirection.INTERNET_TO_ENDPOINT);
+    mockParcelCollectorManagerWatch.mockReturnValueOnce(arrayToAsyncIterable(['parcel2']));
+
+    const parcelObjects = await asyncIterableToArray(
+      parcelStore.streamActiveBoundForEndpoints([localEndpoint1Address], false),
+    );
+
+    expect(parcelObjects).toEqual([await computeEndpointBoundParcelKey(parcel1)]);
+    expect(mockParcelCollectorManagerWatch).not.toBeCalled();
   });
 
   describe('Invalid metadata file', () => {
@@ -332,7 +375,9 @@ describe('listActiveBoundForEndpoints', () => {
       await fs.unlink((await computeEndpointBoundParcelPath(parcel)) + '.pmeta');
 
       await expect(
-        asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpoint1Address])),
+        asyncIterableToArray(
+          parcelStore.streamActiveBoundForEndpoints([localEndpoint1Address], true),
+        ),
       ).toResolve();
 
       await expect(
@@ -354,7 +399,9 @@ describe('listActiveBoundForEndpoints', () => {
       );
 
       await expect(
-        asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpoint1Address])),
+        asyncIterableToArray(
+          parcelStore.streamActiveBoundForEndpoints([localEndpoint1Address], true),
+        ),
       ).toResolve();
 
       await expect(
@@ -372,7 +419,9 @@ describe('listActiveBoundForEndpoints', () => {
       await overrideMetadataFile({}, parcel, ParcelDirection.INTERNET_TO_ENDPOINT);
 
       await expect(
-        asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpoint1Address])),
+        asyncIterableToArray(
+          parcelStore.streamActiveBoundForEndpoints([localEndpoint1Address], true),
+        ),
       ).toResolve();
 
       await expect(
@@ -394,7 +443,9 @@ describe('listActiveBoundForEndpoints', () => {
       );
 
       await expect(
-        asyncIterableToArray(parcelStore.listActiveBoundForEndpoints([localEndpoint1Address])),
+        asyncIterableToArray(
+          parcelStore.streamActiveBoundForEndpoints([localEndpoint1Address], true),
+        ),
       ).toResolve();
 
       await expect(

@@ -13,12 +13,14 @@ import makeConnectionStatusServer from './control/connectionStatus';
 import makeCourierSyncServer from './control/courierSync';
 import { disableCors } from './cors';
 import { makeServer, runServer } from './index';
-import powebRoutes from './poweb';
+import powebRoutes, { POWEB_API_PREFIX } from './poweb';
+import makeParcelCollectionServer from './poweb/parcelCollection';
 import RouteOptions from './RouteOptions';
 import { WebsocketServerFactory } from './websocket';
 
 jest.mock('./control/connectionStatus');
 jest.mock('./control/courierSync');
+jest.mock('./poweb/parcelCollection');
 
 const mockFastify: FastifyInstance = {
   addHook: mockSpy(jest.fn()),
@@ -180,6 +182,13 @@ describe('WebSocket servers', () => {
     await expectWebsocketServerToBeMounted(
       makeCourierSyncServer,
       `${CONTROL_API_PREFIX}/courier-sync`,
+    );
+  });
+
+  test('PoWeb parcel collection should be mounted on /v1/parcel-collection', async () => {
+    await expectWebsocketServerToBeMounted(
+      makeParcelCollectionServer,
+      `${POWEB_API_PREFIX}/parcel-collection`,
     );
   });
 

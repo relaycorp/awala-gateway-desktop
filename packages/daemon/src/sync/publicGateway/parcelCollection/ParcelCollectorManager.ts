@@ -8,6 +8,7 @@ import { Inject, Service } from 'typedi';
 import { LOGGER } from '../../../tokens';
 import { fork } from '../../../utils/subprocess/child';
 import { PublicGatewayCollectionStatus } from '../PublicGatewayCollectionStatus';
+import { ParcelCollectorMessage } from './messaging';
 
 @Service()
 export class ParcelCollectorManager {
@@ -45,9 +46,60 @@ export class ParcelCollectorManager {
   }
 
   public async *streamStatus(): AsyncIterable<PublicGatewayCollectionStatus> {
+    yield* await pipe(
+      this.streamMessages(),
+      async function* (
+        messages: AsyncIterable<ParcelCollectorMessage>,
+      ): AsyncIterable<PublicGatewayCollectionStatus> {
+        for await (const message of messages) {
+          if (message.type === 'status') {
+            yield message.status === 'connected'
+              ? PublicGatewayCollectionStatus.CONNECTED
+              : PublicGatewayCollectionStatus.DISCONNECTED;
+          }
+        }
+      },
+    );
+  }
+
+  public async *watchCollectionsForRecipients(
+    recipientAddresses: readonly string[],
+  ): AsyncIterable<string> {
+    yield* await pipe(
+      this.streamMessages(),
+      async function* (messages: AsyncIterable<ParcelCollectorMessage>): AsyncIterable<string> {
+        for await (const message of messages) {
+          if (
+            message.type === 'parcelCollection' &&
+            recipientAddresses.includes(message.recipientAddress)
+          ) {
+            yield message.parcelKey;
+          }
+        }
+      },
+    );
+  }
+
+  private async *streamMessages(): AsyncIterable<ParcelCollectorMessage> {
+    // Continue streaming across restarts
     while (true) {
       await this.waitForSubprocessToBeRunning();
-      yield* await streamStatus(this.subprocess!);
+
+      // Get a reference to the subprocess to ensure we're working on the same one across restarts
+      const subprocess = this.subprocess!;
+
+      const readonlySubprocessStream = new PassThrough({ objectMode: true });
+      subprocess.pipe(readonlySubprocessStream);
+      const endReadonlyStream = () => {
+        readonlySubprocessStream.end();
+      };
+      subprocess.once('close', endReadonlyStream);
+      try {
+        yield* await source(readonlySubprocessStream);
+      } finally {
+        subprocess.removeListener('close', endReadonlyStream);
+        subprocess.unpipe(readonlySubprocessStream);
+      }
     }
   }
 
@@ -58,33 +110,5 @@ export class ParcelCollectorManager {
         this.events.once('started', resolve);
       });
     }
-  }
-}
-
-async function* streamStatus(subprocess: Duplex): AsyncIterable<PublicGatewayCollectionStatus> {
-  const readonlySubprocessStream = new PassThrough({ objectMode: true });
-  subprocess.pipe(readonlySubprocessStream);
-  const endReadonlyStream = () => {
-    readonlySubprocessStream.end({ type: 'status', status: 'disconnected' });
-  };
-  subprocess.once('close', endReadonlyStream);
-  try {
-    yield* await pipe(source(readonlySubprocessStream), reportStatusChanges);
-  } finally {
-    subprocess.unpipe(readonlySubprocessStream);
-    subprocess.removeListener('close', endReadonlyStream);
-  }
-}
-
-async function* reportStatusChanges(
-  messages: AsyncIterable<any>,
-): AsyncIterable<PublicGatewayCollectionStatus> {
-  for await (const message of messages) {
-    if (message.type !== 'status') {
-      continue;
-    }
-    yield message.status === 'connected'
-      ? PublicGatewayCollectionStatus.CONNECTED
-      : PublicGatewayCollectionStatus.DISCONNECTED;
   }
 }
