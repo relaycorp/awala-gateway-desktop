@@ -1,4 +1,4 @@
-import { MockClient } from '@relaycorp/ws-mock';
+import { CloseFrame, MockClient } from '@relaycorp/ws-mock';
 import { EventEmitter } from 'events';
 import { Duplex } from 'stream';
 import WebSocket from 'ws';
@@ -40,7 +40,7 @@ describe('WebSocket server configuration', () => {
   });
 
   test('CORS request should be allowed if auth is required and succeeds', async () => {
-    const mockHandler = (_: Duplex, socket: WebSocket) => {
+    const mockHandler = async (_: Duplex, socket: WebSocket) => {
       socket.close(1000);
     };
     const authToken = 'auth-token';
@@ -98,6 +98,27 @@ describe('WebSocket server configuration', () => {
     await mockClient.waitForPeerClosure();
 
     expect(handlerSpied).toBeCalledWith(expect.any(Duplex), expect.any(EventEmitter), headers);
+  });
+
+  test('Unhandled exceptions should close the connection', async () => {
+    const error = new Error('unhandled!');
+    const mockHandler = async () => {
+      throw error;
+    };
+    const wsServer = makeWebSocketServer(mockHandler);
+    const mockClient = new MockClient(wsServer);
+
+    await mockClient.connect();
+
+    await expect(mockClient.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
+      code: WebSocketCode.SERVER_ERROR,
+      reason: 'Internal server error',
+    });
+    expect(mockLogs).toContainEqual(
+      partialPinoLog('error', 'Unhandled exception in WebSocket server handler', {
+        err: expect.objectContaining({ message: error.message }),
+      }),
+    );
   });
 
   async function wsHandler(connectionStream: Duplex, socket: WebSocket): Promise<void> {

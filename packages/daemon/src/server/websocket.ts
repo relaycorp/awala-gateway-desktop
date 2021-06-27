@@ -11,10 +11,15 @@ export enum WebSocketCode {
   NORMAL = 1000,
   CANNOT_ACCEPT = 1003,
   VIOLATED_POLICY = 1008,
+  SERVER_ERROR = 1011,
 }
 
 export function makeWebSocketServer(
-  handler: (connectionStream: Duplex, socket: WebSocket, headers: IncomingHttpHeaders) => void,
+  handler: (
+    connectionStream: Duplex,
+    socket: WebSocket,
+    headers: IncomingHttpHeaders,
+  ) => Promise<void>,
   authToken?: string,
 ): WebSocket.Server {
   const wsServer = new WebSocket.Server({
@@ -25,7 +30,7 @@ export function makeWebSocketServer(
   const isAuthRequired = !!authToken;
   const logger = Container.get(LOGGER);
 
-  wsServer.on('connection', (socket, request) => {
+  wsServer.on('connection', async (socket, request) => {
     const url = new URL(request.url!!, 'http://127.0.0.1');
     const requestToken = url.searchParams.get('auth');
     if (isAuthRequired && authToken !== requestToken) {
@@ -41,7 +46,12 @@ export function makeWebSocketServer(
     }
 
     const stream = createWebSocketStream(socket);
-    handler(stream, socket, request.headers);
+    try {
+      await handler(stream, socket, request.headers);
+    } catch (err) {
+      socket.close(WebSocketCode.SERVER_ERROR, 'Internal server error');
+      logger.error({ err }, 'Unhandled exception in WebSocket server handler');
+    }
   });
 
   return wsServer;
