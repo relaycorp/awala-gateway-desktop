@@ -65,52 +65,51 @@ async function doHandshake(
   const privateKeyStore = Container.get(DBPrivateKeyStore);
   const ownCertificates = await privateKeyStore.fetchNodeCertificates();
 
-  return new Promise((resolve) => {
-    socket.once('message', async (message: Buffer) => {
-      let handshakeResponse: HandshakeResponse;
-      try {
-        handshakeResponse = HandshakeResponse.deserialize(bufferToArray(message));
-      } catch (err) {
-        logger.info({ err }, 'Refusing malformed handshake response');
-        socket.close(WebSocketCode.CANNOT_ACCEPT, 'Malformed handshake response');
-        return resolve(null);
-      }
+  logger.debug('Sending handshake challenge');
+  connectionStream.write(Buffer.from(handshakeChallenge.serialize()));
 
-      if (handshakeResponse.nonceSignatures.length === 0) {
-        logger.info('Refusing handshake response with zero signatures');
-        socket.close(
-          WebSocketCode.CANNOT_ACCEPT,
-          'Handshake response does not include any signatures',
-        );
-        return resolve(null);
-      }
+  const { value: handshakeRaw } = await connectionStream[Symbol.asyncIterator]().next();
+  if (!handshakeRaw) {
+    logger.debug('Client aborted handshake');
+    socket.close(WebSocketCode.NORMAL, 'Handshake aborted');
+    return null;
+  }
+  let handshakeResponse: HandshakeResponse;
+  try {
+    handshakeResponse = HandshakeResponse.deserialize(bufferToArray(handshakeRaw));
+  } catch (err) {
+    logger.info({ err }, 'Refusing malformed handshake response');
+    socket.close(WebSocketCode.CANNOT_ACCEPT, 'Malformed handshake response');
+    return null;
+  }
 
-      let endpointCertificates: readonly Certificate[];
-      try {
-        endpointCertificates = await verifyNonceSignatures(
-          handshakeResponse.nonceSignatures,
-          nonce,
-          ownCertificates,
-        );
-      } catch (err) {
-        logger.info({ err }, 'Refusing handshake response with malformed/invalid signatures');
-        socket.close(
-          WebSocketCode.CANNOT_ACCEPT,
-          'Handshake response includes malformed/invalid signature(s)',
-        );
-        return resolve(null);
-      }
+  if (handshakeResponse.nonceSignatures.length === 0) {
+    logger.info('Refusing handshake response with zero signatures');
+    socket.close(WebSocketCode.CANNOT_ACCEPT, 'Handshake response does not include any signatures');
+    return null;
+  }
 
-      const endpointAddresses = await Promise.all(
-        endpointCertificates.map((c) => c.calculateSubjectPrivateAddress()),
-      );
-      logger.debug({ endpointAddresses }, 'Handshake completed successfully');
-      resolve(endpointAddresses);
-    });
+  let endpointCertificates: readonly Certificate[];
+  try {
+    endpointCertificates = await verifyNonceSignatures(
+      handshakeResponse.nonceSignatures,
+      nonce,
+      ownCertificates,
+    );
+  } catch (err) {
+    logger.info({ err }, 'Refusing handshake response with malformed/invalid signatures');
+    socket.close(
+      WebSocketCode.CANNOT_ACCEPT,
+      'Handshake response includes malformed/invalid signature(s)',
+    );
+    return null;
+  }
 
-    logger.debug('Sending handshake challenge');
-    connectionStream.write(Buffer.from(handshakeChallenge.serialize()));
-  });
+  const endpointAddresses = await Promise.all(
+    endpointCertificates.map((c) => c.calculateSubjectPrivateAddress()),
+  );
+  logger.debug({ endpointAddresses }, 'Handshake completed successfully');
+  return endpointAddresses;
 }
 
 async function verifyNonceSignatures(
