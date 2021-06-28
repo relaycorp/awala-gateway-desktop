@@ -70,6 +70,20 @@ describe('Handshake', () => {
     expect(mockLogs).toContainEqual(partialPinoLog('debug', 'Sending handshake challenge'));
   });
 
+  test('Handshake should be aborted if client closes connection before responding', async () => {
+    const client = new MockParcelCollectionClient();
+    await client.connect();
+    await client.receive(); // Discard challenge
+
+    client.close();
+
+    await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
+      code: WebSocketCode.NORMAL,
+      reason: 'Handshake aborted',
+    });
+    expect(mockLogs).toContainEqual(partialPinoLog('debug', 'Client aborted handshake'));
+  });
+
   test('Handshake should fail if response is malformed', async () => {
     const client = new MockParcelCollectionClient();
     await client.connect();
