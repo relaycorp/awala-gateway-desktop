@@ -222,7 +222,7 @@ describe('Cargo collection', () => {
 
   test.todo('Cargo should be stored with no validation');
 
-  test.todo('Incoming cargo processor should be notified about new cargo');
+  test.todo('Parent process should be notified about new parcels');
 
   test.todo('The first 100 cargoes should be accepted');
 
@@ -267,13 +267,21 @@ describe('Cargo delivery', () => {
 
   test.todo('CogRPC client should be closed when delivery fails');
 
-  test.todo('Outgoing cargo generator should be started');
+  test.todo('One cargo should be delivered if all messages fit in it');
 
-  test.todo('Each generated cargo should be delivered');
+  test.todo('Multiple cargoes should be delivered if messages do not fit in one');
 
-  test.todo('Delivery should end when outgoing cargo generator completes normally');
+  test.todo('Recipient should be paired public gateway if registered');
 
-  test.todo('Delivery should end when outgoing cargo generator errors out');
+  test.todo('Recipient should be default public gateway if unregistered');
+
+  test.todo('Start date should be 90 minutes in the past to tolerate clock drift');
+
+  test.todo('Expiry date should be that of latest parcel');
+
+  test.todo('Sender should be self-issued certificate for own key');
+
+  test.todo('Sender certificate chain should be empty');
 });
 
 describe('Completion', () => {
