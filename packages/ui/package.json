@@ -44,7 +44,7 @@
     "@types/verror": "^1.10.4",
     "@types/ws": "^7.4.5",
     "abort-controller": "^3.0.0",
-    "copy-webpack-plugin": "^9.0.0",
+    "copy-webpack-plugin": "^9.0.1",
     "css-loader": "^5.2.6",
     "electron": "^13.1.2",
     "electron-builder": "^22.11.7",
