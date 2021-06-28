@@ -2,12 +2,14 @@ import { Duplex, PassThrough } from 'stream';
 
 import runStartup from './startup';
 import subprocessEntrypoint from './subprocessEntrypoint';
+import runCourierSync from './sync/courierSync/subprocess';
 import runParcelCollection from './sync/publicGateway/parcelCollection/subprocess';
 import runParcelDelivery from './sync/publicGateway/parcelDelivery/subprocess';
 import { getMockInstance, mockSpy } from './testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from './testUtils/logging';
 import * as parentSubprocess from './utils/subprocess/parent';
 
+jest.mock('./sync/courierSync/subprocess');
 jest.mock('./sync/publicGateway/parcelCollection/subprocess');
 jest.mock('./sync/publicGateway/parcelDelivery/subprocess');
 jest.mock('./startup');
@@ -21,6 +23,7 @@ const mockProcessExit = mockSpy(jest.spyOn(process, 'exit'), () => undefined);
 const mockLogSet = mockLoggerToken();
 
 const SUBPROCESSES: { readonly [key: string]: (s: Duplex) => Promise<number> } = {
+  'courier-sync': runCourierSync,
   'parcel-collection': runParcelCollection,
   'parcel-delivery': runParcelDelivery,
 };
