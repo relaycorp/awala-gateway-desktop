@@ -13,27 +13,19 @@ export interface MockLogging {
   readonly logs: MockLogSet;
 }
 
-/**
- * @deprecated Use makeMockLoggingFixture() instead
- */
-export function makeMockLogging(): MockLogging {
+export function makeMockLoggingFixture(): MockLogging {
   // tslint:disable-next-line:readonly-array
   const logs: object[] = [];
   const stream = split2((data) => {
     logs.push(JSON.parse(data));
   });
   const logger = pino({ level: 'debug' }, stream);
-  return { logger, logs };
-}
-
-export function makeMockLoggingFixture(): MockLogging {
-  const mockLogging = makeMockLogging();
 
   beforeEach(() => {
-    mockLogging.logs.splice(0, mockLogging.logs.length);
+    logs.splice(0, logs.length);
   });
 
-  return mockLogging;
+  return { logger, logs };
 }
 
 export function mockLoggerToken(): MockLogSet {
