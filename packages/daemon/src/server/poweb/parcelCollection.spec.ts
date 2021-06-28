@@ -19,7 +19,7 @@ import { Data } from 'ws';
 import { ParcelDirection, ParcelStore } from '../../parcelStore';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { arrayBufferFrom } from '../../testUtils/buffer';
-import { setUpPKIFixture } from '../../testUtils/crypto';
+import { generatePKIFixture, mockGatewayRegistration } from '../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { arrayToAsyncIterable } from '../../testUtils/iterables';
 import { mockSpy } from '../../testUtils/jest';
@@ -41,7 +41,7 @@ let trustedEndpointAddress: string;
 let trustedEndpointSigner: Signer;
 let privateGatewayCertificate: Certificate;
 let privateGatewayPrivateKey: CryptoKey;
-setUpPKIFixture(async (keyPairSet, certPath) => {
+const pkiFixtureRetriever = generatePKIFixture(async (keyPairSet, certPath) => {
   trustedEndpointAddress = await certPath.privateEndpoint.calculateSubjectPrivateAddress();
   trustedEndpointSigner = new Signer(
     certPath.privateEndpoint,
@@ -51,6 +51,7 @@ setUpPKIFixture(async (keyPairSet, certPath) => {
   privateGatewayCertificate = certPath.privateGateway;
   privateGatewayPrivateKey = keyPairSet.privateGateway.privateKey;
 });
+mockGatewayRegistration(pkiFixtureRetriever);
 
 const mockParcelStoreStream = mockSpy(
   jest.spyOn(ParcelStore.prototype, 'streamActiveBoundForEndpoints'),

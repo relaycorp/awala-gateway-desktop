@@ -4,7 +4,8 @@ import { PassThrough } from 'stream';
 import { source } from 'stream-to-it';
 import { Inject, Service } from 'typedi';
 
-import { CourierConnectionStatus, CourierSyncManager } from './courierSync/CourierSyncManager';
+import { CourierConnectionStatus } from './courierSync';
+import { CourierSyncManager } from './courierSync/CourierSyncManager';
 import { GatewayRegistrar } from './publicGateway/GatewayRegistrar';
 import { ParcelCollectorManager } from './publicGateway/parcelCollection/ParcelCollectorManager';
 import { PublicGatewayCollectionStatus } from './publicGateway/PublicGatewayCollectionStatus';

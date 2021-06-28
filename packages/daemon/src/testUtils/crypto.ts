@@ -1,4 +1,3 @@
-import { Certificate } from '@relaycorp/relaynet-core';
 import {
   generateNodeKeyPairSet,
   generatePDACertificationPath,
@@ -6,9 +5,11 @@ import {
   PDACertPath,
 } from '@relaycorp/relaynet-testing';
 import { BinaryLike, createHash, Hash } from 'crypto';
-import { Container } from 'typedi';
-import { Config, ConfigKey } from '../Config';
+
+import { DEFAULT_PUBLIC_GATEWAY } from '../constants';
 import { DBPrivateKeyStore } from '../keystores/DBPrivateKeyStore';
+import { GatewayRegistrar } from '../sync/publicGateway/GatewayRegistrar';
+import { mockSpy } from './jest';
 
 function makeSHA256Hash(plaintext: BinaryLike): Hash {
   return createHash('sha256').update(plaintext);
@@ -23,7 +24,7 @@ export type PKIFixtureRetriever = () => {
   readonly certPath: PDACertPath;
 };
 
-export function setUpPKIFixture(
+export function generatePKIFixture(
   cb: (keyPairSet: NodeKeyPairSet, certPath: PDACertPath) => void,
 ): PKIFixtureRetriever {
   let keyPairSet: NodeKeyPairSet;
@@ -36,26 +37,50 @@ export function setUpPKIFixture(
     cb(keyPairSet, certPath);
   });
 
-  beforeEach(async () => {
-    await mockGatewayRegistration(certPath.privateGateway, keyPairSet.privateGateway.privateKey);
-  });
-
   return () => ({
     certPath,
     keyPairSet,
   });
 }
 
-export async function mockGatewayRegistration(
-  privateGatewayCertificate: Certificate,
-  privateGatewayPrivateKey: CryptoKey,
-): Promise<void> {
-  const privateKeyStore = Container.get(DBPrivateKeyStore);
-  await privateKeyStore.saveNodeKey(privateGatewayPrivateKey, privateGatewayCertificate);
-
-  const config = Container.get(Config);
-  await config.set(
-    ConfigKey.NODE_KEY_SERIAL_NUMBER,
-    privateGatewayCertificate.getSerialNumberHex(),
+export function mockGatewayRegistration(pkiFixtureRetriever: PKIFixtureRetriever): () => void {
+  const mockGetPublicGateway = mockSpy(
+    jest.spyOn(GatewayRegistrar.prototype, 'getPublicGateway'),
+    () => {
+      const { certPath } = pkiFixtureRetriever();
+      return {
+        identityCertificate: certPath.publicGateway,
+        publicAddress: DEFAULT_PUBLIC_GATEWAY,
+      };
+    },
   );
+  const mockIsRegistered = mockSpy(
+    jest.spyOn(GatewayRegistrar.prototype, 'isRegistered'),
+    () => true,
+  );
+
+  const mockGetCurrentKey = mockSpy(
+    jest.spyOn(DBPrivateKeyStore.prototype, 'getCurrentKey'),
+    () => {
+      const { certPath, keyPairSet } = pkiFixtureRetriever();
+      return {
+        certificate: certPath.privateGateway,
+        privateKey: keyPairSet.privateGateway.privateKey,
+      };
+    },
+  );
+  const mockFetchNodeCertificates = mockSpy(
+    jest.spyOn(DBPrivateKeyStore.prototype, 'fetchNodeCertificates'),
+    () => {
+      const { certPath } = pkiFixtureRetriever();
+      return [certPath.privateGateway];
+    },
+  );
+
+  return () => {
+    mockGetPublicGateway.mockResolvedValue(null);
+    mockIsRegistered.mockResolvedValue(false);
+    mockGetCurrentKey.mockResolvedValue(null);
+    mockFetchNodeCertificates.mockResolvedValue([]);
+  };
 }

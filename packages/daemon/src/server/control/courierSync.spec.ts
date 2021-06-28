@@ -1,7 +1,8 @@
 import { MockClient } from '@relaycorp/ws-mock';
 
 import { UnregisteredGatewayError } from '../../errors';
-import { CourierSyncManager, CourierSyncStage } from '../../sync/courierSync/CourierSyncManager';
+import { CourierSyncStage } from '../../sync/courierSync';
+import { CourierSyncManager } from '../../sync/courierSync/CourierSyncManager';
 import { DisconnectedFromCourierError } from '../../sync/courierSync/errors';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { setUpTestDBConnection } from '../../testUtils/db';

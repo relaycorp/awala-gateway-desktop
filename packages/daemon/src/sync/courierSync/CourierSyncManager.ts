@@ -3,7 +3,6 @@ import {
   CargoCollectionAuthorization,
   CargoCollectionRequest,
   issueGatewayCertificate,
-  PrivateKeyStore,
   SessionlessEnvelopedData,
 } from '@relaycorp/relaynet-core';
 import { addDays, differenceInSeconds, subMinutes } from 'date-fns';
@@ -11,7 +10,8 @@ import { v4 as getDefaultGateway } from 'default-gateway';
 import { waitUntilUsedOnHost } from 'tcp-port-used';
 import { Inject, Service } from 'typedi';
 
-import { Config, ConfigKey } from '../../Config';
+import { COURIER_PORT, CourierConnectionStatus, CourierSyncStage } from '.';
+import { Config } from '../../Config';
 import { UnregisteredGatewayError } from '../../errors';
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
 import { sleepSeconds } from '../../utils/timing';
@@ -19,22 +19,10 @@ import { GatewayRegistrar } from '../publicGateway/GatewayRegistrar';
 import { PublicGateway } from '../publicGateway/PublicGateway';
 import { DisconnectedFromCourierError } from './errors';
 
-export const COURIER_PORT = 21473;
 const COURIER_CHECK_TIMEOUT_MS = 3_000;
 const COURIER_CHECK_RETRY_MS = 500;
 
 const DELAY_BETWEEN_COLLECTION_AND_DELIVERY_SECONDS = 5;
-
-export enum CourierConnectionStatus {
-  DISCONNECTED,
-  CONNECTED,
-}
-
-export enum CourierSyncStage {
-  COLLECTION = 'COLLECTION',
-  WAIT = 'WAIT',
-  DELIVERY = 'DELIVERY',
-}
 
 const CLOCK_DRIFT_TOLERANCE_MINUTES = 90;
 const OUTBOUND_CARGO_TTL_DAYS = 14;
@@ -44,7 +32,7 @@ export class CourierSyncManager {
   constructor(
     @Inject() protected gatewayRegistrar: GatewayRegistrar,
     @Inject() protected config: Config,
-    @Inject(() => DBPrivateKeyStore) private privateKeyStore: PrivateKeyStore,
+    @Inject() private privateKeyStore: DBPrivateKeyStore,
   ) {}
 
   public async *streamStatus(): AsyncIterable<CourierConnectionStatus> {
@@ -136,8 +124,7 @@ export class CourierSyncManager {
     const endDate = addDays(now, OUTBOUND_CARGO_TTL_DAYS);
 
     const recipientAddress = `https://${publicGateway.publicAddress}`;
-    const nodeKeyId = await this.config.get(ConfigKey.NODE_KEY_SERIAL_NUMBER);
-    const nodeKey = await this.privateKeyStore.fetchNodeKey(Buffer.from(nodeKeyId!, 'hex'));
+    const nodeKey = (await this.privateKeyStore.getCurrentKey())!;
     const ephemeralNodeCertificate = await issueGatewayCertificate({
       issuerPrivateKey: nodeKey.privateKey,
       subjectPublicKey: await nodeKey.certificate.getPublicKey(),

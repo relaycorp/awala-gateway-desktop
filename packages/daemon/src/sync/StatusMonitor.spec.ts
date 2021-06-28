@@ -7,7 +7,8 @@ import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../tes
 import { mockSpy } from '../testUtils/jest';
 import { mockLoggerToken } from '../testUtils/logging';
 import { setImmediateAsync } from '../testUtils/timing';
-import { CourierConnectionStatus, CourierSyncManager } from './courierSync/CourierSyncManager';
+import { CourierConnectionStatus } from './courierSync';
+import { CourierSyncManager } from './courierSync/CourierSyncManager';
 import { GatewayRegistrar } from './publicGateway/GatewayRegistrar';
 import { ParcelCollectorManager } from './publicGateway/parcelCollection/ParcelCollectorManager';
 import { PublicGatewayCollectionStatus } from './publicGateway/PublicGatewayCollectionStatus';

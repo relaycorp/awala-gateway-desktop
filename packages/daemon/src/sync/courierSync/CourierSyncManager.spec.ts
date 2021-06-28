@@ -11,11 +11,13 @@ import pipe from 'it-pipe';
 import { waitUntilUsedOnHost } from 'tcp-port-used';
 import { Container } from 'typedi';
 
-import { Config, ConfigKey } from '../../Config';
+import { COURIER_PORT, CourierConnectionStatus, CourierSyncStage } from '.';
+import { Config } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { UnregisteredGatewayError } from '../../errors';
+import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
-import { setUpPKIFixture } from '../../testUtils/crypto';
+import { generatePKIFixture, mockGatewayRegistration } from '../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import {
   arrayToAsyncIterable,
@@ -23,16 +25,10 @@ import {
   iterableTake,
 } from '../../testUtils/iterables';
 import { getMockInstance, mockSpy } from '../../testUtils/jest';
-import { mockPrivateKeyStore } from '../../testUtils/keystores';
 import { getPromiseRejection } from '../../testUtils/promises';
 import { sleepSeconds } from '../../utils/timing';
 import { GatewayRegistrar } from '../publicGateway/GatewayRegistrar';
-import {
-  COURIER_PORT,
-  CourierConnectionStatus,
-  CourierSyncManager,
-  CourierSyncStage,
-} from './CourierSyncManager';
+import { CourierSyncManager } from './CourierSyncManager';
 import { DisconnectedFromCourierError } from './errors';
 
 jest.mock('default-gateway', () => ({ v4: jest.fn() }));
@@ -48,43 +44,26 @@ jest.mock('../../utils/timing');
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
-const privateKeyStore = mockPrivateKeyStore();
 
 let courierSync: CourierSyncManager;
 beforeEach(() => {
   courierSync = new CourierSyncManager(
     Container.get(GatewayRegistrar),
     Container.get(Config),
-    privateKeyStore,
+    Container.get(DBPrivateKeyStore),
   );
 });
 
-const mockRegistrarGetPublicGateway = mockSpy(
-  jest.spyOn(GatewayRegistrar.prototype, 'getPublicGateway'),
-);
-let nodePrivateKey: CryptoKey;
 let nodeIdCertificate: Certificate;
 let publicGatewayPrivateKey: CryptoKey;
 let publicGatewayIdCertificate: Certificate;
-setUpPKIFixture((keyPairSet, certPath) => {
+const pkiFixtureRetriever = generatePKIFixture((keyPairSet, certPath) => {
   nodeIdCertificate = certPath.privateGateway;
-  nodePrivateKey = keyPairSet.privateGateway.privateKey;
 
   publicGatewayPrivateKey = keyPairSet.publicGateway.privateKey;
   publicGatewayIdCertificate = certPath.publicGateway;
 });
-beforeEach(async () => {
-  getMockInstance(GatewayRegistrar.prototype.getPublicGateway).mockResolvedValue({
-    identityCertificate: publicGatewayIdCertificate,
-    publicAddress: DEFAULT_PUBLIC_GATEWAY,
-  });
-
-  await privateKeyStore.saveNodeKey(nodePrivateKey, nodeIdCertificate);
-
-  const config = Container.get(Config);
-  await config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
-  await config.set(ConfigKey.NODE_KEY_SERIAL_NUMBER, nodeIdCertificate.getSerialNumberHex());
-});
+const undoGatewayRegistration = mockGatewayRegistration(pkiFixtureRetriever);
 
 describe('sync', () => {
   const mockCollectCargo = mockSpy(jest.fn(), () => arrayToAsyncIterable([]));
@@ -100,7 +79,7 @@ describe('sync', () => {
   });
 
   test('Error should be thrown if private gateway is unregistered', async () => {
-    mockRegistrarGetPublicGateway.mockResolvedValue(null);
+    undoGatewayRegistration();
 
     const syncError = await getPromiseRejection(
       asyncIterableToArray(courierSync.sync()),

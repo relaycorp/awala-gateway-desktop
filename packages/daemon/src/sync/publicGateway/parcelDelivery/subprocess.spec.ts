@@ -7,12 +7,11 @@ import { Container } from 'typedi';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../../constants';
 import { ParcelDirection, ParcelStore } from '../../../parcelStore';
 import { useTemporaryAppDirs } from '../../../testUtils/appDirs';
-import { setUpPKIFixture } from '../../../testUtils/crypto';
+import { generatePKIFixture, mockGatewayRegistration } from '../../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../../testUtils/db';
 import { mockSpy } from '../../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
 import { GeneratedParcel, makeParcel } from '../../../testUtils/ramf';
-import { GatewayRegistrar } from '../GatewayRegistrar';
 import * as gscClient from '../gscClient';
 import runParcelDelivery from './subprocess';
 
@@ -32,23 +31,19 @@ afterEach(() => {
   }
 });
 
-const mockGetPublicGateway = mockSpy(
-  jest.spyOn(GatewayRegistrar.prototype, 'getPublicGateway'),
-  () => ({ publicAddress: DEFAULT_PUBLIC_GATEWAY }),
-);
-
 let parentStream: PassThrough;
 beforeEach(async () => {
   parentStream = new PassThrough({ objectMode: true });
 });
 
 let gatewayCertificate: Certificate;
-const pkiFixtureRetriever = setUpPKIFixture((_keyPairSet, certPath) => {
+const pkiFixtureRetriever = generatePKIFixture((_keyPairSet, certPath) => {
   gatewayCertificate = certPath.privateGateway;
 });
+const undoGatewayRegistration = mockGatewayRegistration(pkiFixtureRetriever);
 
 test('Subprocess should abort if the gateway is unregistered', async () => {
-  mockGetPublicGateway.mockResolvedValue(null);
+  undoGatewayRegistration();
 
   await expect(runParcelDelivery(parentStream)).resolves.toEqual(1);
 

@@ -13,7 +13,7 @@ import { ParcelDirection, ParcelStore } from '../../parcelStore';
 import { ParcelDeliveryManager } from '../../sync/publicGateway/parcelDelivery/ParcelDeliveryManager';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { arrayBufferFrom } from '../../testUtils/buffer';
-import { setUpPKIFixture } from '../../testUtils/crypto';
+import { generatePKIFixture, mockGatewayRegistration } from '../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { testDisallowedMethods } from '../../testUtils/http';
 import { mockSpy } from '../../testUtils/jest';
@@ -35,12 +35,13 @@ const mockParcelDeliveryManagerNotifier = mockSpy(
 let gatewayCertificate: Certificate;
 let endpointPrivateKey: CryptoKey;
 let endpointCertificate: Certificate;
-setUpPKIFixture((keyPairSet, certPath) => {
+const pkiFixtureRetriever = generatePKIFixture((keyPairSet, certPath) => {
   gatewayCertificate = certPath.privateGateway;
 
   endpointPrivateKey = keyPairSet.privateEndpoint.privateKey;
   endpointCertificate = certPath.privateEndpoint;
 });
+mockGatewayRegistration(pkiFixtureRetriever);
 
 describe('Disallowed methods', () => {
   testDisallowedMethods(['POST'], ENDPOINT_URL, () => makeServer());
