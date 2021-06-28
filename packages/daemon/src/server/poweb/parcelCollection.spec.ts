@@ -294,7 +294,7 @@ describe('Acknowledgements', () => {
     await client.doHandshake();
     const parcelDelivery = await client.receiveParcelDelivery();
 
-    await client.send(parcelDelivery.deliveryId);
+    await client.acknowledgeDelivery(parcelDelivery.deliveryId);
 
     expect(mockParcelStoreDelete).toBeCalledWith(parcelKey, ParcelDirection.INTERNET_TO_ENDPOINT);
     expect(mockLogs).toContainEqual(
@@ -324,27 +324,7 @@ describe('Acknowledgements', () => {
     await client.doHandshake();
     await client.receiveParcelDelivery();
 
-    await client.send('invalid delivery id');
-
-    await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
-      code: WebSocketCode.CANNOT_ACCEPT,
-      reason: 'Unknown delivery id sent as acknowledgement',
-    });
-    expect(mockLogs).toContainEqual(
-      partialPinoLog('info', 'Closing connection due to unknown acknowledgement', {
-        endpointAddresses: [trustedEndpointAddress],
-      }),
-    );
-  });
-
-  test('Connection should be closed with an error if client sends a binary ACK', async () => {
-    setParcelsInStore({ key: 'parcel1 key', serialization: Buffer.from('parcel1') });
-    const client = new MockParcelCollectionClient();
-    await client.connect();
-    await client.doHandshake();
-    await client.receiveParcelDelivery();
-
-    await client.send(Buffer.from('this frame should have been a string'));
+    await client.acknowledgeDelivery('invalid delivery id');
 
     await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
       code: WebSocketCode.CANNOT_ACCEPT,
@@ -375,8 +355,8 @@ describe('Acknowledgements', () => {
       const parcel1Delivery = await client.receiveParcelDelivery();
       const parcel2Delivery = await client.receiveParcelDelivery();
       // ACK out of order:
-      await client.send(parcel2Delivery.deliveryId);
-      await client.send(parcel1Delivery.deliveryId);
+      await client.acknowledgeDelivery(parcel2Delivery.deliveryId);
+      await client.acknowledgeDelivery(parcel1Delivery.deliveryId);
 
       await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
         code: WebSocketCode.NORMAL,
@@ -451,6 +431,10 @@ class MockParcelCollectionClient extends MockClient {
   public async receiveParcelDelivery(): Promise<ParcelDelivery> {
     const parcelDeliveryRaw = bufferToArray((await this.receive()) as Buffer);
     return ParcelDelivery.deserialize(parcelDeliveryRaw);
+  }
+
+  public async acknowledgeDelivery(deliveryId: string): Promise<void> {
+    await this.send(Buffer.from(deliveryId));
   }
 }
 
