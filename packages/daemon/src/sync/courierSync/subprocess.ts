@@ -11,7 +11,7 @@ import { Logger } from 'pino';
 import { Duplex } from 'stream';
 import { Container } from 'typedi';
 
-import { COURIER_PORT, CourierSyncStage } from '.';
+import { COURIER_PORT, CourierSyncExitCode, CourierSyncStage } from '.';
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
 import { LOGGER } from '../../tokens';
 import { sleepSeconds } from '../../utils/timing';
@@ -31,7 +31,7 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
   const publicGateway = await gatewayRegistrar.getPublicGateway();
   if (!publicGateway) {
     logger.fatal('Private gateway is unregistered');
-    return 1;
+    return CourierSyncExitCode.UNREGISTERED_GATEWAY;
   }
 
   let defaultGatewayIPAddress: string;
@@ -40,7 +40,7 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
     defaultGatewayIPAddress = defaultGateway.gateway;
   } catch (err) {
     logger.fatal({ err }, 'System default gateway could not be found');
-    return 2;
+    return CourierSyncExitCode.FAILED_SYNC;
   }
 
   let client: CogRPCClient;
@@ -48,7 +48,7 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
     client = await CogRPCClient.init(`https://${defaultGatewayIPAddress}:${COURIER_PORT}`);
   } catch (err) {
     logger.fatal({ err }, 'Failed to initialize CogRPC client');
-    return 3;
+    return CourierSyncExitCode.FAILED_SYNC;
   }
 
   try {
@@ -66,7 +66,7 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
   }
 
   logger.info('Sync completed successfully');
-  return 0;
+  return CourierSyncExitCode.OK;
 }
 
 async function collectCargo(

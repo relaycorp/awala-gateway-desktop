@@ -8,7 +8,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays, subMinutes } from 'date-fns';
 import { v4 } from 'default-gateway';
 
-import { CourierSyncStage } from '.';
+import { CourierSyncExitCode, CourierSyncStage } from '.';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { generatePKIFixture, mockGatewayRegistration } from '../../testUtils/crypto';
@@ -63,7 +63,9 @@ const getParentStream = makeStubPassThrough();
 test('Subprocess should error out if private gateway is unregistered', async () => {
   undoGatewayRegistration();
 
-  await expect(runCourierSync(getParentStream())).resolves.toEqual(1);
+  await expect(runCourierSync(getParentStream())).resolves.toEqual(
+    CourierSyncExitCode.UNREGISTERED_GATEWAY,
+  );
 
   expect(mockLogs).toContainEqual(partialPinoLog('fatal', 'Private gateway is unregistered'));
 });
@@ -72,7 +74,7 @@ test('Subprocess should error out if default gateway could not be found', async 
   const gatewayError = new Error('Cannot find gateway IP address');
   getMockInstance(v4).mockRejectedValue(gatewayError);
 
-  await expect(runCourierSync(getParentStream())).resolves.toEqual(2);
+  await expect(runCourierSync(getParentStream())).resolves.toEqual(CourierSyncExitCode.FAILED_SYNC);
 
   expect(mockLogs).toContainEqual(
     partialPinoLog('fatal', 'System default gateway could not be found', {
@@ -91,7 +93,7 @@ test('Subprocess should error out if the CogRPC client cannot be initialised', a
   const gatewayError = new Error('TLS connection failure');
   getMockInstance(CogRPCClient.init).mockRejectedValue(gatewayError);
 
-  await expect(runCourierSync(getParentStream())).resolves.toEqual(3);
+  await expect(runCourierSync(getParentStream())).resolves.toEqual(CourierSyncExitCode.FAILED_SYNC);
 
   expect(mockLogs).toContainEqual(
     partialPinoLog('fatal', 'Failed to initialize CogRPC client', {
@@ -286,7 +288,7 @@ describe('Cargo delivery', () => {
 
 describe('Completion', () => {
   test('Subprocess should end with code 0 when sync completes successfully', async () => {
-    await expect(runCourierSync(getParentStream())).resolves.toEqual(0);
+    await expect(runCourierSync(getParentStream())).resolves.toEqual(CourierSyncExitCode.OK);
 
     expect(mockLogs).toContainEqual(partialPinoLog('info', 'Sync completed successfully'));
   });
