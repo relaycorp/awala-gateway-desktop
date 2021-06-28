@@ -4,7 +4,7 @@ import { PassThrough } from 'stream';
 import { source } from 'stream-to-it';
 import { Inject, Service } from 'typedi';
 
-import { CourierConnectionStatus, CourierSync } from './courierSync/CourierSync';
+import { CourierConnectionStatus, CourierSyncManager } from './courierSync/CourierSyncManager';
 import { GatewayRegistrar } from './publicGateway/GatewayRegistrar';
 import { ParcelCollectorManager } from './publicGateway/parcelCollection/ParcelCollectorManager';
 import { PublicGatewayCollectionStatus } from './publicGateway/PublicGatewayCollectionStatus';
@@ -27,7 +27,7 @@ export class StatusMonitor {
   private readonly events = new EventEmitter();
 
   constructor(
-    @Inject() protected courierSync: CourierSync,
+    @Inject() protected courierSync: CourierSyncManager,
     @Inject() protected parcelCollectorManager: ParcelCollectorManager,
     @Inject() protected registrar: GatewayRegistrar,
   ) {}

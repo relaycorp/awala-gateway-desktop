@@ -4,7 +4,6 @@ import {
   Certificate,
   derSerializePublicKey,
 } from '@relaycorp/relaynet-core';
-import { generateNodeKeyPairSet, generatePDACertificationPath } from '@relaycorp/relaynet-testing';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays, subMinutes } from 'date-fns';
 import { v4 } from 'default-gateway';
@@ -16,6 +15,7 @@ import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { UnregisteredGatewayError } from '../../errors';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
+import { setUpPKIFixture } from '../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import {
   arrayToAsyncIterable,
@@ -30,9 +30,9 @@ import { GatewayRegistrar } from '../publicGateway/GatewayRegistrar';
 import {
   COURIER_PORT,
   CourierConnectionStatus,
-  CourierSync,
+  CourierSyncManager,
   CourierSyncStage,
-} from './CourierSync';
+} from './CourierSyncManager';
 import { DisconnectedFromCourierError } from './errors';
 
 jest.mock('default-gateway', () => ({ v4: jest.fn() }));
@@ -50,9 +50,9 @@ setUpTestDBConnection();
 useTemporaryAppDirs();
 const privateKeyStore = mockPrivateKeyStore();
 
-let courierSync: CourierSync;
+let courierSync: CourierSyncManager;
 beforeEach(() => {
-  courierSync = new CourierSync(
+  courierSync = new CourierSyncManager(
     Container.get(GatewayRegistrar),
     Container.get(Config),
     privateKeyStore,
@@ -66,10 +66,7 @@ let nodePrivateKey: CryptoKey;
 let nodeIdCertificate: Certificate;
 let publicGatewayPrivateKey: CryptoKey;
 let publicGatewayIdCertificate: Certificate;
-beforeAll(async () => {
-  const keyPairSet = await generateNodeKeyPairSet();
-  const certPath = await generatePDACertificationPath(keyPairSet);
-
+setUpPKIFixture((keyPairSet, certPath) => {
   nodeIdCertificate = certPath.privateGateway;
   nodePrivateKey = keyPairSet.privateGateway.privateKey;
 

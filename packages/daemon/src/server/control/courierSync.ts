@@ -5,7 +5,7 @@ import { Container } from 'typedi';
 import { Server } from 'ws';
 
 import { UnregisteredGatewayError } from '../../errors';
-import { CourierSync } from '../../sync/courierSync/CourierSync';
+import { CourierSyncManager } from '../../sync/courierSync/CourierSyncManager';
 import { DisconnectedFromCourierError } from '../../sync/courierSync/errors';
 import { LOGGER } from '../../tokens';
 import { makeWebSocketServer } from '../websocket';
@@ -17,7 +17,7 @@ export default function makeCourierSyncServer(authToken: string): Server {
   const logger = Container.get(LOGGER);
 
   return makeWebSocketServer(async (connectionStream, socket) => {
-    const courierSync = Container.get(CourierSync);
+    const courierSync = Container.get(CourierSyncManager);
 
     // Wrap the WS writable stream to prevent it from closing with a 1006:
     // https://github.com/websockets/ws/issues/1811

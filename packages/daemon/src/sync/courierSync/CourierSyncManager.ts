@@ -40,7 +40,7 @@ const CLOCK_DRIFT_TOLERANCE_MINUTES = 90;
 const OUTBOUND_CARGO_TTL_DAYS = 14;
 
 @Service()
-export class CourierSync {
+export class CourierSyncManager {
   constructor(
     @Inject() protected gatewayRegistrar: GatewayRegistrar,
     @Inject() protected config: Config,
