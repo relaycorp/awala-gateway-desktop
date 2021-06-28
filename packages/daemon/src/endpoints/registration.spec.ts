@@ -7,17 +7,14 @@ import {
   PrivateNodeRegistrationAuthorization,
   PrivateNodeRegistrationRequest,
 } from '@relaycorp/relaynet-core';
-import { generateNodeKeyPairSet, generatePDACertificationPath } from '@relaycorp/relaynet-testing';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addYears } from 'date-fns';
 import { Container } from 'typedi';
-import { getConnection } from 'typeorm';
 
-import { ConfigKey } from '../Config';
-import { ConfigItem } from '../entity/ConfigItem';
 import { UnregisteredGatewayError } from '../errors';
+import { useTemporaryAppDirs } from '../testUtils/appDirs';
 import { arrayBufferFrom } from '../testUtils/buffer';
-import { mockGatewayRegistration } from '../testUtils/crypto';
+import { generatePKIFixture, mockGatewayRegistration } from '../testUtils/crypto';
 import { setUpTestDBConnection } from '../testUtils/db';
 import { getPromiseRejection } from '../testUtils/promises';
 import {
@@ -27,19 +24,18 @@ import {
 } from './registration';
 
 setUpTestDBConnection();
+useTemporaryAppDirs();
 
 let gatewayKeyPair: CryptoKeyPair;
 let gatewayCertificate: Certificate;
 let endpointKeyPair: CryptoKeyPair;
-beforeAll(async () => {
-  const pairSet = await generateNodeKeyPairSet();
-  const certPath = await generatePDACertificationPath(pairSet);
-
+const pkiFixtureRetriever = generatePKIFixture(async (pairSet, certPath) => {
   gatewayKeyPair = pairSet.privateGateway;
   gatewayCertificate = certPath.privateGateway;
 
   endpointKeyPair = pairSet.privateEndpoint;
 });
+const undoGatewayRegistration = mockGatewayRegistration(pkiFixtureRetriever);
 
 describe('EndpointRegistration', () => {
   describe('preRegister', () => {
@@ -61,6 +57,7 @@ describe('EndpointRegistration', () => {
 
     test('Pre-registration should be refused if gateway has not yet registered', async () => {
       const registrar = Container.get(EndpointRegistrar);
+      undoGatewayRegistration();
 
       await expect(registrar.preRegister('a'.repeat(64))).rejects.toBeInstanceOf(
         UnregisteredGatewayError,
@@ -68,7 +65,6 @@ describe('EndpointRegistration', () => {
     });
 
     test('Keys with well-formed digests should be pre-authorized', async () => {
-      await mockGatewayRegistration(gatewayCertificate, gatewayKeyPair.privateKey);
       const privateEndpointPublicKeyDigest = Buffer.from('a'.repeat(64), 'hex');
       const registrar = Container.get(EndpointRegistrar);
 
@@ -90,10 +86,6 @@ describe('EndpointRegistration', () => {
   });
 
   describe('completeRegistration', () => {
-    beforeEach(async () => {
-      await mockGatewayRegistration(gatewayCertificate, gatewayKeyPair.privateKey);
-    });
-
     test('InvalidRegistrationRequestError should be thrown if the PNRR is invalid', async () => {
       const registrar = Container.get(EndpointRegistrar);
 
@@ -148,7 +140,7 @@ describe('EndpointRegistration', () => {
     test('Registration should fail if gateway is unregistered', async () => {
       const registrar = Container.get(EndpointRegistrar);
       const requestSerialized = await makeRegistrationRequest(registrar);
-      await getConnection().getRepository(ConfigItem).delete(ConfigKey.NODE_KEY_SERIAL_NUMBER);
+      undoGatewayRegistration();
 
       await expect(registrar.completeRegistration(requestSerialized)).rejects.toBeInstanceOf(
         UnregisteredGatewayError,

@@ -87,11 +87,12 @@ describe('fork', () => {
 
     const subprocess = fork(SUBPROCESS_NAME);
 
-    subprocess.on('error', (error) => {
+    subprocess.on('error', (error: SubprocessError) => {
       expect(error).toBeInstanceOf(SubprocessError);
       expect(error.message).toEqual(
         `Subprocess "${SUBPROCESS_NAME}" errored out with code ${exitCode}`,
       );
+      expect(error.exitCode).toEqual(exitCode);
       cb();
     });
     mockChildProcess.emit('exit', exitCode, null);

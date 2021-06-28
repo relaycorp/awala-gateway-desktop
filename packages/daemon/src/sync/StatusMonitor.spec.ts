@@ -7,7 +7,8 @@ import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../tes
 import { mockSpy } from '../testUtils/jest';
 import { mockLoggerToken } from '../testUtils/logging';
 import { setImmediateAsync } from '../testUtils/timing';
-import { CourierConnectionStatus, CourierSync } from './courierSync/CourierSync';
+import { CourierConnectionStatus } from './courierSync';
+import { CourierSyncManager } from './courierSync/CourierSyncManager';
 import { GatewayRegistrar } from './publicGateway/GatewayRegistrar';
 import { ParcelCollectorManager } from './publicGateway/parcelCollection/ParcelCollectorManager';
 import { PublicGatewayCollectionStatus } from './publicGateway/PublicGatewayCollectionStatus';
@@ -20,7 +21,7 @@ mockLoggerToken();
 let monitor: StatusMonitor;
 beforeEach(() => {
   monitor = new StatusMonitor(
-    Container.get(CourierSync),
+    Container.get(CourierSyncManager),
     Container.get(ParcelCollectorManager),
     Container.get(GatewayRegistrar),
   );
@@ -31,8 +32,9 @@ describe('start', () => {
     jest.spyOn(GatewayRegistrar.prototype, 'isRegistered'),
     () => true,
   );
-  const mockCourierStatusStream = mockSpy(jest.spyOn(CourierSync.prototype, 'streamStatus'), () =>
-    arrayToAsyncIterable([]),
+  const mockCourierStatusStream = mockSpy(
+    jest.spyOn(CourierSyncManager.prototype, 'streamStatus'),
+    () => arrayToAsyncIterable([]),
   );
   const mockPubGatewayStatusStream = mockSpy(
     jest.spyOn(ParcelCollectorManager.prototype, 'streamStatus'),

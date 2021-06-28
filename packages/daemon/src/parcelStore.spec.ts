@@ -16,7 +16,7 @@ import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 import { ParcelDirection, ParcelStore } from './parcelStore';
 import { ParcelCollectorManager } from './sync/publicGateway/parcelCollection/ParcelCollectorManager';
 import { useTemporaryAppDirs } from './testUtils/appDirs';
-import { setUpPKIFixture, sha256Hex } from './testUtils/crypto';
+import { generatePKIFixture, mockGatewayRegistration, sha256Hex } from './testUtils/crypto';
 import { setUpTestDBConnection } from './testUtils/db';
 import { arrayToAsyncIterable, asyncIterableToArray } from './testUtils/iterables';
 import { mockSpy } from './testUtils/jest';
@@ -35,7 +35,7 @@ let remoteEndpointPrivateKey: CryptoKey;
 let remoteEndpointCertificate: Certificate;
 let gatewayPrivateKey: CryptoKey;
 let gatewayCertificate: Certificate;
-setUpPKIFixture((keyPairSet, certPath) => {
+const pkiFixtureRetriever = generatePKIFixture((keyPairSet, certPath) => {
   localEndpointPrivateKey = keyPairSet.privateEndpoint.privateKey;
   localEndpointCertificate = certPath.privateEndpoint;
 
@@ -45,11 +45,7 @@ setUpPKIFixture((keyPairSet, certPath) => {
   gatewayPrivateKey = keyPairSet.privateGateway.privateKey;
   gatewayCertificate = certPath.privateGateway;
 });
-
-beforeEach(async () => {
-  const privateKeyStore = Container.get(DBPrivateKeyStore);
-  await privateKeyStore.saveNodeKey(gatewayPrivateKey, gatewayCertificate);
-});
+mockGatewayRegistration(pkiFixtureRetriever);
 
 let parcelStore: ParcelStore;
 beforeEach(() => {

@@ -13,7 +13,7 @@ import { PassThrough } from 'stream';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../../constants';
 import { ParcelDirection, ParcelStore } from '../../../parcelStore';
 import { useTemporaryAppDirs } from '../../../testUtils/appDirs';
-import { setUpPKIFixture } from '../../../testUtils/crypto';
+import { generatePKIFixture, mockGatewayRegistration } from '../../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../../testUtils/db';
 import { arrayToAsyncIterable } from '../../../testUtils/iterables';
 import { mockSpy } from '../../../testUtils/jest';
@@ -21,7 +21,6 @@ import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
 import { GeneratedParcel, makeParcel } from '../../../testUtils/ramf';
 import { recordReadableStreamMessages } from '../../../testUtils/stream';
 import { mockSleepSeconds } from '../../../testUtils/timing';
-import { GatewayRegistrar } from '../GatewayRegistrar';
 import * as gscClient from '../gscClient';
 import { ParcelCollectionNotification, ParcelCollectorStatus } from './messaging';
 import runParcelCollection from './subprocess';
@@ -35,15 +34,11 @@ const mockMakeGSCClient = mockSpy(jest.spyOn(gscClient, 'makeGSCClient'), () => 
   throw new Error('Define the client explicitly in each test');
 });
 
-const mockGetPublicGateway = mockSpy(
-  jest.spyOn(GatewayRegistrar.prototype, 'getPublicGateway'),
-  () => ({ publicAddress: DEFAULT_PUBLIC_GATEWAY }),
-);
-
 let privateGatewayCertificate: Certificate;
-const retrievePKIFixture = setUpPKIFixture((_keyPairSet, certPath) => {
+const retrievePKIFixture = generatePKIFixture((_keyPairSet, certPath) => {
   privateGatewayCertificate = certPath.privateGateway;
 });
+const undoGatewayRegistration = mockGatewayRegistration(retrievePKIFixture);
 
 let parentStream: PassThrough;
 beforeEach(() => {
@@ -58,7 +53,7 @@ const mockParcelStore = mockSpy(jest.spyOn(ParcelStore.prototype, 'store'), () =
 });
 
 test('Subprocess should abort if the gateway is unregistered', async () => {
-  mockGetPublicGateway.mockResolvedValue(null);
+  undoGatewayRegistration();
 
   await expect(runParcelCollection(parentStream)).resolves.toEqual(1);
 

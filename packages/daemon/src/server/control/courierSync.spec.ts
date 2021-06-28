@@ -1,7 +1,8 @@
 import { MockClient } from '@relaycorp/ws-mock';
 
 import { UnregisteredGatewayError } from '../../errors';
-import { CourierSync, CourierSyncStage } from '../../sync/courierSync/CourierSync';
+import { CourierSyncStage } from '../../sync/courierSync';
+import { CourierSyncManager } from '../../sync/courierSync/CourierSyncManager';
 import { DisconnectedFromCourierError } from '../../sync/courierSync/errors';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { setUpTestDBConnection } from '../../testUtils/db';
@@ -18,7 +19,7 @@ mockWebsocketStream();
 
 const mockLogs = mockLoggerToken();
 
-const mockSync = mockSpy(jest.spyOn(CourierSync.prototype, 'sync'));
+const mockSync = mockSpy(jest.spyOn(CourierSyncManager.prototype, 'sync'));
 
 const AUTH_TOKEN = 'token';
 

@@ -77,7 +77,7 @@ describe('Logging', () => {
     const ERROR = new Error('Oh noes');
 
     test.each(['uncaughtException', 'unhandledRejection'])(
-      '%s should be logged and end the process with code 1',
+      '%s should be logged and end the process with code 128',
       async (eventName) => {
         await startUp(COMPONENT_NAME);
         const handler = getProcessEventHandler(eventName);
@@ -90,7 +90,7 @@ describe('Logging', () => {
             err: expect.objectContaining({ message: ERROR.message }),
           }),
         );
-        expect(mockProcessExit).toBeCalledWith(1);
+        expect(mockProcessExit).toBeCalledWith(128);
       },
     );
 
