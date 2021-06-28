@@ -1,13 +1,14 @@
 import { PrivateKey, PublicKey } from '@relaycorp/keystore-db';
 import { promises as fs } from 'fs';
 import { join } from 'path';
+import pino from 'pino';
 import { Container } from 'typedi';
 import * as typeorm from 'typeorm';
 
 import envPaths from 'env-paths';
 import startUp from './startup';
-import { mockSpy } from './testUtils/jest';
-import { makeMockLogging, MockLogging } from './testUtils/logging';
+import { getMockContext, mockSpy } from './testUtils/jest';
+import { makeMockLoggingFixture, partialPinoLog } from './testUtils/logging';
 import { mockToken } from './testUtils/tokens';
 import { APP_DIRS, LOGGER } from './tokens';
 import * as logging from './utils/logging';
@@ -15,15 +16,21 @@ import * as logging from './utils/logging';
 const mockCreateConnection = mockSpy(jest.spyOn(typeorm, 'createConnection'));
 
 mockToken(APP_DIRS);
-mockToken(LOGGER);
 
-let mockLogging: MockLogging;
-beforeEach(() => {
-  mockLogging = makeMockLogging();
-});
+mockToken(LOGGER);
+const mockLogging = makeMockLoggingFixture();
+const mockFinalLogging = makeMockLoggingFixture();
 mockSpy(jest.spyOn(logging, 'makeLogger'), () => mockLogging.logger);
 
 const mockMkdir = mockSpy(jest.spyOn(fs, 'mkdir'));
+
+const mockProcessOn = mockSpy(jest.spyOn(process, 'on'));
+const mockProcessExit = mockSpy(jest.spyOn(process, 'exit'));
+
+mockSpy(
+  jest.spyOn(pino, 'final'),
+  (_, handler) => (err: Error) => handler(err, mockFinalLogging.logger),
+);
 
 const PATHS = envPaths('AwalaGateway', { suffix: '' });
 
@@ -64,6 +71,35 @@ describe('Logging', () => {
     await startUp(COMPONENT_NAME);
 
     expect(Container.get(LOGGER)).toBe(mockLogging.logger);
+  });
+
+  describe('Exit handling', () => {
+    const ERROR = new Error('Oh noes');
+
+    test.each(['uncaughtException', 'unhandledRejection'])(
+      '%s should be logged and end the process with code 1',
+      async (eventName) => {
+        await startUp(COMPONENT_NAME);
+        const handler = getProcessEventHandler(eventName);
+
+        handler(ERROR);
+
+        expect(mockLogging.logs).toBeEmpty();
+        expect(mockFinalLogging.logs).toContainEqual(
+          partialPinoLog('fatal', eventName, {
+            err: expect.objectContaining({ message: ERROR.message }),
+          }),
+        );
+        expect(mockProcessExit).toBeCalledWith(1);
+      },
+    );
+
+    function getProcessEventHandler(eventName: string): (err?: Error) => void {
+      expect(mockProcessOn).toBeCalledWith(eventName, expect.any(Function));
+      const context = getMockContext(mockProcessOn);
+
+      return context.calls.find((c) => c[0] === eventName)[1];
+    }
   });
 });
 
