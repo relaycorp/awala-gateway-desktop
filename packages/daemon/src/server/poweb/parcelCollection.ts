@@ -165,10 +165,10 @@ function makeACKProcessor(
   tracker: CollectionTracker,
   socket: WebSocket,
   logger: Logger,
-): (ackMessages: AsyncIterable<string>) => Promise<void> {
+): (ackMessages: AsyncIterable<Buffer>) => Promise<void> {
   return async (ackMessages) => {
     for await (const ackMessage of ackMessages) {
-      const parcelKey = tracker.popPendingParcelKey(ackMessage);
+      const parcelKey = tracker.popPendingParcelKey(ackMessage.toString());
       if (!parcelKey) {
         logger.info('Closing connection due to unknown acknowledgement');
         socket.close(WebSocketCode.CANNOT_ACCEPT, 'Unknown delivery id sent as acknowledgement');
