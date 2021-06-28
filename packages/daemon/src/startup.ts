@@ -37,7 +37,7 @@ function registerExitHandler(logger: Logger): void {
     pino.final(logger, (err, finalLogger) => {
       finalLogger.fatal({ err }, logMessage);
 
-      process.exit(1);
+      process.exit(128);
     });
 
   process.on('uncaughtException', handler('uncaughtException'));
