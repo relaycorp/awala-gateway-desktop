@@ -1,35 +1,24 @@
-import { CogRPCClient } from '@relaycorp/cogrpc';
-import {
-  CargoCollectionAuthorization,
-  Certificate,
-  derSerializePublicKey,
-} from '@relaycorp/relaynet-core';
-import bufferToArray from 'buffer-to-arraybuffer';
-import { addDays, subMinutes } from 'date-fns';
 import { v4 } from 'default-gateway';
 import pipe from 'it-pipe';
 import { waitUntilUsedOnHost } from 'tcp-port-used';
 import { Container } from 'typedi';
 
-import { COURIER_PORT, CourierConnectionStatus, CourierSyncStage } from '.';
+import { COURIER_PORT, CourierConnectionStatus, CourierSyncExitCode, CourierSyncStage } from '.';
 import { Config } from '../../Config';
-import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { UnregisteredGatewayError } from '../../errors';
-import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
-import { generatePKIFixture, mockGatewayRegistration } from '../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../testUtils/db';
-import {
-  arrayToAsyncIterable,
-  asyncIterableToArray,
-  iterableTake,
-} from '../../testUtils/iterables';
-import { getMockInstance, mockSpy } from '../../testUtils/jest';
+import { asyncIterableToArray, iterableTake } from '../../testUtils/iterables';
+import { getMockInstance } from '../../testUtils/jest';
 import { getPromiseRejection } from '../../testUtils/promises';
-import { sleepSeconds } from '../../utils/timing';
+import { makeStubPassThrough } from '../../testUtils/stream';
+import { setImmediateAsync } from '../../testUtils/timing';
+import * as child from '../../utils/subprocess/child';
+import { SubprocessError } from '../../utils/subprocess/SubprocessError';
 import { GatewayRegistrar } from '../publicGateway/GatewayRegistrar';
 import { CourierSyncManager } from './CourierSyncManager';
 import { DisconnectedFromCourierError } from './errors';
+import { CourierSyncStageNotification } from './messaging';
 
 jest.mock('default-gateway', () => ({ v4: jest.fn() }));
 const mockGatewayIPAddr = '192.168.0.12';
@@ -38,48 +27,26 @@ beforeEach(() => {
   getMockInstance(v4).mockResolvedValue({ gateway: mockGatewayIPAddr });
 });
 
-jest.mock('@relaycorp/cogrpc', () => ({ CogRPCClient: { init: jest.fn() } }));
 jest.mock('tcp-port-used', () => ({ waitUntilUsedOnHost: jest.fn() }));
-jest.mock('../../utils/timing');
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
 
 let courierSync: CourierSyncManager;
 beforeEach(() => {
-  courierSync = new CourierSyncManager(
-    Container.get(GatewayRegistrar),
-    Container.get(Config),
-    Container.get(DBPrivateKeyStore),
-  );
+  courierSync = new CourierSyncManager(Container.get(GatewayRegistrar), Container.get(Config));
 });
-
-let nodeIdCertificate: Certificate;
-let publicGatewayPrivateKey: CryptoKey;
-let publicGatewayIdCertificate: Certificate;
-const pkiFixtureRetriever = generatePKIFixture((keyPairSet, certPath) => {
-  nodeIdCertificate = certPath.privateGateway;
-
-  publicGatewayPrivateKey = keyPairSet.publicGateway.privateKey;
-  publicGatewayIdCertificate = certPath.publicGateway;
-});
-const undoGatewayRegistration = mockGatewayRegistration(pkiFixtureRetriever);
 
 describe('sync', () => {
-  const mockCollectCargo = mockSpy(jest.fn(), () => arrayToAsyncIterable([]));
-  const mockDeliverCargo = mockSpy(jest.fn());
-  const mockCogRPCClose = mockSpy(jest.fn());
-  beforeEach(() => {
-    getMockInstance(CogRPCClient.init).mockRestore();
-    getMockInstance(CogRPCClient.init).mockReturnValue({
-      close: mockCogRPCClose,
-      collectCargo: mockCollectCargo,
-      deliverCargo: mockDeliverCargo,
-    });
-  });
+  const getSubprocessStream = makeStubPassThrough();
+  jest.spyOn(child, 'fork').mockImplementation(getSubprocessStream);
 
   test('Error should be thrown if private gateway is unregistered', async () => {
-    undoGatewayRegistration();
+    setImmediate(() => {
+      getSubprocessStream().destroy(
+        new SubprocessError('whoops', CourierSyncExitCode.UNREGISTERED_GATEWAY),
+      );
+    });
 
     const syncError = await getPromiseRejection(
       asyncIterableToArray(courierSync.sync()),
@@ -89,195 +56,80 @@ describe('sync', () => {
     expect(syncError.message).toEqual('Private gateway is unregistered');
   });
 
-  test('Client should connect to port 21473 on the default gateway', async () => {
-    await asyncIterableToArray(courierSync.sync());
-
-    expect(CogRPCClient.init).toBeCalledWith(`https://${mockGatewayIPAddr}:21473`);
-  });
-
-  test('Error should be thrown if default gateway could not be found', async () => {
-    const gatewayError = new Error('Cannot find gateway IP address');
-    getMockInstance(v4).mockRejectedValue(gatewayError);
+  test('Error should be thrown if sync fails', async () => {
+    const error = new SubprocessError('whoops', CourierSyncExitCode.FAILED_SYNC);
+    setImmediate(() => {
+      getSubprocessStream().destroy(error);
+    });
 
     const syncError = await getPromiseRejection(
       asyncIterableToArray(courierSync.sync()),
       DisconnectedFromCourierError,
     );
 
-    expect(syncError.message).toMatch(/^Could not find default system gateway:/);
-    expect(syncError.cause()).toEqual(gatewayError);
+    expect(syncError.message).toMatch(/^Courier sync failed:/);
+    expect(syncError.cause()).toEqual(error);
   });
 
-  test('Error should be thrown if the CogRPC client cannot be initialised', async () => {
-    const gatewayError = new Error('TLS connection failure');
-    getMockInstance(CogRPCClient.init).mockRejectedValue(gatewayError);
+  test('Valid notifications from subprocess should be yielded', async () => {
+    const subprocessStream = getSubprocessStream();
+    setImmediate(async () => {
+      subprocessStream.write({ stage: CourierSyncStage.COLLECTION, type: 'stage' });
+      subprocessStream.write({ stage: CourierSyncStage.DELIVERY, type: 'stage' });
+      subprocessStream.write({ stage: CourierSyncStage.WAIT, type: 'stage' });
+      await setImmediateAsync();
+      subprocessStream.destroy();
+    });
 
-    const syncError = await getPromiseRejection(
-      asyncIterableToArray(courierSync.sync()),
-      DisconnectedFromCourierError,
-    );
-
-    expect(syncError.message).toMatch(/^Failed to initialize CogRPC client:/);
-    expect(syncError.cause()).toEqual(gatewayError);
+    await expect(pipe(courierSync.sync(), asyncIterableToArray)).resolves.toEqual([
+      CourierSyncStage.COLLECTION,
+      CourierSyncStage.DELIVERY,
+      CourierSyncStage.WAIT,
+    ]);
   });
 
-  describe('Cargo collection', () => {
-    test('COLLECTION stage should be yielded at the start', async () => {
-      const stages = await asyncIterableToArray(courierSync.sync());
+  test('Unrelated messages from subprocess should be ignored', async () => {
+    const subprocessStream = getSubprocessStream();
+    setImmediate(async () => {
+      subprocessStream.write({ type: 'foo' });
 
-      expect(stages[0]).toEqual(CourierSyncStage.COLLECTION);
+      const validNotification: CourierSyncStageNotification = {
+        stage: CourierSyncStage.DELIVERY,
+        type: 'stage',
+      };
+      subprocessStream.write(validNotification);
+
+      await setImmediateAsync();
+      subprocessStream.destroy();
     });
 
-    describe('Cargo Collection Authorization', () => {
-      test('Recipient should be public gateway', async () => {
-        await asyncIterableToArray(courierSync.sync());
-
-        const cca = await retrieveCCA();
-        expect(cca.recipientAddress).toEqual(`https://${DEFAULT_PUBLIC_GATEWAY}`);
-      });
-
-      test('Creation date should be 90 minutes in the past to tolerate clock drift', async () => {
-        await asyncIterableToArray(courierSync.sync());
-
-        const cca = await retrieveCCA();
-        expect(cca.creationDate).toBeBefore(subMinutes(new Date(), 90));
-        expect(cca.creationDate).toBeAfter(subMinutes(new Date(), 92));
-      });
-
-      test('Expiry date should be 14 days in the future', async () => {
-        await asyncIterableToArray(courierSync.sync());
-
-        const cca = await retrieveCCA();
-        expect(cca.expiryDate).toBeAfter(addDays(new Date(), 13));
-        expect(cca.expiryDate).toBeBefore(addDays(new Date(), 14));
-      });
-
-      test('Sender should be self-issued certificate for own key', async () => {
-        await asyncIterableToArray(courierSync.sync());
-
-        const cca = await retrieveCCA();
-        const senderCertificate = cca.senderCertificate;
-
-        expect(senderCertificate.isEqual(nodeIdCertificate)).toBeFalse();
-        await expect(
-          derSerializePublicKey(await senderCertificate.getPublicKey()),
-        ).resolves.toEqual(await derSerializePublicKey(await nodeIdCertificate.getPublicKey()));
-
-        expect(senderCertificate.startDate).toEqual(cca.creationDate);
-        expect(senderCertificate.expiryDate).toEqual(cca.expiryDate);
-      });
-
-      test('Sender certificate chain should be empty', async () => {
-        await asyncIterableToArray(courierSync.sync());
-
-        const cca = await retrieveCCA();
-        expect(cca.senderCaCertificateChain).toEqual([]);
-      });
-
-      describe('Cargo Delivery Authorization in Cargo Collection Request', () => {
-        test('Public key should be that of the public gateway', async () => {
-          await asyncIterableToArray(courierSync.sync());
-
-          const cca = await retrieveCCA();
-          const cargoDeliveryAuthorization = await retrieveCDA(cca);
-          expect(cargoDeliveryAuthorization.isEqual(publicGatewayIdCertificate)).toBeFalse();
-          await expect(
-            derSerializePublicKey(await cargoDeliveryAuthorization.getPublicKey()),
-          ).resolves.toEqual(
-            await derSerializePublicKey(await publicGatewayIdCertificate.getPublicKey()),
-          );
-        });
-
-        test('Certificate should be valid for 14 days', async () => {
-          await asyncIterableToArray(courierSync.sync());
-
-          const cca = await retrieveCCA();
-          const cargoDeliveryAuthorization = await retrieveCDA(cca);
-          expect(cargoDeliveryAuthorization.expiryDate).toBeAfter(addDays(new Date(), 13));
-          expect(cargoDeliveryAuthorization.expiryDate).toBeBefore(addDays(new Date(), 14));
-        });
-
-        test('Issuer should be private gateway', async () => {
-          await asyncIterableToArray(courierSync.sync());
-
-          const cca = await retrieveCCA();
-          const cargoDeliveryAuthorization = await retrieveCDA(cca);
-          await expect(
-            cargoDeliveryAuthorization.getCertificationPath([], [cca.senderCertificate]),
-          ).toResolve();
-        });
-
-        async function retrieveCDA(cca: CargoCollectionAuthorization): Promise<Certificate> {
-          const { payload: ccr } = await cca.unwrapPayload(publicGatewayPrivateKey);
-          return ccr.cargoDeliveryAuthorization;
-        }
-      });
-
-      async function retrieveCCA(): Promise<CargoCollectionAuthorization> {
-        expect(mockCollectCargo).toBeCalled();
-        const ccaSerialized = bufferToArray(mockCollectCargo.mock.calls[0][0]);
-        return CargoCollectionAuthorization.deserialize(ccaSerialized);
-      }
-    });
-
-    test.todo('Cargo should be stored with no validation');
-
-    test.todo('Incoming cargo processor should be notified about new cargo');
-
-    test.todo('The first 100 cargoes should be accepted');
-
-    test.todo('No more than 100 cargoes should be accepted');
+    await expect(pipe(courierSync.sync(), asyncIterableToArray)).resolves.toEqual([
+      CourierSyncStage.DELIVERY,
+    ]);
   });
 
-  describe('Wait period', () => {
-    test('WAIT stage should be yielded at the start', async () => {
-      const stages = await asyncIterableToArray(courierSync.sync());
+  test('Invalid stage notification should be ignored', async () => {
+    const subprocessStream = getSubprocessStream();
+    setImmediate(async () => {
+      const invalidNotification: CourierSyncStageNotification = {
+        stage: 'getting ready' as any,
+        type: 'stage',
+      };
+      subprocessStream.write(invalidNotification);
 
-      expect(stages[1]).toEqual(CourierSyncStage.WAIT);
+      const validNotification: CourierSyncStageNotification = {
+        stage: CourierSyncStage.DELIVERY,
+        type: 'stage',
+      };
+      subprocessStream.write(validNotification);
+
+      await setImmediateAsync();
+      subprocessStream.destroy();
     });
 
-    test('Client should wait for 5 seconds before delivering cargo', async () => {
-      await asyncIterableToArray(courierSync.sync());
-
-      expect(sleepSeconds).toBeCalledWith(5);
-      expect(sleepSeconds).toHaveBeenCalledAfter(mockCollectCargo as any);
-    });
-  });
-
-  describe('Cargo delivery', () => {
-    test('DELIVERY stage should be yielded at the start', async () => {
-      const stages = await asyncIterableToArray(courierSync.sync());
-
-      expect(stages[2]).toEqual(CourierSyncStage.DELIVERY);
-    });
-
-    test.todo('Outgoing cargo generator should be started');
-
-    test.todo('Each generated cargo should be delivered');
-
-    test.todo('Delivery should end when outgoing cargo generator completes normally');
-
-    test.todo('Delivery should end when outgoing cargo generator errors out');
-  });
-
-  describe('Completion', () => {
-    test.todo('Iterator should end when sync completes successfully');
-
-    test('CogRPC client should be closed when sync completes successfully', async () => {
-      await asyncIterableToArray(courierSync.sync());
-
-      expect(mockCogRPCClose).toBeCalledWith();
-    });
-
-    test('CogRPC client should be closed when collection fails', async () => {
-      mockCollectCargo.mockRejectedValue(new Error());
-
-      await expect(asyncIterableToArray(courierSync.sync())).toReject();
-
-      expect(mockCogRPCClose).toBeCalledWith();
-    });
-
-    test.todo('CogRPC client should be closed when delivery fails');
+    await expect(pipe(courierSync.sync(), asyncIterableToArray)).resolves.toEqual([
+      CourierSyncStage.DELIVERY,
+    ]);
   });
 });
 

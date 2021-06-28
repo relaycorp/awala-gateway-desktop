@@ -1,38 +1,25 @@
-import { CogRPCClient } from '@relaycorp/cogrpc';
-import {
-  CargoCollectionAuthorization,
-  CargoCollectionRequest,
-  issueGatewayCertificate,
-  SessionlessEnvelopedData,
-} from '@relaycorp/relaynet-core';
-import { addDays, differenceInSeconds, subMinutes } from 'date-fns';
 import { v4 as getDefaultGateway } from 'default-gateway';
+import pipe from 'it-pipe';
 import { waitUntilUsedOnHost } from 'tcp-port-used';
 import { Inject, Service } from 'typedi';
 
 import { COURIER_PORT, CourierConnectionStatus, CourierSyncStage } from '.';
 import { Config } from '../../Config';
 import { UnregisteredGatewayError } from '../../errors';
-import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
-import { sleepSeconds } from '../../utils/timing';
+import { fork } from '../../utils/subprocess/child';
+import { IPCMessage } from '../ipc';
 import { GatewayRegistrar } from '../publicGateway/GatewayRegistrar';
-import { PublicGateway } from '../publicGateway/PublicGateway';
 import { DisconnectedFromCourierError } from './errors';
+import { CourierSyncStageNotification } from './messaging';
 
 const COURIER_CHECK_TIMEOUT_MS = 3_000;
 const COURIER_CHECK_RETRY_MS = 500;
-
-const DELAY_BETWEEN_COLLECTION_AND_DELIVERY_SECONDS = 5;
-
-const CLOCK_DRIFT_TOLERANCE_MINUTES = 90;
-const OUTBOUND_CARGO_TTL_DAYS = 14;
 
 @Service()
 export class CourierSyncManager {
   constructor(
     @Inject() protected gatewayRegistrar: GatewayRegistrar,
     @Inject() protected config: Config,
-    @Inject() private privateKeyStore: DBPrivateKeyStore,
   ) {}
 
   public async *streamStatus(): AsyncIterable<CourierConnectionStatus> {
@@ -53,29 +40,21 @@ export class CourierSyncManager {
    * @throws DisconnectedFromCourierError
    */
   public async *sync(): AsyncIterable<CourierSyncStage> {
-    const publicGateway = await this.gatewayRegistrar.getPublicGateway();
-    if (!publicGateway) {
-      throw new UnregisteredGatewayError('Private gateway is unregistered');
-    }
-
-    const defaultGatewayIPAddress = await this.getDefaultGatewayIPAddress();
-    let client: CogRPCClient;
-    try {
-      client = await CogRPCClient.init(`https://${defaultGatewayIPAddress}:${COURIER_PORT}`);
-    } catch (err) {
-      throw new DisconnectedFromCourierError(err, 'Failed to initialize CogRPC client');
-    }
-    try {
-      yield CourierSyncStage.COLLECTION;
-      await this.collectCargo(client, publicGateway);
-
-      yield CourierSyncStage.WAIT;
-      await sleepSeconds(DELAY_BETWEEN_COLLECTION_AND_DELIVERY_SECONDS);
-
-      yield CourierSyncStage.DELIVERY;
-    } finally {
-      client.close();
-    }
+    const syncSubprocess = fork('courier-sync');
+    yield* await pipe(
+      wrapSubprocessErrors(syncSubprocess),
+      async function* (messages: AsyncIterable<IPCMessage>): AsyncIterable<CourierSyncStage> {
+        for await (const message of messages) {
+          if (message.type !== 'stage') {
+            continue;
+          }
+          const messageTyped = message as CourierSyncStageNotification;
+          if (messageTyped.stage in CourierSyncStage) {
+            yield messageTyped.stage;
+          }
+        }
+      },
+    );
   }
 
   /**
@@ -112,43 +91,16 @@ export class CourierSyncManager {
     }
     return CourierConnectionStatus.CONNECTED;
   }
+}
 
-  private async collectCargo(client: CogRPCClient, publicGateway: PublicGateway): Promise<void> {
-    const ccaSerialized = await this.generateCCA(publicGateway);
-    await client.collectCargo(ccaSerialized);
-  }
-
-  private async generateCCA(publicGateway: PublicGateway): Promise<Buffer> {
-    const now = new Date();
-    const startDate = subMinutes(now, CLOCK_DRIFT_TOLERANCE_MINUTES);
-    const endDate = addDays(now, OUTBOUND_CARGO_TTL_DAYS);
-
-    const recipientAddress = `https://${publicGateway.publicAddress}`;
-    const nodeKey = (await this.privateKeyStore.getCurrentKey())!;
-    const ephemeralNodeCertificate = await issueGatewayCertificate({
-      issuerPrivateKey: nodeKey.privateKey,
-      subjectPublicKey: await nodeKey.certificate.getPublicKey(),
-      validityEndDate: endDate,
-      validityStartDate: startDate,
-    });
-    const cargoDeliveryAuthorization = await issueGatewayCertificate({
-      issuerCertificate: ephemeralNodeCertificate,
-      issuerPrivateKey: nodeKey.privateKey,
-      subjectPublicKey: await publicGateway.identityCertificate.getPublicKey(),
-      validityEndDate: ephemeralNodeCertificate.expiryDate,
-    });
-    const ccr = new CargoCollectionRequest(cargoDeliveryAuthorization);
-    const ccaPayload = await SessionlessEnvelopedData.encrypt(
-      await ccr.serialize(),
-      publicGateway.identityCertificate,
-    );
-    const cca = new CargoCollectionAuthorization(
-      recipientAddress,
-      ephemeralNodeCertificate,
-      Buffer.from(ccaPayload.serialize()),
-      { creationDate: startDate, ttl: differenceInSeconds(endDate, startDate) },
-    );
-    const ccaSerialized = await cca.serialize(nodeKey.privateKey);
-    return Buffer.from(ccaSerialized);
+async function* wrapSubprocessErrors(
+  messages: AsyncIterable<IPCMessage>,
+): AsyncIterable<IPCMessage> {
+  try {
+    yield* await messages;
+  } catch (err) {
+    throw err?.exitCode === 1
+      ? new UnregisteredGatewayError('Private gateway is unregistered')
+      : new DisconnectedFromCourierError(err, 'Courier sync failed');
   }
 }
