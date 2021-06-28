@@ -434,7 +434,7 @@ class MockParcelCollectionClient extends MockClient {
   }
 
   public async acknowledgeDelivery(deliveryId: string): Promise<void> {
-    await this.send(Buffer.from(deliveryId))
+    await this.send(Buffer.from(deliveryId));
   }
 }
 
