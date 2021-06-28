@@ -31,8 +31,9 @@ describe('start', () => {
     jest.spyOn(GatewayRegistrar.prototype, 'isRegistered'),
     () => true,
   );
-  const mockCourierStatusStream = mockSpy(jest.spyOn(CourierSyncManager.prototype, 'streamStatus'), () =>
-    arrayToAsyncIterable([]),
+  const mockCourierStatusStream = mockSpy(
+    jest.spyOn(CourierSyncManager.prototype, 'streamStatus'),
+    () => arrayToAsyncIterable([]),
   );
   const mockPubGatewayStatusStream = mockSpy(
     jest.spyOn(ParcelCollectorManager.prototype, 'streamStatus'),
