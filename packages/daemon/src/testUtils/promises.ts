@@ -1,6 +1,6 @@
 export async function getPromiseRejection<E extends Error>(
   promise: Promise<any>,
-  expectedErrorClass: new () => E,
+  expectedErrorClass: new (...args: readonly any[]) => E,
 ): Promise<E> {
   try {
     await promise;

@@ -99,7 +99,7 @@ async function* wrapSubprocessErrors(
   try {
     yield* await messages;
   } catch (err) {
-    throw err?.exitCode === 1
+    throw err.exitCode === 1
       ? new UnregisteredGatewayError('Private gateway is unregistered')
       : new DisconnectedFromCourierError(err, 'Courier sync failed');
   }

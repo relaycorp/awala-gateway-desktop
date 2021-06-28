@@ -71,6 +71,21 @@ describe('sync', () => {
     expect(syncError.cause()).toEqual(error);
   });
 
+  test('Error should be thrown if unexpected error occurs', async () => {
+    const error = new Error('whoops');
+    setImmediate(() => {
+      getSubprocessStream().destroy(error);
+    });
+
+    const syncError = await getPromiseRejection(
+      asyncIterableToArray(courierSync.sync()),
+      DisconnectedFromCourierError,
+    );
+
+    expect(syncError.message).toMatch(/^Courier sync failed:/);
+    expect(syncError.cause()).toEqual(error);
+  });
+
   test('Valid notifications from subprocess should be yielded', async () => {
     const subprocessStream = getSubprocessStream();
     setImmediate(async () => {
