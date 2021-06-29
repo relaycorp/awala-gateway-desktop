@@ -19,14 +19,13 @@ export default async function (): Promise<void> {
 }
 
 async function purgeExpiredParcelCollectionACKs(): Promise<void> {
-  const date = new Date();
-  const time = sqliteDateFormat(date);
+  const cutoffDate = sqliteDateFormat(new Date());
   await getConnection()
     .createQueryBuilder()
     .delete()
     .from(PendingParcelCollectionACK)
-    .where('parcelExpiryDate <= :time', {
-      time,
+    .where('parcelExpiryDate <= :date', {
+      date: cutoffDate,
     })
     .execute();
 }
