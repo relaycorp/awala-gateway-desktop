@@ -1,21 +1,26 @@
 import { CogRPCClient } from '@relaycorp/cogrpc';
 import {
+  Cargo,
   CargoCollectionAuthorization,
+  CargoDeliveryRequest,
   Certificate,
   derSerializePublicKey,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays, subMinutes } from 'date-fns';
 import { v4 } from 'default-gateway';
+import { Container } from 'typedi';
 
 import { CourierSyncExitCode, CourierSyncStage } from '.';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
+import { ParcelDirection, ParcelStore } from '../../parcelStore';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { generatePKIFixture, mockGatewayRegistration } from '../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../testUtils/db';
-import { arrayToAsyncIterable } from '../../testUtils/iterables';
+import { arrayToAsyncIterable, asyncIterableToArray } from '../../testUtils/iterables';
 import { getMockInstance, mockSpy } from '../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
+import { GeneratedParcel, makeParcel } from '../../testUtils/ramf';
 import { makeStubPassThrough, recordReadableStreamMessages } from '../../testUtils/stream';
 import { sleepSeconds } from '../../utils/timing';
 import { CourierSyncStageNotification } from './messaging';
@@ -35,11 +40,11 @@ setUpTestDBConnection();
 useTemporaryAppDirs();
 const mockLogs = mockLoggerToken();
 
-let nodeIdCertificate: Certificate;
+let privateGatewayCertificate: Certificate;
 let publicGatewayPrivateKey: CryptoKey;
 let publicGatewayIdCertificate: Certificate;
 const pkiFixtureRetriever = generatePKIFixture((keyPairSet, certPath) => {
-  nodeIdCertificate = certPath.privateGateway;
+  privateGatewayCertificate = certPath.privateGateway;
 
   publicGatewayPrivateKey = keyPairSet.publicGateway.privateKey;
   publicGatewayIdCertificate = certPath.publicGateway;
@@ -47,7 +52,7 @@ const pkiFixtureRetriever = generatePKIFixture((keyPairSet, certPath) => {
 const undoGatewayRegistration = mockGatewayRegistration(pkiFixtureRetriever);
 
 const mockCollectCargo = mockSpy(jest.fn(), () => arrayToAsyncIterable([]));
-const mockDeliverCargo = mockSpy(jest.fn());
+const mockDeliverCargo = mockSpy(jest.fn(), () => arrayToAsyncIterable([]));
 const mockCogRPCClose = mockSpy(jest.fn());
 beforeEach(() => {
   getMockInstance(CogRPCClient.init).mockRestore();
@@ -160,9 +165,9 @@ describe('Cargo collection', () => {
       const cca = await retrieveCCA();
       const senderCertificate = cca.senderCertificate;
 
-      expect(senderCertificate.isEqual(nodeIdCertificate)).toBeFalse();
+      expect(senderCertificate.isEqual(privateGatewayCertificate)).toBeFalse();
       await expect(derSerializePublicKey(await senderCertificate.getPublicKey())).resolves.toEqual(
-        await derSerializePublicKey(await nodeIdCertificate.getPublicKey()),
+        await derSerializePublicKey(await privateGatewayCertificate.getPublicKey()),
       );
 
       expect(senderCertificate.startDate).toEqual(cca.creationDate);
@@ -254,6 +259,19 @@ describe('Wait period', () => {
 });
 
 describe('Cargo delivery', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  afterEach(() => {
+    if (jest.isMockFunction(ParcelStore.prototype.listActiveBoundForInternet)) {
+      getMockInstance(ParcelStore.prototype.listActiveBoundForInternet).mockRestore();
+    }
+    if (jest.isMockFunction(ParcelStore.prototype.retrieve)) {
+      getMockInstance(ParcelStore.prototype.retrieve).mockRestore();
+    }
+  });
+
   test('Parent should be notified about DELIVERY stage at the start', async () => {
     const parentStream = getParentStream();
     const getParentStreamMessages = recordReadableStreamMessages(parentStream);
@@ -267,23 +285,152 @@ describe('Cargo delivery', () => {
     });
   });
 
-  test.todo('CogRPC client should be closed when delivery fails');
+  test('CogRPC client should be closed when delivery fails', async () => {
+    const error = new Error('nope.jpeg');
+    mockDeliverCargo.mockReturnValueOnce(async function* (): AsyncIterable<any> {
+      throw error;
+    });
 
-  test.todo('One cargo should be delivered if all messages fit in it');
+    await expect(runCourierSync(getParentStream())).resolves.toEqual(3);
 
-  test.todo('Multiple cargoes should be delivered if messages do not fit in one');
+    expect(mockCogRPCClose).toBeCalledWith();
+    expect(mockLogs).toContainEqual(
+      partialPinoLog('fatal', 'Sync failed', {
+        err: expect.objectContaining({ message: error.message }),
+      }),
+    );
+  });
 
-  test.todo('Recipient should be paired public gateway if registered');
+  test('No cargo should be delivered if there are no parcels or collection ACKs', async () => {
+    await runCourierSync(getParentStream());
 
-  test.todo('Recipient should be default public gateway if unregistered');
+    await expect(getCargoDeliveryRequests()).resolves.toHaveLength(0);
+  });
 
-  test.todo('Start date should be 90 minutes in the past to tolerate clock drift');
+  test('Queued parcels should be included in cargo', async () => {
+    const { parcelSerialized } = await makeAndStoreParcel();
 
-  test.todo('Expiry date should be that of latest parcel');
+    await runCourierSync(getParentStream());
 
-  test.todo('Sender should be self-issued certificate for own key');
+    const deliveryRequests = await getCargoDeliveryRequests();
+    expect(deliveryRequests).toHaveLength(1);
+    const cargoMessages = await unwrapCargoMessages(deliveryRequests[0].cargo);
+    expect(cargoMessages).toEqual([parcelSerialized]);
+  });
 
-  test.todo('Sender certificate chain should be empty');
+  test('Recently-deleted parcels should be gracefully skipped', async () => {
+    const parcel1Key = 'key1';
+    jest.spyOn(ParcelStore.prototype, 'listActiveBoundForInternet').mockReturnValueOnce(
+      arrayToAsyncIterable([
+        { parcelKey: parcel1Key, expiryDate: new Date() },
+        { parcelKey: 'key2', expiryDate: new Date() },
+      ]),
+    );
+    const parcelStoreRetrieveSpy = jest.spyOn(ParcelStore.prototype, 'retrieve');
+    parcelStoreRetrieveSpy.mockResolvedValueOnce(null);
+    const parcel2Serialized = Buffer.from('foo');
+    parcelStoreRetrieveSpy.mockResolvedValueOnce(parcel2Serialized);
+
+    await runCourierSync(getParentStream());
+
+    const deliveryRequests = await getCargoDeliveryRequests();
+    expect(deliveryRequests).toHaveLength(1);
+    const cargoMessages = await unwrapCargoMessages(deliveryRequests[0].cargo);
+    expect(cargoMessages).toEqual([parcel2Serialized]);
+    expect(mockLogs).toContainEqual(
+      partialPinoLog('debug', 'Skipped deleted parcel', {
+        parcelKey: parcel1Key,
+      }),
+    );
+  });
+
+  test.todo('Parcel collection acknowledgements should be included in cargo');
+
+  test('Recipient should be paired public gateway', async () => {
+    await makeAndStoreParcel();
+
+    await runCourierSync(getParentStream());
+
+    const deliveryRequests = await getCargoDeliveryRequests();
+    const cargo = await Cargo.deserialize(bufferToArray(deliveryRequests[0].cargo));
+    expect(cargo.recipientAddress).toEqual(`https://${DEFAULT_PUBLIC_GATEWAY}`);
+  });
+
+  test('Expiry date should be that of last parcel', async () => {
+    await makeAndStoreParcel();
+    jest.useFakeTimers();
+    jest.advanceTimersByTime(2_000);
+    const { parcel: latestParcel } = await makeAndStoreParcel();
+
+    await runCourierSync(getParentStream());
+
+    const deliveryRequests = await getCargoDeliveryRequests();
+    const cargo = await Cargo.deserialize(bufferToArray(deliveryRequests[0].cargo));
+    expect(cargo.expiryDate).toEqual(latestParcel.expiryDate);
+  });
+
+  test.todo('Expiry date should be that of last parcel collection ACK');
+
+  test('Sender certificate should be the one issued by public gateway', async () => {
+    await makeAndStoreParcel();
+
+    await runCourierSync(getParentStream());
+
+    const deliveryRequests = await getCargoDeliveryRequests();
+    const cargo = await Cargo.deserialize(bufferToArray(deliveryRequests[0].cargo));
+    expect(cargo.senderCertificate.isEqual(privateGatewayCertificate)).toBeTrue();
+  });
+
+  test('Sender certificate chain should be empty', async () => {
+    await makeAndStoreParcel();
+
+    await runCourierSync(getParentStream());
+
+    const deliveryRequests = await getCargoDeliveryRequests();
+    const cargo = await Cargo.deserialize(bufferToArray(deliveryRequests[0].cargo));
+    expect(cargo.senderCaCertificateChain).toHaveLength(0);
+  });
+
+  test('Delivery acknowledgement should be logged', async () => {
+    const ackId = 'the ack';
+    mockDeliverCargo.mockReturnValueOnce(arrayToAsyncIterable([ackId]));
+    await makeAndStoreParcel();
+
+    await runCourierSync(getParentStream());
+
+    expect(mockLogs).toContainEqual(
+      partialPinoLog('debug', 'Received parcel delivery acknowledgement', {
+        ackId,
+      }),
+    );
+  });
+
+  async function getCargoDeliveryRequests(): Promise<readonly CargoDeliveryRequest[]> {
+    expect(mockDeliverCargo).toBeCalled();
+
+    const iterable = mockDeliverCargo.mock.calls[0][0];
+    return asyncIterableToArray(iterable);
+  }
+
+  async function makeAndStoreParcel(): Promise<GeneratedParcel> {
+    const { certPath, keyPairSet } = await pkiFixtureRetriever();
+    const { parcel, parcelSerialized } = await makeParcel(
+      ParcelDirection.ENDPOINT_TO_INTERNET,
+      certPath,
+      keyPairSet,
+    );
+
+    const parcelStore = Container.get(ParcelStore);
+    await parcelStore.store(parcelSerialized, parcel, ParcelDirection.ENDPOINT_TO_INTERNET);
+
+    return { parcel, parcelSerialized };
+  }
+
+  async function unwrapCargoMessages(cargoSerialized: Buffer): Promise<readonly Buffer[]> {
+    const cargo = await Cargo.deserialize(bufferToArray(cargoSerialized));
+    const { payload: cargoMessageSet } = await cargo.unwrapPayload(publicGatewayPrivateKey);
+    return cargoMessageSet.messages.map((m) => Buffer.from(m));
+  }
 });
 
 describe('Completion', () => {

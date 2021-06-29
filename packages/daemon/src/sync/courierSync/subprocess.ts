@@ -2,17 +2,23 @@ import { CogRPCClient } from '@relaycorp/cogrpc';
 import {
   CargoCollectionAuthorization,
   CargoCollectionRequest,
+  CargoDeliveryRequest,
+  CargoMessageStream,
+  Gateway,
   issueGatewayCertificate,
   SessionlessEnvelopedData,
 } from '@relaycorp/relaynet-core';
 import { addDays, differenceInSeconds, subMinutes } from 'date-fns';
 import { v4 as getDefaultGateway } from 'default-gateway';
+import pipe from 'it-pipe';
 import { Logger } from 'pino';
 import { Duplex } from 'stream';
 import { Container } from 'typedi';
 
 import { COURIER_PORT, CourierSyncExitCode, CourierSyncStage } from '.';
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
+import { DBPublicKeyStore } from '../../keystores/DBPublicKeyStore';
+import { ParcelDirection, ParcelStore } from '../../parcelStore';
 import { LOGGER } from '../../tokens';
 import { sleepSeconds } from '../../utils/timing';
 import { GatewayRegistrar } from '../publicGateway/GatewayRegistrar';
@@ -51,13 +57,14 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
     return CourierSyncExitCode.FAILED_SYNC;
   }
 
+  const parcelStore = Container.get(ParcelStore);
   try {
     await collectCargo(publicGateway, client, parentStream, logger);
 
     sendStageNotificationToParent(parentStream, CourierSyncStage.WAIT);
     await sleepSeconds(DELAY_BETWEEN_COLLECTION_AND_DELIVERY_SECONDS);
 
-    sendStageNotificationToParent(parentStream, CourierSyncStage.DELIVERY);
+    await deliverCargo(publicGateway, client, parcelStore, parentStream, logger);
   } catch (err) {
     logger.fatal({ err }, 'Sync failed');
     return 3;
@@ -114,6 +121,63 @@ async function generateCCA(publicGateway: PublicGateway): Promise<Buffer> {
   );
   const ccaSerialized = await cca.serialize(nodeKey.privateKey);
   return Buffer.from(ccaSerialized);
+}
+
+async function deliverCargo(
+  publicGateway: PublicGateway,
+  client: CogRPCClient,
+  parcelStore: ParcelStore,
+  parentStream: Duplex,
+  logger: Logger,
+): Promise<void> {
+  sendStageNotificationToParent(parentStream, CourierSyncStage.DELIVERY);
+
+  const cargoDeliveryStream = makeCargoDeliveryStream(publicGateway, parcelStore, logger);
+  await pipe(client.deliverCargo(cargoDeliveryStream), async (ackIds: AsyncIterable<string>) => {
+    for await (const ackId of ackIds) {
+      logger.debug({ ackId }, 'Received parcel delivery acknowledgement');
+    }
+  });
+}
+
+async function* makeCargoDeliveryStream(
+  publicGateway: PublicGateway,
+  parcelStore: ParcelStore,
+  logger: Logger,
+): AsyncIterable<CargoDeliveryRequest> {
+  const privateKeyStore = Container.get(DBPrivateKeyStore);
+  const publicKeyStore = Container.get(DBPublicKeyStore);
+  const gateway = new Gateway(privateKeyStore, publicKeyStore);
+  const currentKey = (await privateKeyStore.getCurrentKey())!;
+  const cargoStream = gateway.generateCargoes(
+    makeParcelStream(parcelStore, logger),
+    publicGateway.identityCertificate,
+    currentKey.privateKey,
+    currentKey.certificate,
+    `https://${publicGateway.publicAddress}`,
+  );
+  yield* await pipe(
+    cargoStream,
+    async function* (cargoes: AsyncIterable<Buffer>): AsyncIterable<CargoDeliveryRequest> {
+      for await (const cargo of cargoes) {
+        yield { cargo, localId: 'sd' };
+      }
+    },
+  );
+}
+
+async function* makeParcelStream(parcelStore: ParcelStore, logger: Logger): CargoMessageStream {
+  for await (const parcelWithExpiryDate of parcelStore.listActiveBoundForInternet()) {
+    const parcelSerialized = await parcelStore.retrieve(
+      parcelWithExpiryDate.parcelKey,
+      ParcelDirection.ENDPOINT_TO_INTERNET,
+    );
+    if (parcelSerialized) {
+      yield { message: parcelSerialized, expiryDate: parcelWithExpiryDate.expiryDate };
+    } else {
+      logger.debug({ parcelKey: parcelWithExpiryDate.parcelKey }, 'Skipped deleted parcel');
+    }
+  }
 }
 
 function sendStageNotificationToParent(parentStream: Duplex, stage: CourierSyncStage): void {
