@@ -13,7 +13,7 @@ import { Container } from 'typedi';
 
 import { FileStore } from './fileStore';
 import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
-import { ParcelDirection, ParcelStore } from './parcelStore';
+import { ParcelDirection, ParcelStore, ParcelWithExpiryDate } from './parcelStore';
 import { ParcelCollectorManager } from './sync/publicGateway/parcelCollection/ParcelCollectorManager';
 import { useTemporaryAppDirs } from './testUtils/appDirs';
 import { generatePKIFixture, mockGatewayRegistration, sha256Hex } from './testUtils/crypto';
@@ -136,8 +136,14 @@ describe('listActiveBoundForInternet', () => {
     const parcelObjects = await asyncIterableToArray(parcelStore.listActiveBoundForInternet());
 
     expect(parcelObjects).toHaveLength(2);
-    expect(parcelObjects).toContain(await computeInternetBoundParcelKey(parcel1));
-    expect(parcelObjects).toContain(await computeInternetBoundParcelKey(parcel2));
+    expect(parcelObjects).toContainEqual<ParcelWithExpiryDate>({
+      expiryDate: parcel1.expiryDate,
+      parcelKey: await computeInternetBoundParcelKey(parcel1),
+    });
+    expect(parcelObjects).toContainEqual<ParcelWithExpiryDate>({
+      expiryDate: parcel2.expiryDate,
+      parcelKey: await computeInternetBoundParcelKey(parcel2),
+    });
   });
 
   describe('Invalid metadata file', () => {

@@ -16,6 +16,11 @@ interface ParcelMetadata {
   readonly expiryDate: number;
 }
 
+export interface ParcelWithExpiryDate {
+  readonly parcelKey: string;
+  readonly expiryDate: Date;
+}
+
 export enum ParcelDirection {
   ENDPOINT_TO_INTERNET,
   INTERNET_TO_ENDPOINT,
@@ -52,7 +57,7 @@ export class ParcelStore {
     return parcelRelativeKey;
   }
 
-  public async *listActiveBoundForInternet(): AsyncIterable<string> {
+  public async *listActiveBoundForInternet(): AsyncIterable<ParcelWithExpiryDate> {
     const keyPrefix = getAbsoluteParcelKey(ParcelDirection.ENDPOINT_TO_INTERNET);
     const absoluteKeys = await this.fileStore.listObjects(keyPrefix);
     yield* await pipe(
@@ -100,10 +105,10 @@ export class ParcelStore {
   protected filterActiveParcels(
     keyPrefix: string,
     direction: ParcelDirection,
-  ): (parcelKeys: AsyncIterable<string>) => AsyncIterable<string> {
+  ): (parcelKeys: AsyncIterable<string>) => AsyncIterable<ParcelWithExpiryDate> {
     // tslint:disable-next-line:no-this-assignment
     const store = this;
-    return async function* (parcelKeys): AsyncIterable<any> {
+    return async function* (parcelKeys): AsyncIterable<ParcelWithExpiryDate> {
       for await (const absoluteKey of parcelKeys) {
         if (absoluteKey.endsWith(PARCEL_METADATA_EXTENSION)) {
           continue;
@@ -116,7 +121,7 @@ export class ParcelStore {
           continue;
         }
 
-        yield relativeKey;
+        yield { parcelKey: relativeKey, expiryDate };
       }
     };
   }
@@ -133,6 +138,11 @@ export class ParcelStore {
       yield* await pipe(
         this.fileStore.listObjects(keyPrefix),
         this.filterActiveParcels(endpointBoundPrefix, ParcelDirection.INTERNET_TO_ENDPOINT),
+        async function* (parcels: AsyncIterable<ParcelWithExpiryDate>): AsyncIterable<string> {
+          for await (const parcel of parcels) {
+            yield parcel.parcelKey;
+          }
+        },
       );
     }
   }

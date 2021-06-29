@@ -8,7 +8,7 @@ import { source } from 'stream-to-it';
 import { Container } from 'typedi';
 
 import { DBPrivateKeyStore } from '../../../keystores/DBPrivateKeyStore';
-import { ParcelDirection, ParcelStore } from '../../../parcelStore';
+import { ParcelDirection, ParcelStore, ParcelWithExpiryDate } from '../../../parcelStore';
 import { LOGGER } from '../../../tokens';
 import { GatewayRegistrar } from '../GatewayRegistrar';
 import { makeGSCClient } from '../gscClient';
@@ -27,7 +27,7 @@ export default async function runParcelDelivery(parentStream: Duplex): Promise<n
   logger.info('Ready to deliver parcels');
   await pipe(async function* (): AsyncIterable<string> {
     // Deliver the queued parcels before delivering parcels streamed by the parent process
-    yield* await parcelStore.listActiveBoundForInternet();
+    yield* await convertParcelsWithExpiryDateToParcelKeys(parcelStore.listActiveBoundForInternet());
     yield* source(parentStream);
   }, await deliverParcels(publicGateway.publicAddress, parcelStore, logger));
 
@@ -80,4 +80,12 @@ async function deliverParcels(
       }
     }
   };
+}
+
+async function* convertParcelsWithExpiryDateToParcelKeys(
+  parcelsWithExpiryDate: AsyncIterable<ParcelWithExpiryDate>,
+): AsyncIterable<string> {
+  for await (const parcelWithExpiryDate of parcelsWithExpiryDate) {
+    yield parcelWithExpiryDate.parcelKey;
+  }
 }
