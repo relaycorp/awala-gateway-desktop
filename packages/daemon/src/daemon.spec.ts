@@ -2,7 +2,7 @@ import { addSeconds } from 'date-fns';
 import { getRepository } from 'typeorm';
 
 import daemon from './daemon';
-import { PendingParcelCollectionACK } from './entity/PendingParcelCollectionACK';
+import { ParcelCollection } from './entity/ParcelCollection';
 import { makeServer, runServer } from './server';
 import startup from './startup';
 import runSync from './sync';
@@ -37,7 +37,7 @@ test('Sync should be run', async () => {
 
 test('Expired parcel collections should be removed', async () => {
   const now = new Date();
-  const parcelCollectionACKRepo = getRepository(PendingParcelCollectionACK);
+  const parcelCollectionACKRepo = getRepository(ParcelCollection);
   const expiredACK = parcelCollectionACKRepo.create({
     parcelExpiryDate: now,
     parcelId: 'foo',

@@ -19,7 +19,7 @@ import { getRepository } from 'typeorm';
 import uuid from 'uuid-random';
 
 import { COURIER_PORT, CourierSyncExitCode, CourierSyncStage } from '.';
-import { PendingParcelCollectionACK } from '../../entity/PendingParcelCollectionACK';
+import { ParcelCollection } from '../../entity/ParcelCollection';
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
 import { DBPublicKeyStore } from '../../keystores/DBPublicKeyStore';
 import { ParcelDirection, ParcelStore } from '../../parcelStore';
@@ -174,7 +174,7 @@ async function* makeCargoMessageStream(
   parcelStore: ParcelStore,
   logger: Logger,
 ): CargoMessageStream {
-  const collectionACKRepo = getRepository(PendingParcelCollectionACK);
+  const collectionACKRepo = getRepository(ParcelCollection);
   const stream = await collectionACKRepo.find();
   for (const pendingAck of stream) {
     const ack = new ParcelCollectionAck(

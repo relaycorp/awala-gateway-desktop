@@ -16,7 +16,7 @@ import uuid from 'uuid-random';
 
 import { CourierSyncExitCode, CourierSyncStage } from '.';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
-import { PendingParcelCollectionACK } from '../../entity/PendingParcelCollectionACK';
+import { ParcelCollection } from '../../entity/ParcelCollection';
 import { ParcelDirection, ParcelStore } from '../../parcelStore';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { generatePKIFixture, mockGatewayRegistration } from '../../testUtils/crypto';
@@ -337,8 +337,8 @@ describe('Cargo delivery', () => {
   test('Expiry date should be that of last parcel collection ACK', async () => {
     const now = new Date();
     now.setMilliseconds(0);
-    await storeParcelCollectionAck(addSeconds(now, 2));
-    const newestCollectionACK = await storeParcelCollectionAck(addSeconds(now, 3));
+    await storeParcelCollection(addSeconds(now, 2));
+    const newestCollectionACK = await storeParcelCollection(addSeconds(now, 3));
 
     await runCourierSync(getParentStream());
 
@@ -412,7 +412,7 @@ describe('Cargo delivery', () => {
     });
 
     test('Collection acknowledgement for valid parcels should be included in cargo', async () => {
-      const collectionACK = await storeParcelCollectionAck(addSeconds(new Date(), 2));
+      const collectionACK = await storeParcelCollection(addSeconds(new Date(), 2));
 
       await runCourierSync(getParentStream());
 
@@ -435,7 +435,7 @@ describe('Cargo delivery', () => {
 
   describe('Delivery ACKs', () => {
     test('Generated ACK should be UUID4', async () => {
-      await storeParcelCollectionAck(addSeconds(new Date(), 2));
+      await storeParcelCollection(addSeconds(new Date(), 2));
 
       await runCourierSync(getParentStream());
 
@@ -479,10 +479,8 @@ describe('Cargo delivery', () => {
     return { parcel, parcelSerialized };
   }
 
-  async function storeParcelCollectionAck(
-    parcelExpiryDate: Date,
-  ): Promise<PendingParcelCollectionACK> {
-    const collectionACKRepo = getRepository(PendingParcelCollectionACK);
+  async function storeParcelCollection(parcelExpiryDate: Date): Promise<ParcelCollection> {
+    const collectionACKRepo = getRepository(ParcelCollection);
     const randomString = uuid();
     const ack = collectionACKRepo.create({
       parcelExpiryDate,
