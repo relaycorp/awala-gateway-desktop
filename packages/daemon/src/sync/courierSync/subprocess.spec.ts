@@ -5,14 +5,18 @@ import {
   CargoDeliveryRequest,
   Certificate,
   derSerializePublicKey,
+  ParcelCollectionAck,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { addDays, subMinutes } from 'date-fns';
+import { addDays, addSeconds, subMinutes } from 'date-fns';
 import { v4 } from 'default-gateway';
 import { Container } from 'typedi';
+import { getRepository } from 'typeorm';
+import uuid from 'uuid-random';
 
 import { CourierSyncExitCode, CourierSyncStage } from '.';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
+import { PendingParcelCollectionACK } from '../../entity/PendingParcelCollectionACK';
 import { ParcelDirection, ParcelStore } from '../../parcelStore';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { generatePKIFixture, mockGatewayRegistration } from '../../testUtils/crypto';
@@ -227,9 +231,15 @@ describe('Cargo collection', () => {
     }
   });
 
-  test.todo('Cargo should be stored with no validation');
+  describe('Encapsulated parcels', () => {
+    test.todo('Parcel ACK should be added to queue');
 
-  test.todo('Parent process should be notified about new parcels');
+    test.todo('Parent process should be notified about new parcels');
+  });
+
+  describe('Encapsulated parcel collection ACKs', () => {
+    test.todo('ACKed parcel should be deleted');
+  });
 
   test.todo('The first 100 cargoes should be accepted');
 
@@ -301,51 +311,6 @@ describe('Cargo delivery', () => {
     );
   });
 
-  test('No cargo should be delivered if there are no parcels or collection ACKs', async () => {
-    await runCourierSync(getParentStream());
-
-    await expect(getCargoDeliveryRequests()).resolves.toHaveLength(0);
-  });
-
-  test('Queued parcels should be included in cargo', async () => {
-    const { parcelSerialized } = await makeAndStoreParcel();
-
-    await runCourierSync(getParentStream());
-
-    const deliveryRequests = await getCargoDeliveryRequests();
-    expect(deliveryRequests).toHaveLength(1);
-    const cargoMessages = await unwrapCargoMessages(deliveryRequests[0].cargo);
-    expect(cargoMessages).toEqual([parcelSerialized]);
-  });
-
-  test('Recently-deleted parcels should be gracefully skipped', async () => {
-    const parcel1Key = 'key1';
-    jest.spyOn(ParcelStore.prototype, 'listActiveBoundForInternet').mockReturnValueOnce(
-      arrayToAsyncIterable([
-        { parcelKey: parcel1Key, expiryDate: new Date() },
-        { parcelKey: 'key2', expiryDate: new Date() },
-      ]),
-    );
-    const parcelStoreRetrieveSpy = jest.spyOn(ParcelStore.prototype, 'retrieve');
-    parcelStoreRetrieveSpy.mockResolvedValueOnce(null);
-    const parcel2Serialized = Buffer.from('foo');
-    parcelStoreRetrieveSpy.mockResolvedValueOnce(parcel2Serialized);
-
-    await runCourierSync(getParentStream());
-
-    const deliveryRequests = await getCargoDeliveryRequests();
-    expect(deliveryRequests).toHaveLength(1);
-    const cargoMessages = await unwrapCargoMessages(deliveryRequests[0].cargo);
-    expect(cargoMessages).toEqual([parcel2Serialized]);
-    expect(mockLogs).toContainEqual(
-      partialPinoLog('debug', 'Skipped deleted parcel', {
-        parcelKey: parcel1Key,
-      }),
-    );
-  });
-
-  test.todo('Parcel collection acknowledgements should be included in cargo');
-
   test('Recipient should be paired public gateway', async () => {
     await makeAndStoreParcel();
 
@@ -364,12 +329,23 @@ describe('Cargo delivery', () => {
 
     await runCourierSync(getParentStream());
 
-    const deliveryRequests = await getCargoDeliveryRequests();
-    const cargo = await Cargo.deserialize(bufferToArray(deliveryRequests[0].cargo));
+    const [deliveryRequest] = await getCargoDeliveryRequests();
+    const cargo = await Cargo.deserialize(bufferToArray(deliveryRequest.cargo));
     expect(cargo.expiryDate).toEqual(latestParcel.expiryDate);
   });
 
-  test.todo('Expiry date should be that of last parcel collection ACK');
+  test('Expiry date should be that of last parcel collection ACK', async () => {
+    const now = new Date();
+    now.setMilliseconds(0);
+    await storeParcelCollectionAck(addSeconds(now, 2));
+    const newestCollectionACK = await storeParcelCollectionAck(addSeconds(now, 3));
+
+    await runCourierSync(getParentStream());
+
+    const [deliveryRequest] = await getCargoDeliveryRequests();
+    const cargo = await Cargo.deserialize(bufferToArray(deliveryRequest.cargo));
+    expect(cargo.expiryDate).toEqual(newestCollectionACK.parcelExpiryDate);
+  });
 
   test('Sender certificate should be the one issued by public gateway', async () => {
     await makeAndStoreParcel();
@@ -391,18 +367,95 @@ describe('Cargo delivery', () => {
     expect(cargo.senderCaCertificateChain).toHaveLength(0);
   });
 
-  test('Delivery acknowledgement should be logged', async () => {
-    const ackId = 'the ack';
-    mockDeliverCargo.mockReturnValueOnce(arrayToAsyncIterable([ackId]));
-    await makeAndStoreParcel();
+  describe('Cargo contents', () => {
+    test('No cargo should be delivered if there are no parcels or collection ACKs', async () => {
+      await runCourierSync(getParentStream());
 
-    await runCourierSync(getParentStream());
+      await expect(getCargoDeliveryRequests()).resolves.toHaveLength(0);
+    });
 
-    expect(mockLogs).toContainEqual(
-      partialPinoLog('debug', 'Received parcel delivery acknowledgement', {
-        ackId,
-      }),
-    );
+    test('Queued parcels should be included in cargo', async () => {
+      const { parcelSerialized } = await makeAndStoreParcel();
+
+      await runCourierSync(getParentStream());
+
+      const deliveryRequests = await getCargoDeliveryRequests();
+      expect(deliveryRequests).toHaveLength(1);
+      const cargoMessages = await unwrapCargoMessages(deliveryRequests[0].cargo);
+      expect(cargoMessages).toEqual([parcelSerialized]);
+    });
+
+    test('Recently-deleted parcels should be gracefully skipped', async () => {
+      const parcel1Key = 'key1';
+      jest.spyOn(ParcelStore.prototype, 'listActiveBoundForInternet').mockReturnValueOnce(
+        arrayToAsyncIterable([
+          { parcelKey: parcel1Key, expiryDate: new Date() },
+          { parcelKey: 'key2', expiryDate: new Date() },
+        ]),
+      );
+      const parcelStoreRetrieveSpy = jest.spyOn(ParcelStore.prototype, 'retrieve');
+      parcelStoreRetrieveSpy.mockResolvedValueOnce(null);
+      const parcel2Serialized = Buffer.from('foo');
+      parcelStoreRetrieveSpy.mockResolvedValueOnce(parcel2Serialized);
+
+      await runCourierSync(getParentStream());
+
+      const deliveryRequests = await getCargoDeliveryRequests();
+      expect(deliveryRequests).toHaveLength(1);
+      const cargoMessages = await unwrapCargoMessages(deliveryRequests[0].cargo);
+      expect(cargoMessages).toEqual([parcel2Serialized]);
+      expect(mockLogs).toContainEqual(
+        partialPinoLog('debug', 'Skipped deleted parcel', {
+          parcelKey: parcel1Key,
+        }),
+      );
+    });
+
+    test('Collection acknowledgement for valid parcels should be included in cargo', async () => {
+      const collectionACK = await storeParcelCollectionAck(addSeconds(new Date(), 2));
+
+      await runCourierSync(getParentStream());
+
+      const deliveryRequests = await getCargoDeliveryRequests();
+      expect(deliveryRequests).toHaveLength(1);
+      const cargoMessages = await unwrapCargoMessages(deliveryRequests[0].cargo);
+      expect(cargoMessages).toHaveLength(1);
+      const collectionACKDeserialized = ParcelCollectionAck.deserialize(
+        bufferToArray(cargoMessages[0]),
+      );
+      expect(collectionACKDeserialized.parcelId).toEqual(collectionACK.parcelId);
+      expect(collectionACKDeserialized.recipientEndpointAddress).toEqual(
+        collectionACK.recipientEndpointAddress,
+      );
+      expect(collectionACKDeserialized.senderEndpointPrivateAddress).toEqual(
+        collectionACK.senderEndpointPrivateAddress,
+      );
+    });
+  });
+
+  describe('Delivery ACKs', () => {
+    test('Generated ACK should be UUID4', async () => {
+      await storeParcelCollectionAck(addSeconds(new Date(), 2));
+
+      await runCourierSync(getParentStream());
+
+      const [deliveryRequest] = await getCargoDeliveryRequests();
+      expect(deliveryRequest.localId).toSatisfy((i) => uuid.test(i));
+    });
+
+    test('ACK should be logged when received', async () => {
+      const ackId = 'the ack';
+      mockDeliverCargo.mockReturnValueOnce(arrayToAsyncIterable([ackId]));
+      await makeAndStoreParcel();
+
+      await runCourierSync(getParentStream());
+
+      expect(mockLogs).toContainEqual(
+        partialPinoLog('debug', 'Received parcel delivery acknowledgement', {
+          ackId,
+        }),
+      );
+    });
   });
 
   async function getCargoDeliveryRequests(): Promise<readonly CargoDeliveryRequest[]> {
@@ -424,6 +477,21 @@ describe('Cargo delivery', () => {
     await parcelStore.store(parcelSerialized, parcel, ParcelDirection.ENDPOINT_TO_INTERNET);
 
     return { parcel, parcelSerialized };
+  }
+
+  async function storeParcelCollectionAck(
+    parcelExpiryDate: Date,
+  ): Promise<PendingParcelCollectionACK> {
+    const collectionACKRepo = getRepository(PendingParcelCollectionACK);
+    const randomString = uuid();
+    const ack = collectionACKRepo.create({
+      parcelExpiryDate,
+      parcelId: randomString,
+      recipientEndpointAddress: randomString,
+      senderEndpointPrivateAddress: randomString,
+    });
+    await collectionACKRepo.save(ack);
+    return ack;
   }
 
   async function unwrapCargoMessages(cargoSerialized: Buffer): Promise<readonly Buffer[]> {

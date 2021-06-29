@@ -6,6 +6,7 @@ import {
   CargoMessageStream,
   Gateway,
   issueGatewayCertificate,
+  ParcelCollectionAck,
   SessionlessEnvelopedData,
 } from '@relaycorp/relaynet-core';
 import { addDays, differenceInSeconds, subMinutes } from 'date-fns';
@@ -14,8 +15,11 @@ import pipe from 'it-pipe';
 import { Logger } from 'pino';
 import { Duplex } from 'stream';
 import { Container } from 'typedi';
+import { getRepository } from 'typeorm';
+import uuid from 'uuid-random';
 
 import { COURIER_PORT, CourierSyncExitCode, CourierSyncStage } from '.';
+import { PendingParcelCollectionACK } from '../../entity/PendingParcelCollectionACK';
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
 import { DBPublicKeyStore } from '../../keystores/DBPublicKeyStore';
 import { ParcelDirection, ParcelStore } from '../../parcelStore';
@@ -150,7 +154,7 @@ async function* makeCargoDeliveryStream(
   const gateway = new Gateway(privateKeyStore, publicKeyStore);
   const currentKey = (await privateKeyStore.getCurrentKey())!;
   const cargoStream = gateway.generateCargoes(
-    makeParcelStream(parcelStore, logger),
+    makeCargoMessageStream(parcelStore, logger),
     publicGateway.identityCertificate,
     currentKey.privateKey,
     currentKey.certificate,
@@ -160,13 +164,27 @@ async function* makeCargoDeliveryStream(
     cargoStream,
     async function* (cargoes: AsyncIterable<Buffer>): AsyncIterable<CargoDeliveryRequest> {
       for await (const cargo of cargoes) {
-        yield { cargo, localId: 'sd' };
+        yield { cargo, localId: uuid() };
       }
     },
   );
 }
 
-async function* makeParcelStream(parcelStore: ParcelStore, logger: Logger): CargoMessageStream {
+async function* makeCargoMessageStream(
+  parcelStore: ParcelStore,
+  logger: Logger,
+): CargoMessageStream {
+  const collectionACKRepo = getRepository(PendingParcelCollectionACK);
+  const stream = await collectionACKRepo.find();
+  for (const pendingAck of stream) {
+    const ack = new ParcelCollectionAck(
+      pendingAck.senderEndpointPrivateAddress,
+      pendingAck.recipientEndpointAddress,
+      pendingAck.parcelId,
+    );
+    yield { message: Buffer.from(ack.serialize()), expiryDate: pendingAck.parcelExpiryDate };
+  }
+
   for await (const parcelWithExpiryDate of parcelStore.listActiveBoundForInternet()) {
     const parcelSerialized = await parcelStore.retrieve(
       parcelWithExpiryDate.parcelKey,
