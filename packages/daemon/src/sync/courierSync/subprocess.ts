@@ -169,15 +169,15 @@ async function* makeCargoMessageStream(
   parcelStore: ParcelStore,
   logger: Logger,
 ): CargoMessageStream {
-  const collectionACKRepo = getRepository(ParcelCollection);
-  const stream = await collectionACKRepo.find();
-  for (const pendingAck of stream) {
+  const collectionRepo = getRepository(ParcelCollection);
+  const pendingACKs = await collectionRepo.find();
+  for (const pendingACK of pendingACKs) {
     const ack = new ParcelCollectionAck(
-      pendingAck.senderEndpointPrivateAddress,
-      pendingAck.recipientEndpointAddress,
-      pendingAck.parcelId,
+      pendingACK.senderEndpointPrivateAddress,
+      pendingACK.recipientEndpointAddress,
+      pendingACK.parcelId,
     );
-    yield { message: Buffer.from(ack.serialize()), expiryDate: pendingAck.parcelExpiryDate };
+    yield { message: Buffer.from(ack.serialize()), expiryDate: pendingACK.parcelExpiryDate };
   }
 
   for await (const parcelWithExpiryDate of parcelStore.listInternetBound()) {
