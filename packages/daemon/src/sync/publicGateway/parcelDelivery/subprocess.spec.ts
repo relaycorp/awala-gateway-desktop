@@ -44,7 +44,7 @@ const pkiFixtureRetriever = generatePKIFixture((_keyPairSet, certPath) => {
 const undoGatewayRegistration = mockGatewayRegistration(pkiFixtureRetriever);
 
 test('Subprocess should abort if the gateway is unregistered', async () => {
-  undoGatewayRegistration();
+  await undoGatewayRegistration();
 
   await expect(runParcelDelivery(parentStream)).resolves.toEqual(1);
 

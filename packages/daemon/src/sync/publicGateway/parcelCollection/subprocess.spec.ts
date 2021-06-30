@@ -54,7 +54,7 @@ const mockParcelStore = mockSpy(jest.spyOn(ParcelStore.prototype, 'storeEndpoint
 });
 
 test('Subprocess should abort if the gateway is unregistered', async () => {
-  undoGatewayRegistration();
+  await undoGatewayRegistration();
 
   await expect(runParcelCollection(parentStream)).resolves.toEqual(1);
 
