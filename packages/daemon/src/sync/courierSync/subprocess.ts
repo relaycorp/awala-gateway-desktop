@@ -180,7 +180,7 @@ async function* makeCargoMessageStream(
     yield { message: Buffer.from(ack.serialize()), expiryDate: pendingAck.parcelExpiryDate };
   }
 
-  for await (const parcelWithExpiryDate of parcelStore.listActiveBoundForInternet()) {
+  for await (const parcelWithExpiryDate of parcelStore.listInternetBound()) {
     const parcelSerialized = await parcelStore.retrieve(
       parcelWithExpiryDate.parcelKey,
       ParcelDirection.ENDPOINT_TO_INTERNET,

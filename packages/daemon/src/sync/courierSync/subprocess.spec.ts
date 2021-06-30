@@ -276,8 +276,8 @@ describe('Cargo delivery', () => {
   });
 
   afterEach(() => {
-    if (jest.isMockFunction(ParcelStore.prototype.listActiveBoundForInternet)) {
-      getMockInstance(ParcelStore.prototype.listActiveBoundForInternet).mockRestore();
+    if (jest.isMockFunction(ParcelStore.prototype.listInternetBound)) {
+      getMockInstance(ParcelStore.prototype.listInternetBound).mockRestore();
     }
     if (jest.isMockFunction(ParcelStore.prototype.retrieve)) {
       getMockInstance(ParcelStore.prototype.retrieve).mockRestore();
@@ -391,7 +391,7 @@ describe('Cargo delivery', () => {
 
     test('Recently-deleted parcels should be gracefully skipped', async () => {
       const parcel1Key = 'key1';
-      jest.spyOn(ParcelStore.prototype, 'listActiveBoundForInternet').mockReturnValueOnce(
+      jest.spyOn(ParcelStore.prototype, 'listInternetBound').mockReturnValueOnce(
         arrayToAsyncIterable([
           { parcelKey: parcel1Key, expiryDate: new Date() },
           { parcelKey: 'key2', expiryDate: new Date() },
@@ -478,7 +478,7 @@ describe('Cargo delivery', () => {
     );
 
     const parcelStore = Container.get(ParcelStore);
-    await parcelStore.store(parcelSerialized, parcel, ParcelDirection.ENDPOINT_TO_INTERNET);
+    await parcelStore.storeInternetBound(parcelSerialized, parcel);
 
     return { parcel, parcelSerialized };
   }
