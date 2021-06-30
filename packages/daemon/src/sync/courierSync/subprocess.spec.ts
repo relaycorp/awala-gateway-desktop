@@ -105,7 +105,7 @@ test('Subprocess should error out if the CogRPC client cannot be initialised', a
   await expect(runCourierSync(getParentStream())).resolves.toEqual(CourierSyncExitCode.FAILED_SYNC);
 
   expect(mockLogs).toContainEqual(
-    partialPinoLog('fatal', 'Failed to initialize CogRPC client', {
+    partialPinoLog('fatal', 'Sync failed', {
       err: expect.objectContaining({ message: gatewayError.message }),
     }),
   );
@@ -129,7 +129,9 @@ describe('Cargo collection', () => {
     const error = new Error('nope.jpeg');
     mockCollectCargo.mockRejectedValue(error);
 
-    await expect(runCourierSync(getParentStream())).resolves.toEqual(3);
+    await expect(runCourierSync(getParentStream())).resolves.toEqual(
+      CourierSyncExitCode.FAILED_SYNC,
+    );
 
     expect(mockCogRPCClose).toBeCalledWith();
     expect(mockLogs).toContainEqual(
@@ -301,7 +303,9 @@ describe('Cargo delivery', () => {
       throw error;
     });
 
-    await expect(runCourierSync(getParentStream())).resolves.toEqual(3);
+    await expect(runCourierSync(getParentStream())).resolves.toEqual(
+      CourierSyncExitCode.FAILED_SYNC,
+    );
 
     expect(mockCogRPCClose).toBeCalledWith();
     expect(mockLogs).toContainEqual(

@@ -53,16 +53,11 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
     return CourierSyncExitCode.FAILED_SYNC;
   }
 
-  let client: CogRPCClient;
+  const parcelStore = Container.get(ParcelStore);
+  let client: CogRPCClient | null = null;
   try {
     client = await CogRPCClient.init(`https://${defaultGatewayIPAddress}:${COURIER_PORT}`);
-  } catch (err) {
-    logger.fatal({ err }, 'Failed to initialize CogRPC client');
-    return CourierSyncExitCode.FAILED_SYNC;
-  }
 
-  const parcelStore = Container.get(ParcelStore);
-  try {
     await collectCargo(publicGateway, client, parentStream, logger);
 
     sendStageNotificationToParent(parentStream, CourierSyncStage.WAIT);
@@ -71,9 +66,9 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
     await deliverCargo(publicGateway, client, parcelStore, parentStream, logger);
   } catch (err) {
     logger.fatal({ err }, 'Sync failed');
-    return 3;
+    return CourierSyncExitCode.FAILED_SYNC;
   } finally {
-    client.close();
+    client?.close();
   }
 
   logger.info('Sync completed successfully');
