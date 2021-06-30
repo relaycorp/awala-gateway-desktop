@@ -17,6 +17,20 @@ export class FileStore {
     this.dataPath = appDirs.data;
   }
 
+  public async objectExists(key: string): Promise<boolean> {
+    const objectPath = this.getObjectPath(key);
+    try {
+      await fs.stat(objectPath);
+      return true;
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        // File does not exist
+        return false;
+      }
+      throw new FileStoreError(err, 'Failed to check whether object exists');
+    }
+  }
+
   public async getObject(key: string): Promise<Buffer | null> {
     const objectPath = this.getObjectPath(key);
     try {

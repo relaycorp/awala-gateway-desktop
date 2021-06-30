@@ -4,7 +4,9 @@ import { createHash } from 'crypto';
 import pipe from 'it-pipe';
 import { join } from 'path';
 import { Container, Inject, Service } from 'typedi';
+import { getRepository } from 'typeorm';
 
+import { ParcelCollection } from './entity/ParcelCollection';
 import { FileStore } from './fileStore';
 import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 import { ParcelCollectorManager } from './sync/publicGateway/parcelCollection/ParcelCollectorManager';
@@ -34,12 +36,80 @@ export class ParcelStore {
   ) {}
 
   /**
+   * Store the specified parcel.
    *
    * @param parcelSerialized
    * @param parcel
-   * @param direction The direction of the parcel
    */
-  public async store(
+  public async storeEndpointBound(
+    parcelSerialized: Buffer,
+    parcel: Parcel,
+  ): Promise<string | null> {
+    let isParcelNew = true;
+    if (await wasEndpointBoundParcelCollected(parcel)) {
+      isParcelNew = false;
+      if (await this.wasEndpointBoundParcelDelivered(parcel)) {
+        return null;
+      }
+    }
+    const parcelKey = await this.store(
+      parcelSerialized,
+      parcel,
+      ParcelDirection.INTERNET_TO_ENDPOINT,
+    );
+    return isParcelNew ? parcelKey : null;
+  }
+
+  /**
+   * Yield keys for parcels bound for the specified endpoints.
+   *
+   * @param recipientPrivateAddresses
+   * @param keepAlive Whether to watch for incoming parcels in real time
+   *
+   * If `keepAlive` is enabled, the iterable won't end unless it's ended by the consumer.
+   *
+   */
+  public async *streamEndpointBound(
+    recipientPrivateAddresses: readonly string[],
+    keepAlive: boolean,
+  ): AsyncIterable<string> {
+    yield* await this.listQueuedParcelsBoundForEndpoints(recipientPrivateAddresses);
+
+    if (keepAlive) {
+      // TODO: Find way not to miss newly-collected parcels between listing queued ones and watching
+      const parcelCollectorManager = Container.get(ParcelCollectorManager);
+      yield* await parcelCollectorManager.watchCollectionsForRecipients(recipientPrivateAddresses);
+    }
+  }
+
+  public async storeInternetBound(parcelSerialized: Buffer, parcel: Parcel): Promise<string> {
+    return this.store(parcelSerialized, parcel, ParcelDirection.ENDPOINT_TO_INTERNET);
+  }
+
+  public async *listInternetBound(): AsyncIterable<ParcelWithExpiryDate> {
+    const keyPrefix = getAbsoluteParcelKey(ParcelDirection.ENDPOINT_TO_INTERNET);
+    const absoluteKeys = await this.fileStore.listObjects(keyPrefix);
+    yield* await pipe(
+      absoluteKeys,
+      this.filterActiveParcels(keyPrefix, ParcelDirection.ENDPOINT_TO_INTERNET),
+    );
+  }
+
+  public async retrieve(
+    parcelRelativeKey: string,
+    direction: ParcelDirection,
+  ): Promise<Buffer | null> {
+    const absoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
+    return this.fileStore.getObject(absoluteKey);
+  }
+
+  public async delete(parcelRelativeKey: string, direction: ParcelDirection): Promise<void> {
+    const absoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
+    await this.fileStore.deleteObject(absoluteKey);
+    await this.fileStore.deleteObject(absoluteKey + PARCEL_METADATA_EXTENSION);
+  }
+
+  protected async store(
     parcelSerialized: Buffer,
     parcel: Parcel,
     direction: ParcelDirection,
@@ -55,51 +125,6 @@ export class ParcelStore {
     );
 
     return parcelRelativeKey;
-  }
-
-  public async *listActiveBoundForInternet(): AsyncIterable<ParcelWithExpiryDate> {
-    const keyPrefix = getAbsoluteParcelKey(ParcelDirection.ENDPOINT_TO_INTERNET);
-    const absoluteKeys = await this.fileStore.listObjects(keyPrefix);
-    yield* await pipe(
-      absoluteKeys,
-      this.filterActiveParcels(keyPrefix, ParcelDirection.ENDPOINT_TO_INTERNET),
-    );
-  }
-
-  /**
-   * Yield keys for parcels bound for the specified endpoints.
-   *
-   * @param recipientPrivateAddresses
-   * @param keepAlive Whether to watch for incoming parcels in real time
-   *
-   * If `keepAlive` is enabled, the iterable won't end unless it's ended by the consumer.
-   *
-   */
-  public async *streamActiveBoundForEndpoints(
-    recipientPrivateAddresses: readonly string[],
-    keepAlive: boolean,
-  ): AsyncIterable<string> {
-    yield* await this.listQueuedParcelsBoundForEndpoints(recipientPrivateAddresses);
-
-    if (keepAlive) {
-      // TODO: Find way not to miss newly-collected parcels between listing queued ones and watching
-      const parcelCollectorManager = Container.get(ParcelCollectorManager);
-      yield* await parcelCollectorManager.watchCollectionsForRecipients(recipientPrivateAddresses);
-    }
-  }
-
-  public async retrieve(
-    parcelRelativeKey: string,
-    direction: ParcelDirection,
-  ): Promise<Buffer | null> {
-    const absoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
-    return this.fileStore.getObject(absoluteKey);
-  }
-
-  public async delete(parcelRelativeKey: string, direction: ParcelDirection): Promise<void> {
-    const absoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
-    await this.fileStore.deleteObject(absoluteKey);
-    await this.fileStore.deleteObject(absoluteKey + PARCEL_METADATA_EXTENSION);
   }
 
   protected filterActiveParcels(
@@ -165,6 +190,18 @@ export class ParcelStore {
     const expiryTimestamp = document.expiryDate * 1_000;
     return new Date(expiryTimestamp);
   }
+
+  protected async wasEndpointBoundParcelDelivered(parcel: Parcel): Promise<boolean> {
+    const parcelRelativeKey = await getRelativeParcelKey(
+      parcel,
+      ParcelDirection.INTERNET_TO_ENDPOINT,
+    );
+    const parcelAbsoluteKey = getAbsoluteParcelKey(
+      ParcelDirection.INTERNET_TO_ENDPOINT,
+      parcelRelativeKey,
+    );
+    return !(await this.fileStore.objectExists(parcelAbsoluteKey));
+  }
 }
 
 function sha256Hex(plaintext: string): string {
@@ -186,4 +223,14 @@ function getAbsoluteParcelKey(direction: ParcelDirection, parcelRelativeKey?: st
     direction === ParcelDirection.ENDPOINT_TO_INTERNET ? 'internet-bound' : 'endpoint-bound';
   const trailingComponents = parcelRelativeKey ? [parcelRelativeKey] : [];
   return join('parcels', subComponent, ...trailingComponents);
+}
+
+async function wasEndpointBoundParcelCollected(parcel: Parcel): Promise<boolean> {
+  const collectionRepo = getRepository(ParcelCollection);
+  const parcelCollectionsCount = await collectionRepo.count({
+    parcelId: parcel.id,
+    recipientEndpointAddress: parcel.recipientAddress,
+    senderEndpointPrivateAddress: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+  });
+  return 0 < parcelCollectionsCount;
 }

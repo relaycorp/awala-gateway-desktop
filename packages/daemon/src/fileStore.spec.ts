@@ -17,6 +17,36 @@ const OBJECT_CONTENT = Buffer.from('the content');
 
 const OBJECT_KEY_OUTSIDE_STORE = '../outside.ext';
 
+describe('objectExists', () => {
+  test('True should be returned if object exists', async () => {
+    await store.putObject(OBJECT_CONTENT, OBJECT_KEY);
+
+    await expect(store.objectExists(OBJECT_KEY)).resolves.toBeTrue();
+  });
+
+  test('False should be returned if object does not exist', async () => {
+    await expect(store.objectExists(OBJECT_KEY)).resolves.toBeFalse();
+  });
+
+  test('Relative key outside app dir should be refused', async () => {
+    await expect(store.objectExists(OBJECT_KEY_OUTSIDE_STORE)).rejects.toBeInstanceOf(
+      FileStoreError,
+    );
+  });
+
+  test('Permission errors should be propagated', async () => {
+    await store.putObject(OBJECT_CONTENT, OBJECT_KEY);
+    const statError = new Error('oh no');
+    const statSpy = jest.spyOn(fs, 'stat');
+    statSpy.mockRejectedValueOnce(statError);
+
+    const error = await getPromiseRejection(store.objectExists(OBJECT_KEY), FileStoreError);
+
+    expect(error.message).toMatch(/^Failed to check whether object exists:/);
+    expect(error.cause()).toEqual(statError);
+  });
+});
+
 describe('getObject', () => {
   test('Content of existing file should be returned', async () => {
     await store.putObject(OBJECT_CONTENT, OBJECT_KEY);

@@ -43,7 +43,7 @@ export default function makeParcelCollectionServer(): Server {
     const tracker = new CollectionTracker();
     try {
       await pipe(
-        parcelStore.streamActiveBoundForEndpoints(endpointAddresses, keepAlive),
+        parcelStore.streamEndpointBound(endpointAddresses, keepAlive),
         makeDeliveryStream(parcelStore, tracker, socket, endpointAwareLogger),
         duplex(connectionStream),
         makeACKProcessor(parcelStore, tracker, socket, endpointAwareLogger),

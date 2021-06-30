@@ -27,7 +27,7 @@ export default async function runParcelDelivery(parentStream: Duplex): Promise<n
   logger.info('Ready to deliver parcels');
   await pipe(async function* (): AsyncIterable<string> {
     // Deliver the queued parcels before delivering parcels streamed by the parent process
-    yield* await convertParcelsWithExpiryDateToParcelKeys(parcelStore.listActiveBoundForInternet());
+    yield* await convertParcelsWithExpiryDateToParcelKeys(parcelStore.listInternetBound());
     yield* source(parentStream);
   }, await deliverParcels(publicGateway.publicAddress, parcelStore, logger));
 

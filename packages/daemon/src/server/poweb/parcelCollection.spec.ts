@@ -54,7 +54,7 @@ const pkiFixtureRetriever = generatePKIFixture(async (keyPairSet, certPath) => {
 mockGatewayRegistration(pkiFixtureRetriever);
 
 const mockParcelStoreStream = mockSpy(
-  jest.spyOn(ParcelStore.prototype, 'streamActiveBoundForEndpoints'),
+  jest.spyOn(ParcelStore.prototype, 'streamEndpointBound'),
   () => arrayToAsyncIterable([]),
 );
 const mockParcelStoreRetrieve = mockSpy(jest.spyOn(ParcelStore.prototype, 'retrieve'), () => null);
