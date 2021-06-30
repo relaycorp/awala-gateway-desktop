@@ -103,11 +103,11 @@ describe('Parcel delivery', () => {
     });
     await runParcelDelivery(parentStream);
 
+    expect(mockLogs).toContainEqual(
+      partialPinoLog('info', 'Delivered parcel', { parcelKey: parcelKey! }),
+    );
     expect(parcelDeliveryCall.wasCalled).toBeTrue();
     expect(Buffer.from(parcelDeliveryCall.arguments!.parcelSerialized)).toEqual(parcelSerialized);
-    expect(mockLogs).toContainEqual(
-      partialPinoLog('info', 'Delivered parcel', { parcelKey: parcelKey!! }),
-    );
   });
 
   test('Delivery should be signed with the right key', async () => {
