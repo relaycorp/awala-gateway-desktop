@@ -5,8 +5,9 @@ import {
   CargoDeliveryRequest,
   CargoMessageSet,
   Certificate,
-  CertificateError,
+  CMSError,
   derSerializePublicKey,
+  InvalidMessageError,
   ParcelCollectionAck,
   RAMFSyntaxError,
   SessionlessEnvelopedData,
@@ -83,7 +84,7 @@ beforeEach(() => {
 const getParentStream = makeStubPassThrough();
 
 test('Subprocess should error out if private gateway is unregistered', async () => {
-  undoGatewayRegistration();
+  await undoGatewayRegistration();
 
   await expect(runCourierSync(getParentStream())).resolves.toEqual(
     CourierSyncExitCode.UNREGISTERED_GATEWAY,
@@ -241,23 +242,24 @@ describe('Cargo collection', () => {
     }
   });
 
-  test.skip('Malformed cargo should be logged and ignored', async () => {
+  test('Malformed cargo should be logged and ignored', async () => {
     mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([Buffer.from('malformed')]));
 
     await runCourierSync(getParentStream());
 
     expect(mockLogs).toContainEqual(
-      partialPinoLog('info', 'Ignored malformed/invalid cargo', {
+      partialPinoLog('info', 'Ignoring malformed/invalid cargo', {
         err: expect.objectContaining({ type: RAMFSyntaxError.name }),
       }),
     );
   });
 
-  test.skip('Cargo by unauthorized sender should be logged and ignored', async () => {
+  test('Cargo by unauthorized sender should be logged and ignored', async () => {
+    const { parcelSerialized } = await makeDummyParcel();
     const cargo = new Cargo(
       await privateGatewayPDACertificate.calculateSubjectPrivateAddress(),
       publicGatewayPDACertificate, // Sent by the public gateway, but using wrong certificate
-      Buffer.from([]),
+      await makeCargoPayloadFromMessages([parcelSerialized]),
     );
     const cargoSerialized = Buffer.from(await cargo.serialize(publicGatewayPrivateKey));
     mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
@@ -265,13 +267,15 @@ describe('Cargo collection', () => {
     await runCourierSync(getParentStream());
 
     expect(mockLogs).toContainEqual(
-      partialPinoLog('info', 'Ignored malformed/invalid cargo', {
-        err: expect.objectContaining({ type: CertificateError.name }),
+      partialPinoLog('info', 'Ignoring cargo by unauthorized sender', {
+        cargoId: cargo.id,
+        err: expect.objectContaining({ type: InvalidMessageError.name }),
       }),
     );
+    await expect(getStoredParcelKeys()).resolves.toHaveLength(0);
   });
 
-  test.skip('Cargo with invalid payload should be logged and ignored', async () => {
+  test('Cargo with invalid payload should be logged and ignored', async () => {
     const { cargo, cargoSerialized } = await makeDummyCargo(Buffer.from('malformed payload'));
     mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
 
@@ -280,12 +284,12 @@ describe('Cargo collection', () => {
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Ignored cargo with invalid payload', {
         cargoId: cargo.id,
-        err: expect.objectContaining({ type: CertificateError.name }),
+        err: expect.objectContaining({ type: CMSError.name }),
       }),
     );
   });
 
-  test.skip('Malformed message encapsulated in cargo should be logged and ignored', async () => {
+  test('Malformed message encapsulated in cargo should be logged and ignored', async () => {
     const { cargo, cargoSerialized } = await makeDummyCargoFromMessages(
       Buffer.from('malformed message'),
     );
@@ -296,18 +300,18 @@ describe('Cargo collection', () => {
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Ignoring invalid/malformed message', {
         cargoId: cargo.id,
-        err: expect.objectContaining({ type: CertificateError.name }),
+        err: expect.objectContaining({ type: InvalidMessageError.name }),
       }),
     );
   });
 
   describe('Encapsulated parcels', () => {
-    test.skip('Well-formed yet invalid parcels should be logged and ignored', async () => {
+    test('Well-formed yet invalid parcels should be logged and ignored', async () => {
       const { pdaCertPath, keyPairSet } = await pkiFixtureRetriever();
       const { parcelSerialized: invalidParcelSerialized } = await makeParcel(
-        MessageDirection.TOWARDS_INTERNET,
-        pdaCertPath,
-        keyPairSet,
+        MessageDirection.FROM_INTERNET,
+        { ...pdaCertPath, pdaGrantee: pdaCertPath.publicGateway },
+        { ...keyPairSet, pdaGrantee: keyPairSet.publicGateway },
       );
       const { cargo, cargoSerialized } = await makeDummyCargoFromMessages(invalidParcelSerialized);
       mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
@@ -315,18 +319,15 @@ describe('Cargo collection', () => {
       await runCourierSync(getParentStream());
 
       expect(mockLogs).toContainEqual(
-        partialPinoLog('info', 'Ignoring invalid/malformed message', {
+        partialPinoLog('info', 'Ignoring invalid parcel', {
           cargoId: cargo.id,
-          err: expect.objectContaining({ type: CertificateError.name }),
+          err: expect.objectContaining({ type: InvalidMessageError.name }),
         }),
       );
-      const fileStore = Container.get(FileStore);
-      await expect(
-        asyncIterableToArray(fileStore.listObjects(ParcelStore.FILE_STORE_PREFIX)),
-      ).resolves.toHaveLength(0);
+      await expect(getStoredParcelKeys()).resolves.toHaveLength(0);
     });
 
-    test.skip('Valid parcels should be stored', async () => {
+    test('Valid parcels should be stored', async () => {
       const { parcel, parcelSerialized } = await makeDummyParcel();
       const { cargo, cargoSerialized } = await makeDummyCargoFromMessages(parcelSerialized);
       mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
@@ -343,7 +344,7 @@ describe('Cargo collection', () => {
       expect(mockLogs).toContainEqual(
         partialPinoLog('info', 'Stored parcel', {
           cargoId: cargo.id,
-          parcelKey: parcelKeys[0],
+          parcel: { id: parcel.id, recipientAddress: parcel.recipientAddress, key: parcelKeys[0] },
         }),
       );
     });
@@ -382,13 +383,25 @@ describe('Cargo collection', () => {
   async function makeDummyCargoFromMessages(
     ...messagesSerialized: readonly Buffer[]
   ): Promise<GeneratedCargo> {
+    const payloadSerialized = await makeCargoPayloadFromMessages(messagesSerialized);
+    return makeDummyCargo(payloadSerialized);
+  }
+
+  async function makeCargoPayloadFromMessages(
+    messagesSerialized: readonly Buffer[],
+  ): Promise<Buffer> {
     const { cdaCertPath } = pkiFixtureRetriever();
     const cargoMessageSet = new CargoMessageSet(messagesSerialized.map(bufferToArray));
     const payloadEncrypted = await SessionlessEnvelopedData.encrypt(
       await cargoMessageSet.serialize(),
       cdaCertPath.privateGateway,
     );
-    return makeDummyCargo(Buffer.from(payloadEncrypted.serialize()));
+    return Buffer.from(payloadEncrypted.serialize());
+  }
+
+  async function getStoredParcelKeys(): Promise<readonly string[]> {
+    const fileStore = Container.get(FileStore);
+    return asyncIterableToArray(fileStore.listObjects(ParcelStore.FILE_STORE_PREFIX));
   }
 });
 

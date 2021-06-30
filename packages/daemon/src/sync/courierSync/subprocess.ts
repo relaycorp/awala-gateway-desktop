@@ -1,15 +1,21 @@
 import { CogRPCClient } from '@relaycorp/cogrpc';
 import {
+  Cargo,
   CargoCollectionAuthorization,
   CargoCollectionRequest,
   CargoDeliveryRequest,
+  CargoMessageSet,
   CargoMessageStream,
+  Certificate,
   Gateway,
   issueGatewayCertificate,
+  Parcel,
   ParcelCollectionAck,
+  RecipientAddressType,
   SessionlessEnvelopedData,
   UnboundKeyPair,
 } from '@relaycorp/relaynet-core';
+import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays, differenceInSeconds, subMinutes } from 'date-fns';
 import { v4 as getDefaultGateway } from 'default-gateway';
 import pipe from 'it-pipe';
@@ -69,6 +75,7 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
       gateway,
       client,
       currentKey,
+      parcelStore,
       parentStream,
       privateKeyStore,
       logger,
@@ -99,9 +106,10 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
 
 async function collectCargo(
   publicGateway: PublicGateway,
-  _privateGateway: Gateway,
+  privateGateway: Gateway,
   client: CogRPCClient,
   currentKey: UnboundKeyPair,
+  parcelStore: ParcelStore,
   parentStream: Duplex,
   privateKeyStore: DBPrivateKeyStore,
   logger: Logger,
@@ -109,11 +117,62 @@ async function collectCargo(
   sendStageNotificationToParent(parentStream, CourierSyncStage.COLLECTION);
 
   const ccaSerialized = await generateCCA(publicGateway, currentKey, privateKeyStore);
-  await pipe(client.collectCargo(ccaSerialized), async (cargoes: AsyncIterable<Buffer>) => {
-    for await (const cargo of cargoes) {
-      logger.warn(`Do something with ${cargo}`);
-    }
-  });
+  await pipe(
+    client.collectCargo(ccaSerialized),
+    async (cargoesSerialized: AsyncIterable<Buffer>) => {
+      // We shouldn't *have* to filter self-issued certificates, but PKI.js would hang if we don't
+      // filter out trusted certificates with a Subject Key Identifier (SKI) that matches that of
+      // the end entity certificate.
+      const ownCertificates = await privateKeyStore.fetchNodeCertificates();
+      const ownCDACertificates = await filterSelfIssuedCertificates(ownCertificates);
+
+      for await (const cargoSerialized of cargoesSerialized) {
+        let cargo: Cargo;
+        try {
+          cargo = await Cargo.deserialize(bufferToArray(cargoSerialized));
+        } catch (err) {
+          logger.info({ err }, 'Ignoring malformed/invalid cargo');
+          continue;
+        }
+        const cargoAwareLogger = logger.child({ cargoId: cargo.id });
+
+        try {
+          await cargo.validate(RecipientAddressType.PRIVATE, ownCDACertificates);
+        } catch (err) {
+          cargoAwareLogger.info({ err }, 'Ignoring cargo by unauthorized sender');
+          continue;
+        }
+
+        let cargoMessageSet: CargoMessageSet;
+        try {
+          cargoMessageSet = await privateGateway.unwrapMessagePayload(cargo);
+        } catch (err) {
+          cargoAwareLogger.info({ err }, 'Ignored cargo with invalid payload');
+          continue;
+        }
+
+        for (const itemSerialized of cargoMessageSet.messages) {
+          let item: Parcel | ParcelCollectionAck;
+          try {
+            item = await CargoMessageSet.deserializeItem(itemSerialized);
+          } catch (err) {
+            cargoAwareLogger.info({ err }, 'Ignoring invalid/malformed message');
+            continue;
+          }
+          if (item instanceof Parcel) {
+            await processParcel(
+              item,
+              itemSerialized,
+              parcelStore,
+              ownCertificates,
+              cargoAwareLogger,
+            );
+          }
+          cargoAwareLogger.info({ item }, 'sef');
+        }
+      }
+    },
+  );
 }
 
 async function generateCCA(
@@ -146,6 +205,26 @@ async function generateCCA(
   );
   const ccaSerialized = await cca.serialize(currentKey.privateKey);
   return Buffer.from(ccaSerialized);
+}
+
+async function processParcel(
+  parcel: Parcel,
+  parcelSerialized: ArrayBuffer,
+  parcelStore: ParcelStore,
+  ownCertificates: readonly Certificate[],
+  logger: Logger,
+): Promise<void> {
+  try {
+    await parcel.validate(RecipientAddressType.PRIVATE, ownCertificates);
+  } catch (err) {
+    logger.info({ err }, 'Ignoring invalid parcel');
+    return;
+  }
+  const parcelKey = await parcelStore.storeEndpointBound(Buffer.from(parcelSerialized), parcel);
+  logger.info(
+    { parcel: { id: parcel.id, key: parcelKey, recipientAddress: parcel.recipientAddress } },
+    'Stored parcel',
+  );
 }
 
 async function deliverCargo(
@@ -231,4 +310,19 @@ function sendStageNotificationToParent(parentStream: Duplex, stage: CourierSyncS
     type: 'stage',
   };
   parentStream.write(stageNotification);
+}
+
+async function filterSelfIssuedCertificates(
+  certificates: readonly Certificate[],
+): Promise<readonly Certificate[]> {
+  // tslint:disable-next-line:readonly-array
+  const selfIssuedCertificates = [];
+  for (const certificate of certificates) {
+    if (
+      certificate.getIssuerPrivateAddress() === (await certificate.calculateSubjectPrivateAddress())
+    ) {
+      selfIssuedCertificates.push(certificate);
+    }
+  }
+  return selfIssuedCertificates;
 }

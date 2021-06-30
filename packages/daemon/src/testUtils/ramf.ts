@@ -41,15 +41,14 @@ export async function makeParcel(
 }
 
 export async function makeCargo(
-  certPath: CDACertPath,
+  cdaCertPath: CDACertPath,
   keyPairSet: NodeKeyPairSet,
   payloadSerialized: Buffer,
 ): Promise<GeneratedCargo> {
   const cargo = new Cargo(
-    await certPath.privateGateway.calculateSubjectPrivateAddress(),
-    certPath.publicGateway,
+    await cdaCertPath.privateGateway.calculateSubjectPrivateAddress(),
+    cdaCertPath.publicGateway,
     payloadSerialized,
-    { senderCaCertificateChain: [certPath.privateGateway] },
   );
   const cargoSerialized = Buffer.from(await cargo.serialize(keyPairSet.publicGateway.privateKey));
   return { cargo, cargoSerialized };
