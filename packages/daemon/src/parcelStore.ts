@@ -10,6 +10,7 @@ import { ParcelCollection } from './entity/ParcelCollection';
 import { FileStore } from './fileStore';
 import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 import { ParcelCollectorManager } from './sync/publicGateway/parcelCollection/ParcelCollectorManager';
+import { MessageDirection } from './utils/MessageDirection';
 
 const PARCEL_METADATA_EXTENSION = '.pmeta';
 
@@ -23,13 +24,10 @@ export interface ParcelWithExpiryDate {
   readonly expiryDate: Date;
 }
 
-export enum ParcelDirection {
-  ENDPOINT_TO_INTERNET,
-  INTERNET_TO_ENDPOINT,
-}
-
 @Service()
 export class ParcelStore {
+  public static readonly FILE_STORE_PREFIX = 'parcels';
+
   constructor(
     @Inject() protected fileStore: FileStore,
     @Inject() protected privateKeyStore: DBPrivateKeyStore,
@@ -52,11 +50,7 @@ export class ParcelStore {
         return null;
       }
     }
-    const parcelKey = await this.store(
-      parcelSerialized,
-      parcel,
-      ParcelDirection.INTERNET_TO_ENDPOINT,
-    );
+    const parcelKey = await this.store(parcelSerialized, parcel, MessageDirection.FROM_INTERNET);
     return isParcelNew ? parcelKey : null;
   }
 
@@ -83,27 +77,27 @@ export class ParcelStore {
   }
 
   public async storeInternetBound(parcelSerialized: Buffer, parcel: Parcel): Promise<string> {
-    return this.store(parcelSerialized, parcel, ParcelDirection.ENDPOINT_TO_INTERNET);
+    return this.store(parcelSerialized, parcel, MessageDirection.TOWARDS_INTERNET);
   }
 
   public async *listInternetBound(): AsyncIterable<ParcelWithExpiryDate> {
-    const keyPrefix = getAbsoluteParcelKey(ParcelDirection.ENDPOINT_TO_INTERNET);
+    const keyPrefix = getAbsoluteParcelKey(MessageDirection.TOWARDS_INTERNET);
     const absoluteKeys = await this.fileStore.listObjects(keyPrefix);
     yield* await pipe(
       absoluteKeys,
-      this.filterActiveParcels(keyPrefix, ParcelDirection.ENDPOINT_TO_INTERNET),
+      this.filterActiveParcels(keyPrefix, MessageDirection.TOWARDS_INTERNET),
     );
   }
 
   public async retrieve(
     parcelRelativeKey: string,
-    direction: ParcelDirection,
+    direction: MessageDirection,
   ): Promise<Buffer | null> {
     const absoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
     return this.fileStore.getObject(absoluteKey);
   }
 
-  public async delete(parcelRelativeKey: string, direction: ParcelDirection): Promise<void> {
+  public async delete(parcelRelativeKey: string, direction: MessageDirection): Promise<void> {
     const absoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
     await this.fileStore.deleteObject(absoluteKey);
     await this.fileStore.deleteObject(absoluteKey + PARCEL_METADATA_EXTENSION);
@@ -112,7 +106,7 @@ export class ParcelStore {
   protected async store(
     parcelSerialized: Buffer,
     parcel: Parcel,
-    direction: ParcelDirection,
+    direction: MessageDirection,
   ): Promise<string> {
     const parcelRelativeKey = await getRelativeParcelKey(parcel, direction);
     const parcelAbsoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
@@ -129,7 +123,7 @@ export class ParcelStore {
 
   protected filterActiveParcels(
     keyPrefix: string,
-    direction: ParcelDirection,
+    direction: MessageDirection,
   ): (parcelKeys: AsyncIterable<string>) => AsyncIterable<ParcelWithExpiryDate> {
     // tslint:disable-next-line:no-this-assignment
     const store = this;
@@ -154,15 +148,15 @@ export class ParcelStore {
   protected async *listQueuedParcelsBoundForEndpoints(
     recipientPrivateAddresses: readonly string[],
   ): AsyncIterable<string> {
-    const endpointBoundPrefix = getAbsoluteParcelKey(ParcelDirection.INTERNET_TO_ENDPOINT);
+    const endpointBoundPrefix = getAbsoluteParcelKey(MessageDirection.FROM_INTERNET);
     for (const recipientPrivateAddress of recipientPrivateAddresses) {
       const keyPrefix = getAbsoluteParcelKey(
-        ParcelDirection.INTERNET_TO_ENDPOINT,
+        MessageDirection.FROM_INTERNET,
         recipientPrivateAddress,
       );
       yield* await pipe(
         this.fileStore.listObjects(keyPrefix),
-        this.filterActiveParcels(endpointBoundPrefix, ParcelDirection.INTERNET_TO_ENDPOINT),
+        this.filterActiveParcels(endpointBoundPrefix, MessageDirection.FROM_INTERNET),
         async function* (parcels: AsyncIterable<ParcelWithExpiryDate>): AsyncIterable<string> {
           for await (const parcel of parcels) {
             yield parcel.parcelKey;
@@ -192,12 +186,9 @@ export class ParcelStore {
   }
 
   protected async wasEndpointBoundParcelDelivered(parcel: Parcel): Promise<boolean> {
-    const parcelRelativeKey = await getRelativeParcelKey(
-      parcel,
-      ParcelDirection.INTERNET_TO_ENDPOINT,
-    );
+    const parcelRelativeKey = await getRelativeParcelKey(parcel, MessageDirection.FROM_INTERNET);
     const parcelAbsoluteKey = getAbsoluteParcelKey(
-      ParcelDirection.INTERNET_TO_ENDPOINT,
+      MessageDirection.FROM_INTERNET,
       parcelRelativeKey,
     );
     return !(await this.fileStore.objectExists(parcelAbsoluteKey));
@@ -208,21 +199,21 @@ function sha256Hex(plaintext: string): string {
   return createHash('sha256').update(plaintext).digest('hex');
 }
 
-async function getRelativeParcelKey(parcel: Parcel, direction: ParcelDirection): Promise<string> {
+async function getRelativeParcelKey(parcel: Parcel, direction: MessageDirection): Promise<string> {
   const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectPrivateAddress();
   // Hash some components together to avoid exceeding Windows' 260-char limit for paths
   const keyComponents =
-    direction === ParcelDirection.ENDPOINT_TO_INTERNET
+    direction === MessageDirection.TOWARDS_INTERNET
       ? [senderPrivateAddress, await sha256Hex(parcel.recipientAddress + parcel.id)]
       : [parcel.recipientAddress, await sha256Hex(senderPrivateAddress + parcel.id)];
   return join(...keyComponents);
 }
 
-function getAbsoluteParcelKey(direction: ParcelDirection, parcelRelativeKey?: string): string {
+function getAbsoluteParcelKey(direction: MessageDirection, parcelRelativeKey?: string): string {
   const subComponent =
-    direction === ParcelDirection.ENDPOINT_TO_INTERNET ? 'internet-bound' : 'endpoint-bound';
+    direction === MessageDirection.TOWARDS_INTERNET ? 'internet-bound' : 'endpoint-bound';
   const trailingComponents = parcelRelativeKey ? [parcelRelativeKey] : [];
-  return join('parcels', subComponent, ...trailingComponents);
+  return join(ParcelStore.FILE_STORE_PREFIX, subComponent, ...trailingComponents);
 }
 
 async function wasEndpointBoundParcelCollected(parcel: Parcel): Promise<boolean> {

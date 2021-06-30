@@ -11,7 +11,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { PassThrough } from 'stream';
 
 import { DEFAULT_PUBLIC_GATEWAY } from '../../../constants';
-import { ParcelDirection, ParcelStore } from '../../../parcelStore';
+import { ParcelStore } from '../../../parcelStore';
 import { useTemporaryAppDirs } from '../../../testUtils/appDirs';
 import { generatePKIFixture, mockGatewayRegistration } from '../../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../../testUtils/db';
@@ -21,6 +21,7 @@ import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
 import { GeneratedParcel, makeParcel } from '../../../testUtils/ramf';
 import { recordReadableStreamMessages } from '../../../testUtils/stream';
 import { mockSleepSeconds } from '../../../testUtils/timing';
+import { MessageDirection } from '../../../utils/MessageDirection';
 import * as gscClient from '../gscClient';
 import { ParcelCollectionNotification, ParcelCollectorStatus } from './messaging';
 import runParcelCollection from './subprocess';
@@ -145,7 +146,7 @@ describe('Parcel collection', () => {
 
   test('Well-formed yet invalid parcel should be ACKed and ignored', async () => {
     const { parcelSerialized: invalidParcelSerialized } = await makeDummyParcel(
-      ParcelDirection.ENDPOINT_TO_INTERNET, // Wrong direction
+      MessageDirection.TOWARDS_INTERNET, // Wrong direction
     );
     const collectionAck = jest.fn();
     addParcelCollectionCall(invalidParcelSerialized, collectionAck);
@@ -363,8 +364,8 @@ function addParcelCollectionCall(
 }
 
 async function makeDummyParcel(
-  direction: ParcelDirection = ParcelDirection.INTERNET_TO_ENDPOINT,
+  direction: MessageDirection = MessageDirection.FROM_INTERNET,
 ): Promise<GeneratedParcel> {
-  const { certPath, keyPairSet } = retrievePKIFixture();
-  return makeParcel(direction, certPath, keyPairSet);
+  const { pdaCertPath, keyPairSet } = retrievePKIFixture();
+  return makeParcel(direction, pdaCertPath, keyPairSet);
 }

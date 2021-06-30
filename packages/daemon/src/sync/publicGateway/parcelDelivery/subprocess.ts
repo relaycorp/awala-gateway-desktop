@@ -8,8 +8,9 @@ import { source } from 'stream-to-it';
 import { Container } from 'typedi';
 
 import { DBPrivateKeyStore } from '../../../keystores/DBPrivateKeyStore';
-import { ParcelDirection, ParcelStore, ParcelWithExpiryDate } from '../../../parcelStore';
+import { ParcelStore, ParcelWithExpiryDate } from '../../../parcelStore';
 import { LOGGER } from '../../../tokens';
+import { MessageDirection } from '../../../utils/MessageDirection';
 import { GatewayRegistrar } from '../GatewayRegistrar';
 import { makeGSCClient } from '../gscClient';
 
@@ -51,7 +52,7 @@ async function deliverParcels(
     for await (const parcelKey of parcelKeys) {
       const parcelSerialized = await parcelStore.retrieve(
         parcelKey,
-        ParcelDirection.ENDPOINT_TO_INTERNET,
+        MessageDirection.TOWARDS_INTERNET,
       );
       const parcelAwareLogger = logger.child({ parcelKey });
       if (parcelSerialized) {
@@ -73,7 +74,7 @@ async function deliverParcels(
         }
 
         if (deleteParcel) {
-          await parcelStore.delete(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET);
+          await parcelStore.delete(parcelKey, MessageDirection.TOWARDS_INTERNET);
         }
       } else {
         parcelAwareLogger.info('Skipping non-existing parcel');

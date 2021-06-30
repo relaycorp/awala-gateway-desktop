@@ -1,4 +1,6 @@
 import {
+  CDACertPath,
+  generateCDACertificationPath,
   generateNodeKeyPairSet,
   generatePDACertificationPath,
   NodeKeyPairSet,
@@ -7,6 +9,7 @@ import {
 import { BinaryLike, createHash, Hash } from 'crypto';
 
 import { DEFAULT_PUBLIC_GATEWAY } from '../constants';
+import { UnregisteredGatewayError } from '../errors';
 import { DBPrivateKeyStore } from '../keystores/DBPrivateKeyStore';
 import { GatewayRegistrar } from '../sync/publicGateway/GatewayRegistrar';
 import { mockSpy } from './jest';
@@ -21,25 +24,29 @@ export function sha256Hex(plaintext: string): string {
 
 export type PKIFixtureRetriever = () => {
   readonly keyPairSet: NodeKeyPairSet;
-  readonly certPath: PDACertPath;
+  readonly pdaCertPath: PDACertPath;
+  readonly cdaCertPath: CDACertPath;
 };
 
 export function generatePKIFixture(
-  cb: (keyPairSet: NodeKeyPairSet, certPath: PDACertPath) => void,
+  cb: (keyPairSet: NodeKeyPairSet, pdaCertPath: PDACertPath, cdaCertPath: CDACertPath) => void,
 ): PKIFixtureRetriever {
   let keyPairSet: NodeKeyPairSet;
-  let certPath: PDACertPath;
+  let pdaCertPath: PDACertPath;
+  let cdaCertPath: CDACertPath;
 
   beforeAll(async () => {
     keyPairSet = await generateNodeKeyPairSet();
-    certPath = await generatePDACertificationPath(keyPairSet);
+    pdaCertPath = await generatePDACertificationPath(keyPairSet);
+    cdaCertPath = await generateCDACertificationPath(keyPairSet);
 
-    cb(keyPairSet, certPath);
+    cb(keyPairSet, pdaCertPath, cdaCertPath);
   });
 
   return () => ({
-    certPath,
+    cdaCertPath,
     keyPairSet,
+    pdaCertPath,
   });
 }
 
@@ -47,9 +54,9 @@ export function mockGatewayRegistration(pkiFixtureRetriever: PKIFixtureRetriever
   const mockGetPublicGateway = mockSpy(
     jest.spyOn(GatewayRegistrar.prototype, 'getPublicGateway'),
     () => {
-      const { certPath } = pkiFixtureRetriever();
+      const { pdaCertPath } = pkiFixtureRetriever();
       return {
-        identityCertificate: certPath.publicGateway,
+        identityCertificate: pdaCertPath.publicGateway,
         publicAddress: DEFAULT_PUBLIC_GATEWAY,
       };
     },
@@ -62,18 +69,25 @@ export function mockGatewayRegistration(pkiFixtureRetriever: PKIFixtureRetriever
   const mockGetCurrentKey = mockSpy(
     jest.spyOn(DBPrivateKeyStore.prototype, 'getCurrentKey'),
     () => {
-      const { certPath, keyPairSet } = pkiFixtureRetriever();
+      const { pdaCertPath, keyPairSet } = pkiFixtureRetriever();
       return {
-        certificate: certPath.privateGateway,
+        certificate: pdaCertPath.privateGateway,
         privateKey: keyPairSet.privateGateway.privateKey,
       };
+    },
+  );
+  const mockGetOrCreateCCAIssuer = mockSpy(
+    jest.spyOn(DBPrivateKeyStore.prototype, 'getOrCreateCCAIssuer'),
+    () => {
+      const { cdaCertPath } = pkiFixtureRetriever();
+      return cdaCertPath.privateGateway;
     },
   );
   const mockFetchNodeCertificates = mockSpy(
     jest.spyOn(DBPrivateKeyStore.prototype, 'fetchNodeCertificates'),
     () => {
-      const { certPath } = pkiFixtureRetriever();
-      return [certPath.privateGateway];
+      const { pdaCertPath } = pkiFixtureRetriever();
+      return [pdaCertPath.privateGateway];
     },
   );
 
@@ -82,5 +96,8 @@ export function mockGatewayRegistration(pkiFixtureRetriever: PKIFixtureRetriever
     mockIsRegistered.mockResolvedValue(false);
     mockGetCurrentKey.mockResolvedValue(null);
     mockFetchNodeCertificates.mockResolvedValue([]);
+    mockGetOrCreateCCAIssuer.mockRejectedValue(
+      new UnregisteredGatewayError('Mocking gateway deregistration'),
+    );
   };
 }

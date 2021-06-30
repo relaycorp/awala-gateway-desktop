@@ -5,13 +5,14 @@ import { PassThrough } from 'stream';
 import { Container } from 'typedi';
 
 import { DEFAULT_PUBLIC_GATEWAY } from '../../../constants';
-import { ParcelDirection, ParcelStore } from '../../../parcelStore';
+import { ParcelStore } from '../../../parcelStore';
 import { useTemporaryAppDirs } from '../../../testUtils/appDirs';
 import { generatePKIFixture, mockGatewayRegistration } from '../../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../../testUtils/db';
 import { mockSpy } from '../../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
 import { GeneratedParcel, makeParcel } from '../../../testUtils/ramf';
+import { MessageDirection } from '../../../utils/MessageDirection';
 import * as gscClient from '../gscClient';
 import runParcelDelivery from './subprocess';
 
@@ -133,7 +134,7 @@ describe('Parcel delivery', () => {
     await runParcelDelivery(parentStream);
 
     await expect(
-      parcelStore.retrieve(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET),
+      parcelStore.retrieve(parcelKey, MessageDirection.TOWARDS_INTERNET),
     ).resolves.toBeNull();
   });
 
@@ -161,7 +162,7 @@ describe('Parcel delivery', () => {
     await runParcelDelivery(parentStream);
 
     await expect(
-      parcelStore.retrieve(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET),
+      parcelStore.retrieve(parcelKey, MessageDirection.TOWARDS_INTERNET),
     ).resolves.toBeNull();
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Parcel was refused by the public gateway', { parcelKey }),
@@ -178,7 +179,7 @@ describe('Parcel delivery', () => {
     await runParcelDelivery(parentStream);
 
     await expect(
-      parcelStore.retrieve(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET),
+      parcelStore.retrieve(parcelKey, MessageDirection.TOWARDS_INTERNET),
     ).resolves.not.toBeNull();
     expect(mockLogs).toContainEqual(
       partialPinoLog('warn', 'Parcel delivery failed due to server error', {
@@ -198,7 +199,7 @@ describe('Parcel delivery', () => {
     await runParcelDelivery(parentStream);
 
     await expect(
-      parcelStore.retrieve(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET),
+      parcelStore.retrieve(parcelKey, MessageDirection.TOWARDS_INTERNET),
     ).resolves.not.toBeNull();
     expect(mockLogs).toContainEqual(
       partialPinoLog('fatal', 'Parcel delivery failed due to unexpected error', {
@@ -209,8 +210,8 @@ describe('Parcel delivery', () => {
   });
 
   async function makeDummyParcel(): Promise<GeneratedParcel> {
-    const { certPath, keyPairSet } = pkiFixtureRetriever();
-    return makeParcel(ParcelDirection.ENDPOINT_TO_INTERNET, certPath, keyPairSet);
+    const { pdaCertPath, keyPairSet } = pkiFixtureRetriever();
+    return makeParcel(MessageDirection.TOWARDS_INTERNET, pdaCertPath, keyPairSet);
   }
 });
 
