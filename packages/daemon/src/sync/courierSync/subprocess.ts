@@ -22,7 +22,7 @@ import pipe from 'it-pipe';
 import { Logger } from 'pino';
 import { Duplex } from 'stream';
 import { Container } from 'typedi';
-import { getRepository } from 'typeorm';
+import { getRepository, Repository } from 'typeorm';
 import uuid from 'uuid-random';
 
 import { COURIER_PORT, CourierSyncExitCode, CourierSyncStage } from '.';
@@ -35,7 +35,7 @@ import { MessageDirection } from '../../utils/MessageDirection';
 import { sleepSeconds } from '../../utils/timing';
 import { GatewayRegistrar } from '../publicGateway/GatewayRegistrar';
 import { PublicGateway } from '../publicGateway/PublicGateway';
-import { CourierSyncStageNotification } from './messaging';
+import { CourierSyncStageNotification, ParcelCollectionNotification } from './messaging';
 
 const DELAY_BETWEEN_COLLECTION_AND_DELIVERY_SECONDS = 5;
 
@@ -126,6 +126,8 @@ async function collectCargo(
       const ownCertificates = await privateKeyStore.fetchNodeCertificates();
       const ownCDACertificates = await filterSelfIssuedCertificates(ownCertificates);
 
+      const parcelCollectionRepo = getRepository(ParcelCollection);
+
       for await (const cargoSerialized of cargoesSerialized) {
         let cargo: Cargo;
         try {
@@ -165,6 +167,8 @@ async function collectCargo(
               itemSerialized,
               parcelStore,
               ownCertificates,
+              parcelCollectionRepo,
+              parentStream,
               cargoAwareLogger,
             );
           } else {
@@ -213,6 +217,8 @@ async function processParcel(
   parcelSerialized: ArrayBuffer,
   parcelStore: ParcelStore,
   ownCertificates: readonly Certificate[],
+  parcelCollectionRepo: Repository<ParcelCollection>,
+  parentStream: Duplex,
   logger: Logger,
 ): Promise<void> {
   try {
@@ -222,6 +228,23 @@ async function processParcel(
     return;
   }
   const parcelKey = await parcelStore.storeEndpointBound(Buffer.from(parcelSerialized), parcel);
+
+  const collection = parcelCollectionRepo.create({
+    parcelExpiryDate: parcel.expiryDate,
+    parcelId: parcel.id,
+    recipientEndpointAddress: parcel.recipientAddress,
+    senderEndpointPrivateAddress: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+  });
+  await parcelCollectionRepo.save(collection);
+
+  if (parcelKey) {
+    const notification: ParcelCollectionNotification = {
+      parcelKey,
+      type: 'parcelCollection',
+    };
+    parentStream.write(notification);
+  }
+
   logger.info(
     { parcel: { id: parcel.id, key: parcelKey, recipientAddress: parcel.recipientAddress } },
     'Stored parcel',

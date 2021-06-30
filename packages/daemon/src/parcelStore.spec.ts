@@ -361,6 +361,23 @@ describe('streamEndpointBound', () => {
     expect(parcelObjects).toContain(await computeEndpointBoundParcelKey(parcel1));
   });
 
+  test('Endpoint addresses should be deduped', async () => {
+    const { parcel: parcel1, parcelSerialized: parcel1Serialized } =
+      await makeEndpointBoundParcel();
+    await parcelStore.storeEndpointBound(parcel1Serialized, parcel1);
+    const { parcel: parcel2, parcelSerialized: parcel2Serialized } =
+      await makeEndpointBoundParcel();
+    await parcelStore.storeEndpointBound(parcel2Serialized, parcel2);
+
+    const parcelObjects = await asyncIterableToArray(
+      parcelStore.streamEndpointBound([localEndpoint1Address, localEndpoint1Address], false),
+    );
+
+    expect(parcelObjects).toHaveLength(2);
+    expect(parcelObjects).toContain(await computeEndpointBoundParcelKey(parcel1));
+    expect(parcelObjects).toContain(await computeEndpointBoundParcelKey(parcel2));
+  });
+
   test('New parcels should be output after queued ones if keep alive is on', async () => {
     const { parcel: parcel1, parcelSerialized: parcel1Serialized } =
       await makeEndpointBoundParcel();

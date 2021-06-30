@@ -67,12 +67,14 @@ export class ParcelStore {
     recipientPrivateAddresses: readonly string[],
     keepAlive: boolean,
   ): AsyncIterable<string> {
-    yield* await this.listQueuedParcelsBoundForEndpoints(recipientPrivateAddresses);
+    const uniqueRecipientAddresses = Array.from(new Set(recipientPrivateAddresses));
+
+    yield* await this.listQueuedParcelsBoundForEndpoints(uniqueRecipientAddresses);
 
     if (keepAlive) {
       // TODO: Find way not to miss newly-collected parcels between listing queued ones and watching
       const parcelCollectorManager = Container.get(ParcelCollectorManager);
-      yield* await parcelCollectorManager.watchCollectionsForRecipients(recipientPrivateAddresses);
+      yield* await parcelCollectorManager.watchCollectionsForRecipients(uniqueRecipientAddresses);
     }
   }
 

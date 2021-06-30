@@ -34,7 +34,7 @@ import { GeneratedCargo, GeneratedParcel, makeCargo, makeParcel } from '../../te
 import { makeStubPassThrough, recordReadableStreamMessages } from '../../testUtils/stream';
 import { MessageDirection } from '../../utils/MessageDirection';
 import { sleepSeconds } from '../../utils/timing';
-import { CourierSyncStageNotification } from './messaging';
+import { CourierSyncStageNotification, ParcelCollectionNotification } from './messaging';
 import runCourierSync from './subprocess';
 
 jest.mock('default-gateway', () => ({ v4: jest.fn() }));
@@ -349,16 +349,62 @@ describe('Cargo collection', () => {
       );
     });
 
-    describe('New parcels', () => {
-      test.todo('Parcel ACK should be added to queue');
+    test('Parcel should be added to parcel collection', async () => {
+      const { parcel, parcelSerialized } = await makeDummyParcel();
+      const { cargoSerialized } = await makeDummyCargoFromMessages(parcelSerialized);
+      mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
 
-      test.todo('Parent process should be notified about collection');
+      await runCourierSync(getParentStream());
+
+      const parcelCollectionRepo = getRepository(ParcelCollection);
+      const collection = await parcelCollectionRepo.findOneOrFail({
+        parcelId: parcel.id,
+        recipientEndpointAddress: parcel.recipientAddress,
+        senderEndpointPrivateAddress:
+          await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+      });
+      expect(collection.parcelExpiryDate).toEqual(parcel.expiryDate);
     });
 
-    describe('Old parcels', () => {
-      test.todo('Parcel ACK should not be added to queue');
+    test('Parent process should be notified about collection if parcel is new', async () => {
+      const { parcel, parcelSerialized } = await makeDummyParcel();
+      const { cargoSerialized } = await makeDummyCargoFromMessages(parcelSerialized);
+      mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
+      const parentStream = getParentStream();
+      const getParentProcessMessages = recordReadableStreamMessages(parentStream);
 
-      test.todo('Parent process should not be notified about collection');
+      await runCourierSync(parentStream);
+
+      expect(getParentProcessMessages()).toContainEqual<ParcelCollectionNotification>({
+        parcelKey: expect.stringContaining(parcel.recipientAddress),
+        type: 'parcelCollection',
+      });
+    });
+
+    test('Parent process should not be notified about collection if parcel is old', async () => {
+      const { parcel, parcelSerialized } = await makeDummyParcel();
+      const parcelCollectionRepo = getRepository(ParcelCollection);
+      await parcelCollectionRepo.save(
+        parcelCollectionRepo.create({
+          parcelExpiryDate: parcel.expiryDate,
+          parcelId: parcel.id,
+          recipientEndpointAddress: parcel.recipientAddress,
+          senderEndpointPrivateAddress:
+            await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+        }),
+      );
+      const { cargoSerialized } = await makeDummyCargoFromMessages(parcelSerialized);
+      mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
+      const parentStream = getParentStream();
+      const getParentProcessMessages = recordReadableStreamMessages(parentStream);
+
+      await runCourierSync(parentStream);
+
+      expect(getParentProcessMessages()).not.toContainEqual(
+        expect.objectContaining({
+          type: 'parcelCollection',
+        }),
+      );
     });
   });
 
@@ -408,9 +454,30 @@ describe('Cargo collection', () => {
     }
   });
 
-  test.todo('Cargo should be acknowledged after messages have been processed');
+  test('Multiple cargoes should be processed', async () => {
+    const { parcelSerialized: parcel1Serialized } = await makeDummyParcel();
+    const { cargoSerialized: cargo1Serialized } = await makeDummyCargoFromMessages(
+      parcel1Serialized,
+    );
+    const { parcelSerialized: parcel2Serialized } = await makeDummyParcel();
+    const { cargoSerialized: cargo2Serialized } = await makeDummyCargoFromMessages(
+      parcel2Serialized,
+    );
+    mockCollectCargo.mockReturnValueOnce(
+      arrayToAsyncIterable([cargo1Serialized, cargo2Serialized]),
+    );
 
-  test.todo('Multiple cargoes should be processed');
+    await runCourierSync(getParentStream());
+
+    const { pdaCertPath } = await pkiFixtureRetriever();
+    const parcelKeys = await asyncIterableToArray(
+      parcelStore.streamEndpointBound(
+        [await pdaCertPath.privateEndpoint.calculateSubjectPrivateAddress()],
+        false,
+      ),
+    );
+    expect(parcelKeys).toHaveLength(2);
+  });
 
   async function makeDummyParcel(): Promise<GeneratedParcel> {
     const { pdaCertPath, keyPairSet } = await pkiFixtureRetriever();

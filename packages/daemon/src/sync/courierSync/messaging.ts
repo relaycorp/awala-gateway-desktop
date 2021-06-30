@@ -5,3 +5,8 @@ export interface CourierSyncStageNotification extends IPCMessage {
   readonly stage: CourierSyncStage;
   readonly type: 'stage';
 }
+
+export interface ParcelCollectionNotification extends IPCMessage {
+  readonly parcelKey: string;
+  readonly type: 'parcelCollection';
+}
