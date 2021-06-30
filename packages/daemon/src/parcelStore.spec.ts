@@ -4,6 +4,7 @@ import {
   issueDeliveryAuthorization,
   issueEndpointCertificate,
   Parcel,
+  ParcelCollectionAck,
 } from '@relaycorp/relaynet-core';
 import { deserialize, Document, serialize } from 'bson';
 import { subSeconds } from 'date-fns';
@@ -21,7 +22,7 @@ import { useTemporaryAppDirs } from './testUtils/appDirs';
 import { generatePKIFixture, mockGatewayRegistration, sha256Hex } from './testUtils/crypto';
 import { setUpTestDBConnection } from './testUtils/db';
 import { arrayToAsyncIterable, asyncIterableToArray } from './testUtils/iterables';
-import { mockSpy } from './testUtils/jest';
+import { getMockInstance, mockSpy } from './testUtils/jest';
 import { mockLoggerToken } from './testUtils/logging';
 import { GeneratedParcel } from './testUtils/ramf';
 import { MessageDirection } from './utils/MessageDirection';
@@ -510,6 +511,51 @@ describe('delete', () => {
     await parcelStore.delete(key, MessageDirection.TOWARDS_INTERNET);
 
     await expect(fs.stat(parcelMetadataPath)).toReject();
+  });
+});
+
+describe('deleteInternetBoundFromACK', () => {
+  beforeEach(() => {
+    jest.spyOn(parcelStore, 'delete').mockReset();
+  });
+  afterEach(() => {
+    getMockInstance(parcelStore.delete).mockRestore();
+  });
+
+  test('Existing parcel should be deleted', async () => {
+    const { parcel, parcelSerialized } = await makeInternetBoundParcel();
+    const parcelKey = await parcelStore.storeInternetBound(parcelSerialized, parcel);
+    const ack = new ParcelCollectionAck(
+      await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+      parcel.recipientAddress,
+      parcel.id,
+    );
+
+    await parcelStore.deleteInternetBoundFromACK(ack);
+
+    expect(parcelStore.delete).toBeCalledWith(parcelKey, MessageDirection.TOWARDS_INTERNET);
+  });
+
+  test('ACK should be ignored if sender address is malformed', async () => {
+    const { parcel } = await makeInternetBoundParcel();
+    const ack = new ParcelCollectionAck('..', parcel.recipientAddress, parcel.id);
+
+    await parcelStore.deleteInternetBoundFromACK(ack);
+
+    expect(parcelStore.delete).not.toBeCalled();
+  });
+
+  test('ACK should be ignored if parcel id is malformed', async () => {
+    const { parcel } = await makeInternetBoundParcel();
+    const ack = new ParcelCollectionAck(
+      await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+      parcel.recipientAddress,
+      '..',
+    );
+
+    await parcelStore.deleteInternetBoundFromACK(ack);
+
+    expect(parcelStore.delete).not.toBeCalled();
   });
 });
 

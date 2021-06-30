@@ -167,8 +167,9 @@ async function collectCargo(
               ownCertificates,
               cargoAwareLogger,
             );
+          } else {
+            await processParcelCollectionAck(item, parcelStore, cargoAwareLogger);
           }
-          cargoAwareLogger.info({ item }, 'sef');
         }
       }
     },
@@ -225,6 +226,24 @@ async function processParcel(
     { parcel: { id: parcel.id, key: parcelKey, recipientAddress: parcel.recipientAddress } },
     'Stored parcel',
   );
+}
+
+async function processParcelCollectionAck(
+  ack: ParcelCollectionAck,
+  parcelStore: ParcelStore,
+  logger: Logger,
+): Promise<void> {
+  logger.info(
+    {
+      parcel: {
+        id: ack.parcelId,
+        recipientAddress: ack.recipientEndpointAddress,
+        senderAddress: ack.senderEndpointPrivateAddress,
+      },
+    },
+    'Deleting ACKed parcel',
+  );
+  await parcelStore.deleteInternetBoundFromACK(ack);
 }
 
 async function deliverCargo(

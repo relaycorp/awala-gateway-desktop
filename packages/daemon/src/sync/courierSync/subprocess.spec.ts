@@ -363,7 +363,49 @@ describe('Cargo collection', () => {
   });
 
   describe('Encapsulated parcel collection ACKs', () => {
-    test.todo('ACKed parcel should be deleted');
+    test('ACKed parcel should be deleted', async () => {
+      const { pdaCertPath, keyPairSet } = await pkiFixtureRetriever();
+      const { parcel, parcelSerialized } = await makeParcel(
+        MessageDirection.TOWARDS_INTERNET,
+        pdaCertPath,
+        keyPairSet,
+      );
+      await parcelStore.storeInternetBound(parcelSerialized, parcel);
+      const ackSerialized = makeParcelCollectionAck(
+        await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+        parcel.recipientAddress,
+        parcel.id,
+      );
+      const { cargo, cargoSerialized } = await makeDummyCargoFromMessages(ackSerialized);
+      mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
+
+      await runCourierSync(getParentStream());
+
+      await expect(asyncIterableToArray(parcelStore.listInternetBound())).resolves.toHaveLength(0);
+      expect(mockLogs).toContainEqual(
+        partialPinoLog('info', 'Deleting ACKed parcel', {
+          cargoId: cargo.id,
+          parcel: {
+            id: parcel.id,
+            recipientAddress: parcel.recipientAddress,
+            senderAddress: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+          },
+        }),
+      );
+    });
+
+    function makeParcelCollectionAck(
+      senderEndpointPrivateAddress: string,
+      recipientEndpointAddress: string,
+      parcelId: string,
+    ): Buffer {
+      const ack = new ParcelCollectionAck(
+        senderEndpointPrivateAddress,
+        recipientEndpointAddress,
+        parcelId,
+      );
+      return Buffer.from(ack.serialize());
+    }
   });
 
   test.todo('Cargo should be acknowledged after messages have been processed');

@@ -1,4 +1,4 @@
-import { Parcel } from '@relaycorp/relaynet-core';
+import { Parcel, ParcelCollectionAck } from '@relaycorp/relaynet-core';
 import { deserialize, Document, serialize } from 'bson';
 import { createHash } from 'crypto';
 import pipe from 'it-pipe';
@@ -103,6 +103,21 @@ export class ParcelStore {
     await this.fileStore.deleteObject(absoluteKey + PARCEL_METADATA_EXTENSION);
   }
 
+  public async deleteInternetBoundFromACK(ack: ParcelCollectionAck): Promise<void> {
+    const isAckValid =
+      isAlphaNumeric(ack.senderEndpointPrivateAddress) && isAlphaNumeric(ack.parcelId);
+    if (!isAckValid) {
+      return;
+    }
+    const relativeKey = await getRelativeParcelKeyFromParts(
+      ack.senderEndpointPrivateAddress,
+      ack.recipientEndpointAddress,
+      ack.parcelId,
+      MessageDirection.TOWARDS_INTERNET,
+    );
+    await this.delete(relativeKey, MessageDirection.TOWARDS_INTERNET);
+  }
+
   protected async store(
     parcelSerialized: Buffer,
     parcel: Parcel,
@@ -201,11 +216,25 @@ function sha256Hex(plaintext: string): string {
 
 async function getRelativeParcelKey(parcel: Parcel, direction: MessageDirection): Promise<string> {
   const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectPrivateAddress();
+  return getRelativeParcelKeyFromParts(
+    senderPrivateAddress,
+    parcel.recipientAddress,
+    parcel.id,
+    direction,
+  );
+}
+
+async function getRelativeParcelKeyFromParts(
+  senderPrivateAddress: string,
+  recipientAddress: string,
+  parcelId: string,
+  direction: MessageDirection,
+): Promise<string> {
   // Hash some components together to avoid exceeding Windows' 260-char limit for paths
   const keyComponents =
     direction === MessageDirection.TOWARDS_INTERNET
-      ? [senderPrivateAddress, await sha256Hex(parcel.recipientAddress + parcel.id)]
-      : [parcel.recipientAddress, await sha256Hex(senderPrivateAddress + parcel.id)];
+      ? [senderPrivateAddress, await sha256Hex(recipientAddress + parcelId)]
+      : [recipientAddress, await sha256Hex(senderPrivateAddress + parcelId)];
   return join(...keyComponents);
 }
 
@@ -224,4 +253,8 @@ async function wasEndpointBoundParcelCollected(parcel: Parcel): Promise<boolean>
     senderEndpointPrivateAddress: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
   });
   return 0 < parcelCollectionsCount;
+}
+
+function isAlphaNumeric(string: string): boolean {
+  return /^[\w-]+$/.test(string);
 }
