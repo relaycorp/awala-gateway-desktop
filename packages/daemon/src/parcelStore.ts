@@ -101,6 +101,8 @@ export class ParcelStore {
   }
 
   public async delete(parcelRelativeKey: string, direction: MessageDirection): Promise<void> {
+    const logger = Container.get(LOGGER); // TODO: REMOVE NOW. Only for debugging CI.
+    logger.info({ parcelRelativeKey }, 'About to delete parcel');
     const absoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
     await this.fileStore.deleteObject(absoluteKey);
     await this.fileStore.deleteObject(absoluteKey + PARCEL_METADATA_EXTENSION);
@@ -127,7 +129,7 @@ export class ParcelStore {
     direction: MessageDirection,
   ): Promise<string> {
     const logger = Container.get(LOGGER); // TODO: REMOVE NOW. Only for debugging CI.
-    logger.info({ parcelId: parcel.id, actualDate: new Date().getTime() }, 'About to store parcel');
+    logger.info({ parcelId: parcel.id }, 'About to store parcel');
     const parcelRelativeKey = await getRelativeParcelKey(parcel, direction);
     const parcelAbsoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
     await this.fileStore.putObject(parcelSerialized, parcelAbsoluteKey);
@@ -138,7 +140,7 @@ export class ParcelStore {
       parcelAbsoluteKey + PARCEL_METADATA_EXTENSION,
     );
 
-    logger.info({ parcelRelativeKey, actualDate: new Date().getTime() }, 'Parcel stored');
+    logger.info({ parcelRelativeKey }, 'Parcel stored');
     return parcelRelativeKey;
   }
 
