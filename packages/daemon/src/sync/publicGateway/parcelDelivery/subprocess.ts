@@ -50,7 +50,6 @@ async function deliverParcels(
 
   return async (parcelKeys: AsyncIterable<string>) => {
     for await (const parcelKey of parcelKeys) {
-      logger.info({ parcelKey }, 'Retrieving parcel'); // TODO: REMOVE
       const parcelSerialized = await parcelStore.retrieve(
         parcelKey,
         MessageDirection.TOWARDS_INTERNET,
@@ -75,7 +74,6 @@ async function deliverParcels(
         }
 
         if (deleteParcel) {
-          parcelAwareLogger.info('About to delete parcel in subprocess'); // TODO: REMOVE
           await parcelStore.delete(parcelKey, MessageDirection.TOWARDS_INTERNET);
         }
       } else {

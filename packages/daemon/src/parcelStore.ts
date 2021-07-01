@@ -12,7 +12,6 @@ import { FileStore } from './fileStore';
 import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 import { CourierSyncManager } from './sync/courierSync/CourierSyncManager';
 import { ParcelCollectorManager } from './sync/publicGateway/parcelCollection/ParcelCollectorManager';
-import { LOGGER } from './tokens';
 import { MessageDirection } from './utils/MessageDirection';
 
 const PARCEL_METADATA_EXTENSION = '.pmeta';
@@ -107,9 +106,6 @@ export class ParcelStore {
   }
 
   public async delete(parcelRelativeKey: string, direction: MessageDirection): Promise<void> {
-    const logger = Container.get(LOGGER); // TODO: REMOVE NOW. Only for debugging CI.
-    const error = new Error();
-    logger.info({ parcelRelativeKey, stack: error.stack }, 'About to delete parcel');
     const absoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
     await this.fileStore.deleteObject(absoluteKey);
     await this.fileStore.deleteObject(absoluteKey + PARCEL_METADATA_EXTENSION);
@@ -135,8 +131,6 @@ export class ParcelStore {
     parcel: Parcel,
     direction: MessageDirection,
   ): Promise<string> {
-    const logger = Container.get(LOGGER); // TODO: REMOVE NOW. Only for debugging CI.
-    logger.info({ parcelId: parcel.id }, 'About to store parcel');
     const parcelRelativeKey = await getRelativeParcelKey(parcel, direction);
     const parcelAbsoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
 
@@ -150,7 +144,6 @@ export class ParcelStore {
 
     await this.fileStore.putObject(parcelSerialized, parcelAbsoluteKey);
 
-    logger.info({ parcelRelativeKey, parcelMetadata }, 'Parcel stored');
     return parcelRelativeKey;
   }
 
@@ -170,8 +163,6 @@ export class ParcelStore {
         const expiryDate = await store.getParcelExpiryDate(absoluteKey);
         const now = new Date();
         if (!expiryDate || expiryDate < now) {
-          const logger = Container.get(LOGGER); // TODO: REMOVE NOW. Only for debugging CI.
-          logger.info({ relativeKey, expiryDate, now }, 'Deleting expired parcel...');
           await store.delete(relativeKey, direction);
           continue;
         }
@@ -203,25 +194,18 @@ export class ParcelStore {
   }
 
   protected async getParcelExpiryDate(parcelKey: string): Promise<Date | null> {
-    const logger = Container.get(LOGGER); // TODO: REMOVE NOW. Only for debugging CI.
     const parcelMetadataKey = parcelKey + PARCEL_METADATA_EXTENSION;
     const metadataFile = await this.fileStore.getObject(parcelMetadataKey);
     if (!metadataFile) {
-      logger.info('getParcelExpiryDate, metadataFile does not exist');
       return null;
     }
     let document: Document;
     try {
       document = deserialize(metadataFile);
     } catch (err) {
-      logger.info('getParcelExpiryDate, metadataFile is malformed');
       return null;
     }
     if (!Number.isFinite(document.expiryDate)) {
-      logger.info(
-        { expiryDate: document.expiryDate },
-        'getParcelExpiryDate, expiryDate is not a number',
-      );
       return null;
     }
     const expiryTimestamp = document.expiryDate * 1_000;

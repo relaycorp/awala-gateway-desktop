@@ -12,9 +12,7 @@ import { setUpTestDBConnection } from '../../../testUtils/db';
 import { mockSpy } from '../../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
 import { GeneratedParcel, makeParcel } from '../../../testUtils/ramf';
-import { setImmediateAsync } from '../../../testUtils/timing';
 import { MessageDirection } from '../../../utils/MessageDirection';
-import { sleepSeconds } from '../../../utils/timing';
 import * as gscClient from '../gscClient';
 import runParcelDelivery from './subprocess';
 
@@ -98,23 +96,12 @@ describe('Parcel delivery', () => {
     mockGSCClient = new MockGSCClient([parcelDeliveryCall]);
 
     let parcelKey: string;
-    await Promise.all([
-      runParcelDelivery(parentStream),
-      (async () => {
-        await setImmediateAsync(); // Wait for the subprocess to be up and running
-        parcelKey = await parcelStore.storeInternetBound(parcelSerialized, parcel);
-        // TODO: UNDO
-        await sleepSeconds(2); // TODO: Really necessary to work on Windows/macOS?
-        mockLogs.push([
-          'Retrieval after storage:',
-          (await parcelStore.retrieve(parcelKey, MessageDirection.TOWARDS_INTERNET))
-            ? 'exists'
-            : 'does not exist',
-        ]);
-        parentStream.write(parcelKey);
-        parentStream.end();
-      })(),
-    ]);
+    setImmediate(async () => {
+      parcelKey = await parcelStore.storeInternetBound(parcelSerialized, parcel);
+      parentStream.write(parcelKey);
+      parentStream.end();
+    });
+    await runParcelDelivery(parentStream);
 
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Delivered parcel', { parcelKey: parcelKey! }),
