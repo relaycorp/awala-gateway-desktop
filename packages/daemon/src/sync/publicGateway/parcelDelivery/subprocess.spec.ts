@@ -12,6 +12,7 @@ import { setUpTestDBConnection } from '../../../testUtils/db';
 import { mockSpy } from '../../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
 import { GeneratedParcel, makeParcel } from '../../../testUtils/ramf';
+import { setImmediateAsync } from '../../../testUtils/timing';
 import { MessageDirection } from '../../../utils/MessageDirection';
 import * as gscClient from '../gscClient';
 import runParcelDelivery from './subprocess';
@@ -98,6 +99,7 @@ describe('Parcel delivery', () => {
     let parcelKey: string;
     setImmediate(async () => {
       parcelKey = await parcelStore.storeInternetBound(parcelSerialized, parcel);
+      await setImmediateAsync(); // TODO: Really needed to make test pass on Windows/macOS?
       parentStream.write(parcelKey);
       parentStream.end();
     });
