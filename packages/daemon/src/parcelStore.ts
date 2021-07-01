@@ -141,7 +141,7 @@ export class ParcelStore {
       parcelAbsoluteKey + PARCEL_METADATA_EXTENSION,
     );
 
-    logger.info({ parcelRelativeKey }, 'Parcel stored');
+    logger.info({ parcelRelativeKey, parcelMetadata }, 'Parcel stored');
     return parcelRelativeKey;
   }
 
@@ -194,18 +194,25 @@ export class ParcelStore {
   }
 
   protected async getParcelExpiryDate(parcelKey: string): Promise<Date | null> {
+    const logger = Container.get(LOGGER); // TODO: REMOVE NOW. Only for debugging CI.
     const parcelMetadataKey = parcelKey + PARCEL_METADATA_EXTENSION;
     const metadataFile = await this.fileStore.getObject(parcelMetadataKey);
     if (!metadataFile) {
+      logger.info('getParcelExpiryDate, metadataFile does not exist');
       return null;
     }
     let document: Document;
     try {
       document = deserialize(metadataFile);
     } catch (err) {
+      logger.info('getParcelExpiryDate, metadataFile is malformed');
       return null;
     }
     if (!Number.isFinite(document.expiryDate)) {
+      logger.info(
+        { expiryDate: document.expiryDate },
+        'getParcelExpiryDate, expiryDate is not a number',
+      );
       return null;
     }
     const expiryTimestamp = document.expiryDate * 1_000;
