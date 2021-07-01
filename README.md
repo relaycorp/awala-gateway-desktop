@@ -2,7 +2,9 @@
 
 # Awala Gateway for Desktop
 
-The Awala Gateway for Desktop is a _[private gateway](https://specs.awala.network/RS-000#concepts)_ for Windows 8+ and Linux desktops, with experimental support for macOS. This repository contains the source code for the app, which is also a reference implementation of a private gateway in the Awala protocol suite.
+The Awala Gateway for Desktop is a _[private gateway](https://specs.awala.network/RS-000#concepts)_ for Windows 8+ and Linux desktops, with experimental support for macOS. The installers can be found in [the latest GitHub release](https://github.com/relaycorp/awala-gateway-desktop/releases/latest).
+
+This repository contains the source code for the app, which is also a reference implementation of a private gateway in the Awala protocol suite.
 
 This document is aimed at advanced users and (prospective) contributors. We aim to make the app as simple and intuitive as possible, and we're therefore not planning on publishing end-user documentation at this point. To learn more about _using_ Awala, visit [awala.network/users](https://awala.network/users).
 
