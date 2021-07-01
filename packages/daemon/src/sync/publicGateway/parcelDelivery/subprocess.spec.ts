@@ -103,13 +103,12 @@ describe('Parcel delivery', () => {
         await setImmediateAsync(); // Wait for the subprocess to be up and running
         parcelKey = await parcelStore.storeInternetBound(parcelSerialized, parcel);
         // TODO: UNDO
-        // tslint:disable-next-line:no-console
-        console.log(
+        mockLogs.push([
           'Retrieval after storage:',
           (await parcelStore.retrieve(parcelKey, MessageDirection.TOWARDS_INTERNET))
             ? 'exists'
             : 'does not exist',
-        );
+        ]);
         // await sleepSeconds(0.5); // TODO: Really necessary to work on Windows/macOS?
         parentStream.write(parcelKey);
         parentStream.end();
