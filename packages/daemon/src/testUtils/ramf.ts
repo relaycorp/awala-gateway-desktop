@@ -1,15 +1,20 @@
-import { Certificate, Parcel } from '@relaycorp/relaynet-core';
-import { NodeKeyPairSet, PDACertPath } from '@relaycorp/relaynet-testing';
+import { Cargo, Certificate, Parcel } from '@relaycorp/relaynet-core';
+import { CDACertPath, NodeKeyPairSet, PDACertPath } from '@relaycorp/relaynet-testing';
 
-import { ParcelDirection } from '../parcelStore';
+import { MessageDirection } from '../utils/MessageDirection';
 
 export interface GeneratedParcel {
   readonly parcel: Parcel;
   readonly parcelSerialized: Buffer;
 }
 
+export interface GeneratedCargo {
+  readonly cargo: Cargo;
+  readonly cargoSerialized: Buffer;
+}
+
 export async function makeParcel(
-  direction: ParcelDirection,
+  direction: MessageDirection,
   certPath: PDACertPath,
   keyPairSet: NodeKeyPairSet,
 ): Promise<GeneratedParcel> {
@@ -17,7 +22,7 @@ export async function makeParcel(
   let senderCertificate: Certificate;
   let senderPrivateKey: CryptoKey;
   let senderCaCertificateChain: readonly Certificate[];
-  if (direction === ParcelDirection.ENDPOINT_TO_INTERNET) {
+  if (direction === MessageDirection.TOWARDS_INTERNET) {
     recipientAddress = 'https://example.com';
     senderCertificate = certPath.privateEndpoint;
     senderPrivateKey = keyPairSet.privateEndpoint.privateKey;
@@ -33,4 +38,18 @@ export async function makeParcel(
   });
   const parcelSerialized = Buffer.from(await parcel.serialize(senderPrivateKey));
   return { parcel, parcelSerialized };
+}
+
+export async function makeCargo(
+  cdaCertPath: CDACertPath,
+  keyPairSet: NodeKeyPairSet,
+  payloadSerialized: Buffer,
+): Promise<GeneratedCargo> {
+  const cargo = new Cargo(
+    await cdaCertPath.privateGateway.calculateSubjectPrivateAddress(),
+    cdaCertPath.publicGateway,
+    payloadSerialized,
+  );
+  const cargoSerialized = Buffer.from(await cargo.serialize(keyPairSet.publicGateway.privateKey));
+  return { cargo, cargoSerialized };
 }

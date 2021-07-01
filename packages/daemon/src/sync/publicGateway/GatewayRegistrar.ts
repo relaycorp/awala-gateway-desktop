@@ -18,7 +18,7 @@ import { sleepSeconds } from '../../utils/timing';
 import { makeGSCClient } from './gscClient';
 import { PublicGateway } from './PublicGateway';
 
-const PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY = 'public-gateway-id-certificate.der';
+export const PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY = 'public-gateway-id-certificate.der';
 
 @Service()
 export class GatewayRegistrar {

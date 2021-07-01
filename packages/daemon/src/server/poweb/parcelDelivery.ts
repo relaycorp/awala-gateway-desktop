@@ -9,7 +9,7 @@ import { FastifyInstance, FastifyLoggerInstance, FastifyReply } from 'fastify';
 import { Container } from 'typedi';
 
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
-import { ParcelDirection, ParcelStore } from '../../parcelStore';
+import { ParcelStore } from '../../parcelStore';
 import { ParcelDeliveryManager } from '../../sync/publicGateway/parcelDelivery/ParcelDeliveryManager';
 import { registerAllowedMethods } from '../http';
 import RouteOptions from '../RouteOptions';
@@ -63,11 +63,7 @@ export default async function registerRoutes(
 
       let parcelKey: string;
       try {
-        parcelKey = await parcelStore.store(
-          request.body,
-          parcel,
-          ParcelDirection.ENDPOINT_TO_INTERNET,
-        );
+        parcelKey = await parcelStore.storeInternetBound(request.body, parcel);
       } catch (err) {
         request.log.error({ err }, 'Failed to store parcel');
         return reply.code(500).send({ message: 'Internal server error' });

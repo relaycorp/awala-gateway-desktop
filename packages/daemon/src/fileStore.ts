@@ -17,6 +17,20 @@ export class FileStore {
     this.dataPath = appDirs.data;
   }
 
+  public async objectExists(key: string): Promise<boolean> {
+    const objectPath = this.getObjectPath(key);
+    try {
+      await fs.stat(objectPath);
+      return true;
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        // File does not exist
+        return false;
+      }
+      throw new FileStoreError(err, 'Failed to check whether object exists');
+    }
+  }
+
   public async getObject(key: string): Promise<Buffer | null> {
     const objectPath = this.getObjectPath(key);
     try {
@@ -34,7 +48,11 @@ export class FileStore {
     const objectPath = this.getObjectPath(key);
     const objectDirPath = dirname(objectPath);
     await fs.mkdir(objectDirPath, { recursive: true });
-    await fs.writeFile(objectPath, objectContent);
+
+    const file = await fs.open(objectPath, 'w');
+    await file.write(objectContent);
+    await file.datasync(); // Important to call fdatasync to avoid data loss
+    await file.close();
   }
 
   public async deleteObject(key: string): Promise<void> {

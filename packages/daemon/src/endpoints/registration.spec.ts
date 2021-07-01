@@ -57,7 +57,7 @@ describe('EndpointRegistration', () => {
 
     test('Pre-registration should be refused if gateway has not yet registered', async () => {
       const registrar = Container.get(EndpointRegistrar);
-      undoGatewayRegistration();
+      await undoGatewayRegistration();
 
       await expect(registrar.preRegister('a'.repeat(64))).rejects.toBeInstanceOf(
         UnregisteredGatewayError,
@@ -140,7 +140,7 @@ describe('EndpointRegistration', () => {
     test('Registration should fail if gateway is unregistered', async () => {
       const registrar = Container.get(EndpointRegistrar);
       const requestSerialized = await makeRegistrationRequest(registrar);
-      undoGatewayRegistration();
+      await undoGatewayRegistration();
 
       await expect(registrar.completeRegistration(requestSerialized)).rejects.toBeInstanceOf(
         UnregisteredGatewayError,
