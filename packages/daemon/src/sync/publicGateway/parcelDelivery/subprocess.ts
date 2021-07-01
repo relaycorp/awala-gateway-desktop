@@ -50,6 +50,7 @@ async function deliverParcels(
 
   return async (parcelKeys: AsyncIterable<string>) => {
     for await (const parcelKey of parcelKeys) {
+      logger.info({ parcelKey }, 'Retrieving parcel'); // TODO: REMOVE
       const parcelSerialized = await parcelStore.retrieve(
         parcelKey,
         MessageDirection.TOWARDS_INTERNET,
