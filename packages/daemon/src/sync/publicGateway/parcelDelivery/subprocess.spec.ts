@@ -14,6 +14,7 @@ import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
 import { GeneratedParcel, makeParcel } from '../../../testUtils/ramf';
 import { setImmediateAsync } from '../../../testUtils/timing';
 import { MessageDirection } from '../../../utils/MessageDirection';
+import { sleepSeconds } from '../../../utils/timing';
 import * as gscClient from '../gscClient';
 import runParcelDelivery from './subprocess';
 
@@ -102,6 +103,7 @@ describe('Parcel delivery', () => {
       (async () => {
         await setImmediateAsync(); // Wait for the subprocess to be up and running
         parcelKey = await parcelStore.storeInternetBound(parcelSerialized, parcel);
+        await sleepSeconds(0.5); // TODO: Really necessary to work on Windows/macOS?
         parentStream.write(parcelKey);
         parentStream.end();
       })(),
