@@ -159,7 +159,10 @@ export class ParcelStore {
         const relativeKey = absoluteKey.substr(keyPrefix.length + 1);
 
         const expiryDate = await store.getParcelExpiryDate(absoluteKey);
-        if (!expiryDate || expiryDate < new Date()) {
+        const now = new Date();
+        if (!expiryDate || expiryDate < now) {
+          const logger = Container.get(LOGGER); // TODO: REMOVE NOW. Only for debugging CI.
+          logger.info({ relativeKey, expiryDate, now }, 'Deleting expired parcel...');
           await store.delete(relativeKey, direction);
           continue;
         }
