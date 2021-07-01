@@ -75,6 +75,7 @@ async function deliverParcels(
         }
 
         if (deleteParcel) {
+          parcelAwareLogger.info('About to delete parcel in subprocess'); // TODO: REMOVE
           await parcelStore.delete(parcelKey, MessageDirection.TOWARDS_INTERNET);
         }
       } else {
