@@ -102,7 +102,8 @@ export class ParcelStore {
 
   public async delete(parcelRelativeKey: string, direction: MessageDirection): Promise<void> {
     const logger = Container.get(LOGGER); // TODO: REMOVE NOW. Only for debugging CI.
-    logger.info({ parcelRelativeKey }, 'About to delete parcel');
+    const error = new Error();
+    logger.info({ parcelRelativeKey, stack: error.stack }, 'About to delete parcel');
     const absoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
     await this.fileStore.deleteObject(absoluteKey);
     await this.fileStore.deleteObject(absoluteKey + PARCEL_METADATA_EXTENSION);
