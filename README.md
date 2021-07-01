@@ -42,7 +42,7 @@ This app doesn't track usage (for example, using Google Analytics), nor does it 
 
 ### App signing
 
-The Windows installed is signed with a certificate issued to `Relaycorp, Inc.`.
+The Windows installer is signed with a certificate issued to `Relaycorp, Inc.`.
 
 ## Naming rationale
 
