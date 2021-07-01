@@ -9,7 +9,9 @@ import {
 import { deserialize, Document, serialize } from 'bson';
 import { subSeconds } from 'date-fns';
 import { promises as fs } from 'fs';
+import pipe from 'it-pipe';
 import { join } from 'path';
+import { PassThrough } from 'stream';
 import { Container } from 'typedi';
 import { getRepository } from 'typeorm';
 
@@ -17,11 +19,12 @@ import { ParcelCollection } from './entity/ParcelCollection';
 import { FileStore } from './fileStore';
 import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 import { ParcelStore, ParcelWithExpiryDate } from './parcelStore';
+import { CourierSyncManager } from './sync/courierSync/CourierSyncManager';
 import { ParcelCollectorManager } from './sync/publicGateway/parcelCollection/ParcelCollectorManager';
 import { useTemporaryAppDirs } from './testUtils/appDirs';
 import { generatePKIFixture, mockGatewayRegistration, sha256Hex } from './testUtils/crypto';
 import { setUpTestDBConnection } from './testUtils/db';
-import { arrayToAsyncIterable, asyncIterableToArray } from './testUtils/iterables';
+import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from './testUtils/iterables';
 import { getMockInstance, mockSpy } from './testUtils/jest';
 import { mockLoggerToken } from './testUtils/logging';
 import { GeneratedParcel } from './testUtils/ramf';
@@ -281,6 +284,10 @@ describe('streamEndpointBound', () => {
     jest.spyOn(ParcelCollectorManager.prototype, 'watchCollectionsForRecipients'),
     () => arrayToAsyncIterable([]),
   );
+  const mockCourierSyncManagerStream = mockSpy(
+    jest.spyOn(CourierSyncManager.prototype, 'streamCollectedParcelKeys'),
+    () => arrayToAsyncIterable([]),
+  );
 
   test('No parcels should be output if there are none', async () => {
     await expect(
@@ -378,21 +385,6 @@ describe('streamEndpointBound', () => {
     expect(parcelObjects).toContain(await computeEndpointBoundParcelKey(parcel2));
   });
 
-  test('New parcels should be output after queued ones if keep alive is on', async () => {
-    const { parcel: parcel1, parcelSerialized: parcel1Serialized } =
-      await makeEndpointBoundParcel();
-    await parcelStore.storeEndpointBound(parcel1Serialized, parcel1);
-    const parcel2Key = 'parcel2';
-    mockParcelCollectorManagerWatch.mockReturnValueOnce(arrayToAsyncIterable([parcel2Key]));
-
-    const parcelObjects = await asyncIterableToArray(
-      parcelStore.streamEndpointBound([localEndpoint1Address], true),
-    );
-
-    expect(parcelObjects).toEqual([await computeEndpointBoundParcelKey(parcel1), parcel2Key]);
-    expect(mockParcelCollectorManagerWatch).toBeCalledWith([localEndpoint1Address]);
-  });
-
   test('New parcels should be ignored if keep alive is off', async () => {
     const { parcel: parcel1, parcelSerialized: parcel1Serialized } =
       await makeEndpointBoundParcel();
@@ -405,6 +397,73 @@ describe('streamEndpointBound', () => {
 
     expect(parcelObjects).toEqual([await computeEndpointBoundParcelKey(parcel1)]);
     expect(mockParcelCollectorManagerWatch).not.toBeCalled();
+  });
+
+  describe('Keep alive on', () => {
+    test('New parcels via Internet should be output after queued ones', async () => {
+      const { parcel: parcel1, parcelSerialized: parcel1Serialized } =
+        await makeEndpointBoundParcel();
+      await parcelStore.storeEndpointBound(parcel1Serialized, parcel1);
+      const parcel2Key = 'parcel2';
+      mockParcelCollectorManagerWatch.mockReturnValueOnce(arrayToAsyncIterable([parcel2Key]));
+
+      const parcelObjects = await asyncIterableToArray(
+        parcelStore.streamEndpointBound([localEndpoint1Address], true),
+      );
+
+      expect(parcelObjects).toEqual([await computeEndpointBoundParcelKey(parcel1), parcel2Key]);
+      expect(mockParcelCollectorManagerWatch).toBeCalledWith([localEndpoint1Address]);
+    });
+
+    test('New parcels via courier should be output after queued ones', async () => {
+      const { parcel: parcel1, parcelSerialized: parcel1Serialized } =
+        await makeEndpointBoundParcel();
+      await parcelStore.storeEndpointBound(parcel1Serialized, parcel1);
+      const parcel2Key = 'parcel2';
+      mockCourierSyncManagerStream.mockReturnValueOnce(arrayToAsyncIterable([parcel2Key]));
+
+      const parcelObjects = await asyncIterableToArray(
+        parcelStore.streamEndpointBound([localEndpoint1Address], true),
+      );
+
+      expect(parcelObjects).toEqual([await computeEndpointBoundParcelKey(parcel1), parcel2Key]);
+      expect(mockCourierSyncManagerStream).toBeCalledWith([localEndpoint1Address]);
+    });
+
+    test('Parcels from Internet and courier should be output in order received', async () => {
+      const { parcel: parcel1, parcelSerialized: parcel1Serialized } =
+        await makeEndpointBoundParcel();
+      await parcelStore.storeEndpointBound(parcel1Serialized, parcel1);
+      const internetStream = new PassThrough({ objectMode: true });
+      mockParcelCollectorManagerWatch.mockReturnValueOnce(internetStream);
+      const courierStream = new PassThrough({ objectMode: true });
+      mockCourierSyncManagerStream.mockReturnValueOnce(courierStream);
+      const internetParcel1 = 'parcel 1 via Internet';
+      const internetParcel2 = 'parcel 2 via Internet';
+      const courierParcel1 = 'parcel 1 via courier';
+      const courierParcel2 = 'parcel 2 via courier';
+
+      setImmediate(() => {
+        internetStream.write(internetParcel1);
+        internetStream.write(courierParcel1);
+        internetStream.write(internetParcel2);
+        internetStream.write(courierParcel2);
+      });
+      const parcelObjects = await pipe(
+        parcelStore.streamEndpointBound([localEndpoint1Address], true),
+        iterableTake(5),
+        asyncIterableToArray,
+      );
+
+      expect(parcelObjects).toEqual([
+        await computeEndpointBoundParcelKey(parcel1),
+        internetParcel1,
+        courierParcel1,
+        internetParcel2,
+        courierParcel2,
+      ]);
+      expect(mockCourierSyncManagerStream).toBeCalledWith([localEndpoint1Address]);
+    });
   });
 
   describe('Invalid metadata file', () => {

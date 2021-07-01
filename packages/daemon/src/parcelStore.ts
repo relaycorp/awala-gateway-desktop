@@ -3,12 +3,14 @@ import { deserialize, Document, serialize } from 'bson';
 import { createHash } from 'crypto';
 import pipe from 'it-pipe';
 import { join } from 'path';
+import { parallelMerge } from 'streaming-iterables';
 import { Container, Inject, Service } from 'typedi';
 import { getRepository } from 'typeorm';
 
 import { ParcelCollection } from './entity/ParcelCollection';
 import { FileStore } from './fileStore';
 import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
+import { CourierSyncManager } from './sync/courierSync/CourierSyncManager';
 import { ParcelCollectorManager } from './sync/publicGateway/parcelCollection/ParcelCollectorManager';
 import { LOGGER } from './tokens';
 import { MessageDirection } from './utils/MessageDirection';
@@ -75,7 +77,11 @@ export class ParcelStore {
     if (keepAlive) {
       // TODO: Find way not to miss newly-collected parcels between listing queued ones and watching
       const parcelCollectorManager = Container.get(ParcelCollectorManager);
-      yield* await parcelCollectorManager.watchCollectionsForRecipients(uniqueRecipientAddresses);
+      const courierSyncManager = Container.get(CourierSyncManager);
+      yield* await parallelMerge(
+        parcelCollectorManager.watchCollectionsForRecipients(uniqueRecipientAddresses),
+        courierSyncManager.streamCollectedParcelKeys(uniqueRecipientAddresses),
+      );
     }
   }
 
