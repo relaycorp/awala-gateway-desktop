@@ -104,7 +104,7 @@ describe('Parcel delivery', () => {
         await setImmediateAsync(); // Wait for the subprocess to be up and running
         parcelKey = await parcelStore.storeInternetBound(parcelSerialized, parcel);
         // TODO: UNDO
-        await sleepSeconds(0.5); // TODO: Really necessary to work on Windows/macOS?
+        await sleepSeconds(2); // TODO: Really necessary to work on Windows/macOS?
         mockLogs.push([
           'Retrieval after storage:',
           (await parcelStore.retrieve(parcelKey, MessageDirection.TOWARDS_INTERNET))
