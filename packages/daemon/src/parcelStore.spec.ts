@@ -26,15 +26,16 @@ import { generatePKIFixture, mockGatewayRegistration, sha256Hex } from './testUt
 import { setUpTestDBConnection } from './testUtils/db';
 import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from './testUtils/iterables';
 import { getMockInstance, mockSpy } from './testUtils/jest';
-import { mockLoggerToken } from './testUtils/logging';
+import { mockLoggerToken, partialPinoLog } from './testUtils/logging';
 import { GeneratedParcel } from './testUtils/ramf';
+import { LOGGER } from './tokens';
 import { MessageDirection } from './utils/MessageDirection';
 
 setUpTestDBConnection();
 
 const getAppDirs = useTemporaryAppDirs();
 
-mockLoggerToken();
+const mockLogs = mockLoggerToken();
 
 let localEndpointPrivateKey: CryptoKey;
 let localEndpointCertificate: Certificate;
@@ -56,7 +57,11 @@ mockGatewayRegistration(pkiFixtureRetriever);
 
 let parcelStore: ParcelStore;
 beforeEach(() => {
-  parcelStore = new ParcelStore(Container.get(FileStore), Container.get(DBPrivateKeyStore));
+  parcelStore = new ParcelStore(
+    Container.get(FileStore),
+    Container.get(DBPrivateKeyStore),
+    Container.get(LOGGER),
+  );
 });
 
 const PUBLIC_ENDPOINT_ADDRESS = 'https://endpoint.com';
@@ -225,6 +230,11 @@ describe('listInternetBound', () => {
       await expect(
         parcelStore.retrieve(parcelKey, MessageDirection.TOWARDS_INTERNET),
       ).resolves.toBeNull();
+      expect(mockLogs).toContainEqual(
+        partialPinoLog('warn', 'Failed to find parcel metadata file', {
+          parcelKey,
+        }),
+      );
     });
 
     test('Parcel with malformed metadata should be ignored and delete', async () => {
@@ -241,6 +251,12 @@ describe('listInternetBound', () => {
       await expect(
         parcelStore.retrieve(parcelKey, MessageDirection.TOWARDS_INTERNET),
       ).resolves.toBeNull();
+      expect(mockLogs).toContainEqual(
+        partialPinoLog('warn', 'Malformed parcel metadata file', {
+          err: expect.objectContaining({ type: 'Error' }),
+          parcelKey,
+        }),
+      );
     });
 
     test('Parcel without expiry date should be ignored and deleted', async () => {
@@ -253,22 +269,30 @@ describe('listInternetBound', () => {
       await expect(
         parcelStore.retrieve(parcelKey, MessageDirection.TOWARDS_INTERNET),
       ).resolves.toBeNull();
+      expect(mockLogs).toContainEqual(
+        partialPinoLog('warn', 'Parcel metadata does not have a (valid) expiry date', {
+          parcelKey,
+        }),
+      );
     });
 
     test('Parcel with malformed expiry date should be ignored and deleted', async () => {
       const { parcel, parcelSerialized } = await makeInternetBoundParcel();
       const parcelKey = await parcelStore.storeInternetBound(parcelSerialized, parcel);
-      await overrideMetadataFile(
-        { expiryDate: 'tomorrow' },
-        parcel,
-        MessageDirection.TOWARDS_INTERNET,
-      );
+      const expiryDate = 'tomorrow';
+      await overrideMetadataFile({ expiryDate }, parcel, MessageDirection.TOWARDS_INTERNET);
 
       await expect(asyncIterableToArray(parcelStore.listInternetBound())).toResolve();
 
       await expect(
         parcelStore.retrieve(parcelKey, MessageDirection.TOWARDS_INTERNET),
       ).resolves.toBeNull();
+      expect(mockLogs).toContainEqual(
+        partialPinoLog('warn', 'Parcel metadata does not have a (valid) expiry date', {
+          expiryDate,
+          parcelKey,
+        }),
+      );
     });
   });
 });
@@ -494,6 +518,11 @@ describe('streamEndpointBound', () => {
       await expect(
         parcelStore.retrieve(parcelKey!, MessageDirection.FROM_INTERNET),
       ).resolves.toBeNull();
+      expect(mockLogs).toContainEqual(
+        partialPinoLog('warn', 'Failed to find parcel metadata file', {
+          parcelKey,
+        }),
+      );
     });
 
     test('Parcel with malformed metadata should be ignored and delete', async () => {
@@ -508,6 +537,11 @@ describe('streamEndpointBound', () => {
       await expect(
         parcelStore.retrieve(parcelKey!, MessageDirection.FROM_INTERNET),
       ).resolves.toBeNull();
+      expect(mockLogs).toContainEqual(
+        partialPinoLog('warn', 'Malformed parcel metadata file', {
+          parcelKey,
+        }),
+      );
     });
 
     test('Parcel without expiry date should be ignored and deleted', async () => {
@@ -522,16 +556,18 @@ describe('streamEndpointBound', () => {
       await expect(
         parcelStore.retrieve(parcelKey!, MessageDirection.FROM_INTERNET),
       ).resolves.toBeNull();
+      expect(mockLogs).toContainEqual(
+        partialPinoLog('warn', 'Parcel metadata does not have a (valid) expiry date', {
+          parcelKey,
+        }),
+      );
     });
 
     test('Parcel with malformed expiry date should be ignored and deleted', async () => {
       const { parcel, parcelSerialized } = await makeEndpointBoundParcel();
       const parcelKey = await parcelStore.storeEndpointBound(parcelSerialized, parcel);
-      await overrideMetadataFile(
-        { expiryDate: 'tomorrow' },
-        parcel,
-        MessageDirection.FROM_INTERNET,
-      );
+      const expiryDate = 'tomorrow';
+      await overrideMetadataFile({ expiryDate }, parcel, MessageDirection.FROM_INTERNET);
 
       await expect(
         asyncIterableToArray(parcelStore.streamEndpointBound([localEndpoint1Address], true)),
@@ -540,6 +576,12 @@ describe('streamEndpointBound', () => {
       await expect(
         parcelStore.retrieve(parcelKey!, MessageDirection.FROM_INTERNET),
       ).resolves.toBeNull();
+      expect(mockLogs).toContainEqual(
+        partialPinoLog('warn', 'Parcel metadata does not have a (valid) expiry date', {
+          expiryDate,
+          parcelKey,
+        }),
+      );
     });
   });
 });

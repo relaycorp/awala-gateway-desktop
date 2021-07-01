@@ -3,6 +3,7 @@ import { deserialize, Document, serialize } from 'bson';
 import { createHash } from 'crypto';
 import pipe from 'it-pipe';
 import { join } from 'path';
+import { Logger } from 'pino';
 import { parallelMerge } from 'streaming-iterables';
 import { Container, Inject, Service } from 'typedi';
 import { getRepository } from 'typeorm';
@@ -12,6 +13,7 @@ import { FileStore } from './fileStore';
 import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 import { CourierSyncManager } from './sync/courierSync/CourierSyncManager';
 import { ParcelCollectorManager } from './sync/publicGateway/parcelCollection/ParcelCollectorManager';
+import { LOGGER } from './tokens';
 import { MessageDirection } from './utils/MessageDirection';
 
 const PARCEL_METADATA_EXTENSION = '.pmeta';
@@ -33,6 +35,7 @@ export class ParcelStore {
   constructor(
     @Inject() protected fileStore: FileStore,
     @Inject() protected privateKeyStore: DBPrivateKeyStore,
+    @Inject(LOGGER) protected logger: Logger,
   ) {}
 
   /**
@@ -160,7 +163,7 @@ export class ParcelStore {
         }
         const relativeKey = absoluteKey.substr(keyPrefix.length + 1);
 
-        const expiryDate = await store.getParcelExpiryDate(absoluteKey);
+        const expiryDate = await store.getParcelExpiryDate(absoluteKey, relativeKey);
         const now = new Date();
         if (!expiryDate || expiryDate < now) {
           await store.delete(relativeKey, direction);
@@ -193,19 +196,30 @@ export class ParcelStore {
     }
   }
 
-  protected async getParcelExpiryDate(parcelKey: string): Promise<Date | null> {
-    const parcelMetadataKey = parcelKey + PARCEL_METADATA_EXTENSION;
+  protected async getParcelExpiryDate(
+    absoluteKey: string,
+    relativeKey: string,
+  ): Promise<Date | null> {
+    const parcelAwareLogger = this.logger.child({ parcelKey: relativeKey });
+
+    const parcelMetadataKey = absoluteKey + PARCEL_METADATA_EXTENSION;
     const metadataFile = await this.fileStore.getObject(parcelMetadataKey);
     if (!metadataFile) {
+      parcelAwareLogger.warn('Failed to find parcel metadata file');
       return null;
     }
     let document: Document;
     try {
       document = deserialize(metadataFile);
     } catch (err) {
+      parcelAwareLogger.warn({ err }, 'Malformed parcel metadata file');
       return null;
     }
     if (!Number.isFinite(document.expiryDate)) {
+      parcelAwareLogger.warn(
+        { expiryDate: document.expiryDate },
+        'Parcel metadata does not have a (valid) expiry date',
+      );
       return null;
     }
     const expiryTimestamp = document.expiryDate * 1_000;
