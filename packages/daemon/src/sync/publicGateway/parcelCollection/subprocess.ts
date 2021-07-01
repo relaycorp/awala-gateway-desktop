@@ -12,7 +12,7 @@ import { Duplex, Writable } from 'stream';
 import { Container } from 'typedi';
 
 import { DBPrivateKeyStore } from '../../../keystores/DBPrivateKeyStore';
-import { ParcelDirection, ParcelStore } from '../../../parcelStore';
+import { ParcelStore } from '../../../parcelStore';
 import { LOGGER } from '../../../tokens';
 import { sleepSeconds } from '../../../utils/timing';
 import { GatewayRegistrar } from '../GatewayRegistrar';
@@ -121,21 +121,22 @@ function processParcels(
         continue;
       }
 
-      const parcelKey = await parcelStore.store(
+      const parcelKey = await parcelStore.storeEndpointBound(
         Buffer.from(collection.parcelSerialized),
         parcel,
-        ParcelDirection.INTERNET_TO_ENDPOINT,
       );
       await collection.ack();
 
-      const collectionMessage: ParcelCollectionNotification = {
-        parcelKey,
-        recipientAddress: parcel.recipientAddress,
-        type: 'parcelCollection',
-      };
-      parentStream.write(collectionMessage);
+      if (parcelKey) {
+        const collectionMessage: ParcelCollectionNotification = {
+          parcelKey,
+          recipientAddress: parcel.recipientAddress,
+          type: 'parcelCollection',
+        };
+        parentStream.write(collectionMessage);
+      }
       logger.info(
-        { parcel: { id: parcel.id, recipientAddress: parcel.recipientAddress } },
+        { parcel: { id: parcel.id, key: parcelKey, recipientAddress: parcel.recipientAddress } },
         'Saved new parcel',
       );
     }

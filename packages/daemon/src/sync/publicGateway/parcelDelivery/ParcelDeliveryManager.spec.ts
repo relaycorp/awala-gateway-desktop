@@ -5,9 +5,9 @@ import { setUpTestDBConnection } from '../../../testUtils/db';
 import { arrayToAsyncIterable } from '../../../testUtils/iterables';
 import { mockSpy } from '../../../testUtils/jest';
 import { mockLoggerToken } from '../../../testUtils/logging';
-import { makeStubPassThrough } from '../../../testUtils/stream';
+import { mockFork } from '../../../testUtils/subprocess';
 import { setImmediateAsync } from '../../../testUtils/timing';
-import * as child from '../../../utils/subprocess/child';
+import { fork } from '../../../utils/subprocess/child';
 import { ParcelCollectorManager } from '../parcelCollection/ParcelCollectorManager';
 import { PublicGatewayCollectionStatus } from '../PublicGatewayCollectionStatus';
 import { ParcelDeliveryManager } from './ParcelDeliveryManager';
@@ -22,8 +22,7 @@ const mockPubGatewayStatusStream = mockSpy(
   () => arrayToAsyncIterable([]),
 );
 
-const getSubprocessStream = makeStubPassThrough();
-const mockFork = mockSpy(jest.spyOn(child, 'fork'), getSubprocessStream);
+const getSubprocess = mockFork();
 
 let parcelDeliveryManager: ParcelDeliveryManager;
 beforeEach(() => {
@@ -40,7 +39,7 @@ describe('deliverWhileConnected', () => {
     await parcelDeliveryManager.deliverWhileConnected();
 
     await setImmediateAsync();
-    expect(mockFork).not.toBeCalled();
+    expect(fork).not.toBeCalled();
   });
 
   test('Subprocess should be started when public gateway can be reached', async () => {
@@ -54,8 +53,8 @@ describe('deliverWhileConnected', () => {
     await parcelDeliveryManager.deliverWhileConnected();
 
     await setImmediateAsync();
-    expect(mockFork).toBeCalledWith('parcel-delivery');
-    expect(getSubprocessStream().destroyed).toBeFalse();
+    expect(fork).toBeCalledWith('parcel-delivery');
+    expect(getSubprocess().destroyed).toBeFalse();
   });
 
   test('Subprocess should not be started again if an instance is running', async () => {
@@ -70,7 +69,7 @@ describe('deliverWhileConnected', () => {
     await parcelDeliveryManager.deliverWhileConnected();
 
     await setImmediateAsync();
-    expect(mockFork).toBeCalledTimes(1);
+    expect(fork).toBeCalledTimes(1);
   });
 
   test('Subprocess should be killed when connection to public gateway is lost', async () => {
@@ -84,7 +83,7 @@ describe('deliverWhileConnected', () => {
     await parcelDeliveryManager.deliverWhileConnected();
 
     await setImmediateAsync();
-    expect(getSubprocessStream().destroyed).toBeTrue();
+    expect(getSubprocess().destroyed).toBeTrue();
   });
 
   test('Subprocess should not be attempted to be killed if it is not running', async () => {
@@ -99,14 +98,14 @@ describe('deliverWhileConnected', () => {
     await parcelDeliveryManager.deliverWhileConnected();
 
     await setImmediateAsync();
-    expect(getSubprocessStream().destroyed).toBeTrue();
+    expect(getSubprocess().destroyed).toBeTrue();
   });
 });
 
 describe('notifyAboutNewParcel', () => {
   test('Notification should be skipped while disconnected', async () => {
     let notificationsCount = 0;
-    getSubprocessStream().on('data', () => {
+    getSubprocess().on('data', () => {
       notificationsCount += 1;
     });
 
@@ -126,7 +125,7 @@ describe('notifyAboutNewParcel', () => {
     );
     // tslint:disable-next-line:readonly-array
     const notifications: string[] = [];
-    getSubprocessStream().on('data', (data) => {
+    getSubprocess().on('data', (data) => {
       notifications.push(data);
     });
     const parcelKey = 'whatever';

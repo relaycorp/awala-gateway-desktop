@@ -9,7 +9,7 @@ import { subSeconds } from 'date-fns';
 import { FastifyInstance } from 'fastify';
 import { Response as LightMyRequestResponse } from 'light-my-request';
 
-import { ParcelDirection, ParcelStore } from '../../parcelStore';
+import { ParcelStore } from '../../parcelStore';
 import { ParcelDeliveryManager } from '../../sync/publicGateway/parcelDelivery/ParcelDeliveryManager';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { arrayBufferFrom } from '../../testUtils/buffer';
@@ -27,7 +27,9 @@ setUpTestDBConnection();
 useTemporaryAppDirs();
 const mockLogs = mockLoggerToken();
 
-const mockStoreInternetBoundParcel = mockSpy(jest.spyOn(ParcelStore.prototype, 'store'));
+const mockStoreInternetBoundParcel = mockSpy(
+  jest.spyOn(ParcelStore.prototype, 'storeInternetBound'),
+);
 const mockParcelDeliveryManagerNotifier = mockSpy(
   jest.spyOn(ParcelDeliveryManager.prototype, 'notifyAboutNewParcel'),
 );
@@ -186,7 +188,6 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
   expect(mockStoreInternetBoundParcel).toBeCalledWith(
     parcelSerialized,
     expect.toSatisfy((p) => p.id === parcel.id),
-    ParcelDirection.ENDPOINT_TO_INTERNET,
   );
   expect(mockParcelDeliveryManagerNotifier).toBeCalledWith(
     mockStoreInternetBoundParcel.mock.results[0].value,

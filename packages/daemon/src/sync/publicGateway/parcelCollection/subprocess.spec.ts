@@ -11,7 +11,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { PassThrough } from 'stream';
 
 import { DEFAULT_PUBLIC_GATEWAY } from '../../../constants';
-import { ParcelDirection, ParcelStore } from '../../../parcelStore';
+import { ParcelStore } from '../../../parcelStore';
 import { useTemporaryAppDirs } from '../../../testUtils/appDirs';
 import { generatePKIFixture, mockGatewayRegistration } from '../../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../../testUtils/db';
@@ -21,6 +21,7 @@ import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
 import { GeneratedParcel, makeParcel } from '../../../testUtils/ramf';
 import { recordReadableStreamMessages } from '../../../testUtils/stream';
 import { mockSleepSeconds } from '../../../testUtils/timing';
+import { MessageDirection } from '../../../utils/MessageDirection';
 import * as gscClient from '../gscClient';
 import { ParcelCollectionNotification, ParcelCollectorStatus } from './messaging';
 import runParcelCollection from './subprocess';
@@ -48,12 +49,12 @@ afterEach(() => {
   parentStream.destroy();
 });
 
-const mockParcelStore = mockSpy(jest.spyOn(ParcelStore.prototype, 'store'), () => {
+const mockParcelStore = mockSpy(jest.spyOn(ParcelStore.prototype, 'storeEndpointBound'), () => {
   // Do nothing
 });
 
 test('Subprocess should abort if the gateway is unregistered', async () => {
-  undoGatewayRegistration();
+  await undoGatewayRegistration();
 
   await expect(runParcelCollection(parentStream)).resolves.toEqual(1);
 
@@ -145,7 +146,7 @@ describe('Parcel collection', () => {
 
   test('Well-formed yet invalid parcel should be ACKed and ignored', async () => {
     const { parcelSerialized: invalidParcelSerialized } = await makeDummyParcel(
-      ParcelDirection.ENDPOINT_TO_INTERNET, // Wrong direction
+      MessageDirection.TOWARDS_INTERNET, // Wrong direction
     );
     const collectionAck = jest.fn();
     addParcelCollectionCall(invalidParcelSerialized, collectionAck);
@@ -164,7 +165,6 @@ describe('Parcel collection', () => {
   test('Valid parcels should be stored and parent process should be notified', async () => {
     const { parcel, parcelSerialized } = await makeDummyParcel();
     const collectionAck = jest.fn();
-    const getParentMessages = recordReadableStreamMessages(parentStream);
     const parcelKey = 'foo/bar';
     mockParcelStore.mockResolvedValueOnce(parcelKey);
     addParcelCollectionCall(parcelSerialized, collectionAck);
@@ -174,19 +174,50 @@ describe('Parcel collection', () => {
     expect(mockParcelStore).toBeCalledWith(
       parcelSerialized,
       expect.toSatisfy((p) => p.id === parcel.id),
-      ParcelDirection.INTERNET_TO_ENDPOINT,
     );
-    expect(getParentMessages()).toContainEqual<ParcelCollectionNotification>({
-      parcelKey,
-      recipientAddress: parcel.recipientAddress,
-      type: 'parcelCollection',
-    });
     expect(collectionAck).toBeCalled();
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Saved new parcel', {
         parcel: expect.objectContaining({
           id: parcel.id,
+          key: parcelKey,
           recipientAddress: parcel.recipientAddress,
+        }),
+      }),
+    );
+  });
+
+  test('Parent process should be notified if parcel was stored and is new', async () => {
+    const { parcel, parcelSerialized } = await makeDummyParcel();
+    const getParentMessages = recordReadableStreamMessages(parentStream);
+    const parcelKey = 'foo/bar';
+    mockParcelStore.mockResolvedValueOnce(parcelKey);
+    addParcelCollectionCall(parcelSerialized, jest.fn());
+
+    await runParcelCollection(parentStream);
+
+    expect(mockParcelStore).toBeCalled();
+    expect(getParentMessages()).toContainEqual<ParcelCollectionNotification>({
+      parcelKey,
+      recipientAddress: parcel.recipientAddress,
+      type: 'parcelCollection',
+    });
+  });
+
+  test('Parent process should not be notified if parcel is valid but was not stored', async () => {
+    const { parcelSerialized } = await makeDummyParcel();
+    const getParentMessages = recordReadableStreamMessages(parentStream);
+    mockParcelStore.mockResolvedValueOnce(null);
+    addParcelCollectionCall(parcelSerialized, jest.fn());
+
+    await runParcelCollection(parentStream);
+
+    expect(mockParcelStore).toBeCalled();
+    expect(getParentMessages().filter((m) => m.type !== 'status')).toHaveLength(0);
+    expect(mockLogs).toContainEqual(
+      partialPinoLog('info', 'Saved new parcel', {
+        parcel: expect.not.objectContaining({
+          key: expect.anything(),
         }),
       }),
     );
@@ -266,7 +297,6 @@ describe('Public gateway resolution failures', () => {
     expect(mockParcelStore).toBeCalledWith(
       parcelSerialized,
       expect.toSatisfy((p) => p.id === parcel.id),
-      ParcelDirection.INTERNET_TO_ENDPOINT,
     );
   });
 });
@@ -304,7 +334,6 @@ describe('Collection errors', () => {
     expect(mockParcelStore).toBeCalledWith(
       parcelSerialized,
       expect.toSatisfy((p) => p.id === parcel.id),
-      ParcelDirection.INTERNET_TO_ENDPOINT,
     );
   });
 });
@@ -335,8 +364,8 @@ function addParcelCollectionCall(
 }
 
 async function makeDummyParcel(
-  direction: ParcelDirection = ParcelDirection.INTERNET_TO_ENDPOINT,
+  direction: MessageDirection = MessageDirection.FROM_INTERNET,
 ): Promise<GeneratedParcel> {
-  const { certPath, keyPairSet } = retrievePKIFixture();
-  return makeParcel(direction, certPath, keyPairSet);
+  const { pdaCertPath, keyPairSet } = retrievePKIFixture();
+  return makeParcel(direction, pdaCertPath, keyPairSet);
 }

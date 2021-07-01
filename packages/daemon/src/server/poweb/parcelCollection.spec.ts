@@ -16,7 +16,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import uuid from 'uuid-random';
 import { Data } from 'ws';
 
-import { ParcelDirection, ParcelStore } from '../../parcelStore';
+import { ParcelStore } from '../../parcelStore';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { arrayBufferFrom } from '../../testUtils/buffer';
 import { generatePKIFixture, mockGatewayRegistration } from '../../testUtils/crypto';
@@ -26,6 +26,7 @@ import { mockSpy } from '../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
 import { setImmediateAsync } from '../../testUtils/timing';
 import { mockWebsocketStream } from '../../testUtils/websocket';
+import { MessageDirection } from '../../utils/MessageDirection';
 import { sleepSeconds } from '../../utils/timing';
 import { WebSocketCode } from '../websocket';
 import makeParcelCollectionServer from './parcelCollection';
@@ -54,7 +55,7 @@ const pkiFixtureRetriever = generatePKIFixture(async (keyPairSet, certPath) => {
 mockGatewayRegistration(pkiFixtureRetriever);
 
 const mockParcelStoreStream = mockSpy(
-  jest.spyOn(ParcelStore.prototype, 'streamActiveBoundForEndpoints'),
+  jest.spyOn(ParcelStore.prototype, 'streamEndpointBound'),
   () => arrayToAsyncIterable([]),
 );
 const mockParcelStoreRetrieve = mockSpy(jest.spyOn(ParcelStore.prototype, 'retrieve'), () => null);
@@ -226,7 +227,7 @@ test('Active parcels should be sent to client', async () => {
   expect(uuid.test(parcelDelivery.deliveryId));
   expect(mockLogs).toContainEqual(partialPinoLog('debug', 'Sending parcel', { parcelKey }));
   expect(mockParcelStoreStream).toBeCalledWith([trustedEndpointAddress], expect.anything());
-  expect(mockParcelStoreRetrieve).toBeCalledWith(parcelKey, ParcelDirection.INTERNET_TO_ENDPOINT);
+  expect(mockParcelStoreRetrieve).toBeCalledWith(parcelKey, MessageDirection.FROM_INTERNET);
 });
 
 test('Recently-deleted parcels should be gracefully skipped', async () => {
@@ -311,7 +312,7 @@ describe('Acknowledgements', () => {
 
     await client.acknowledgeDelivery(parcelDelivery.deliveryId);
 
-    expect(mockParcelStoreDelete).toBeCalledWith(parcelKey, ParcelDirection.INTERNET_TO_ENDPOINT);
+    expect(mockParcelStoreDelete).toBeCalledWith(parcelKey, MessageDirection.FROM_INTERNET);
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Deleting acknowledged parcel', {
         endpointAddresses: [trustedEndpointAddress],

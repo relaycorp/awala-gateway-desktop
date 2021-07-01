@@ -3,18 +3,15 @@ import { PassThrough } from 'stream';
 import { Container } from 'typedi';
 
 import { asyncIterableToArray, iterableTake } from '../../../testUtils/iterables';
-import { mockSpy } from '../../../testUtils/jest';
+import { getMockInstance } from '../../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
-import { makeStubPassThrough } from '../../../testUtils/stream';
+import { mockFork } from '../../../testUtils/subprocess';
 import { setImmediateAsync } from '../../../testUtils/timing';
 import { LOGGER } from '../../../tokens';
-import * as child from '../../../utils/subprocess/child';
+import { fork } from '../../../utils/subprocess/child';
 import { PublicGatewayCollectionStatus } from '../PublicGatewayCollectionStatus';
 import { ParcelCollectionNotification, ParcelCollectorMessage } from './messaging';
 import { ParcelCollectorManager } from './ParcelCollectorManager';
-
-const getSubprocessStream = makeStubPassThrough();
-const mockFork = mockSpy(jest.spyOn(child, 'fork'), getSubprocessStream);
 
 const mockLogs = mockLoggerToken();
 
@@ -23,11 +20,13 @@ beforeEach(() => {
   manager = new ParcelCollectorManager(Container.get(LOGGER));
 });
 
+const getSubprocess = mockFork();
+
 describe('start', () => {
   test('Subprocess parcel-collection should be started', () => {
     manager.start();
 
-    expect(mockFork).toBeCalledWith('parcel-collection');
+    expect(fork).toBeCalledWith('parcel-collection');
     expect(mockLogs).toContainEqual(partialPinoLog('info', 'Started parcel collection subprocess'));
   });
 
@@ -35,7 +34,7 @@ describe('start', () => {
     manager.start();
     manager.start();
 
-    expect(mockFork).toBeCalledTimes(1);
+    expect(fork).toBeCalledTimes(1);
     expect(mockLogs).toContainEqual(
       partialPinoLog('warn', 'Ignored attempt to start parcel collection subprocess a second time'),
     );
@@ -45,14 +44,14 @@ describe('start', () => {
 describe('restart', () => {
   test('Process should be killed and then started if it is already running', async () => {
     const subprocess1 = new PassThrough({ objectMode: true });
-    mockFork.mockReturnValueOnce(subprocess1);
+    getMockInstance(fork).mockReturnValueOnce(subprocess1);
     const subprocess2 = new PassThrough({ objectMode: true });
-    mockFork.mockReturnValueOnce(subprocess2);
+    getMockInstance(fork).mockReturnValueOnce(subprocess2);
     manager.start();
 
     await manager.restart();
 
-    expect(mockFork).toBeCalledTimes(2);
+    expect(fork).toBeCalledTimes(2);
     expect(subprocess1.destroyed).toBeTrue();
     expect(subprocess2.destroyed).toBeFalse();
   });
@@ -69,12 +68,12 @@ describe('restart', () => {
     manager.start();
 
     // Mimic a restart
-    getSubprocessStream().destroy();
+    getSubprocess().destroy();
     await setImmediateAsync();
 
     await manager.restart();
 
-    expect(mockFork).toBeCalledTimes(1);
+    expect(fork).toBeCalledTimes(1);
   });
 });
 
@@ -132,7 +131,7 @@ describe('streamStatus', () => {
   test('Messages without types should be ignored', async () => {
     manager.start();
     setImmediate(() => {
-      getSubprocessStream().write({ foo: 'bar' });
+      getSubprocess().write({ foo: 'bar' });
       emitValidSubprocessMessage({ type: 'status', status: 'connected' });
     });
 
@@ -165,15 +164,16 @@ describe('streamStatus', () => {
 
     await pipe(manager.streamStatus(), iterableTake(1), asyncIterableToArray);
 
-    expect(getSubprocessStream().destroyed).toBeFalse();
-    expect(getSubprocessStream().listenerCount('data')).toEqual(0);
+    const subprocess = getSubprocess();
+    expect(subprocess.destroyed).toBeFalse();
+    expect(subprocess.listenerCount('data')).toEqual(0);
   });
 
   test('Status should continue to be streamed across restarts', async () => {
     const subprocess1 = new PassThrough({ objectMode: true });
-    mockFork.mockReturnValueOnce(subprocess1);
+    getMockInstance(fork).mockReturnValueOnce(subprocess1);
     const subprocess2 = new PassThrough({ objectMode: true });
-    mockFork.mockReturnValueOnce(subprocess2);
+    getMockInstance(fork).mockReturnValueOnce(subprocess2);
     manager.start();
 
     setImmediate(async () => {
@@ -287,7 +287,7 @@ describe('watchCollectionsForRecipients', () => {
   test('Messages without types should be ignored', async () => {
     manager.start();
     setImmediate(async () => {
-      getSubprocessStream().write({ foo: 'bar' });
+      getSubprocess().write({ foo: 'bar' });
       emitValidSubprocessMessage({
         parcelKey: PARCEL_KEY,
         recipientAddress: RECIPIENT_ADDRESS,
@@ -340,15 +340,15 @@ describe('watchCollectionsForRecipients', () => {
       asyncIterableToArray,
     );
 
-    expect(getSubprocessStream().destroyed).toBeFalse();
-    expect(getSubprocessStream().listenerCount('data')).toEqual(0);
+    expect(getSubprocess().destroyed).toBeFalse();
+    expect(getSubprocess().listenerCount('data')).toEqual(0);
   });
 
   test('New collections should be reported after subprocess is restarted', async () => {
     const subprocess1 = new PassThrough({ objectMode: true });
-    mockFork.mockReturnValueOnce(subprocess1);
+    getMockInstance(fork).mockReturnValueOnce(subprocess1);
     const subprocess2 = new PassThrough({ objectMode: true });
-    mockFork.mockReturnValueOnce(subprocess2);
+    getMockInstance(fork).mockReturnValueOnce(subprocess2);
     manager.start();
     const parcel2Key = 'another parcel';
 
@@ -376,5 +376,5 @@ describe('watchCollectionsForRecipients', () => {
 });
 
 function emitValidSubprocessMessage(message: ParcelCollectorMessage): void {
-  getSubprocessStream().write(message);
+  getSubprocess().write(message);
 }
