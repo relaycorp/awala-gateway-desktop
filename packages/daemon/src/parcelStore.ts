@@ -139,13 +139,16 @@ export class ParcelStore {
     logger.info({ parcelId: parcel.id }, 'About to store parcel');
     const parcelRelativeKey = await getRelativeParcelKey(parcel, direction);
     const parcelAbsoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
-    await this.fileStore.putObject(parcelSerialized, parcelAbsoluteKey);
 
+    // Store the metadata first to avoid a race condition with methods that watch the filesystem
+    // for new parcels
     const parcelMetadata: ParcelMetadata = { expiryDate: parcel.expiryDate.getTime() / 1_000 };
     await this.fileStore.putObject(
       serialize(parcelMetadata),
       parcelAbsoluteKey + PARCEL_METADATA_EXTENSION,
     );
+
+    await this.fileStore.putObject(parcelSerialized, parcelAbsoluteKey);
 
     logger.info({ parcelRelativeKey, parcelMetadata }, 'Parcel stored');
     return parcelRelativeKey;

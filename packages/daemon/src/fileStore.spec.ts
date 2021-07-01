@@ -102,6 +102,26 @@ describe('putObject', () => {
     await expect(fs.readFile(join(getTempAppDirs().data, OBJECT_KEY))).resolves.toEqual(contentV2);
   });
 
+  test('File should be flushed with fdatasync', async () => {
+    const mockFileHandle = {
+      close: jest.fn(),
+      datasync: jest.fn(),
+      write: jest.fn(),
+    };
+    const fsOpenSpy = jest.spyOn(fs, 'open').mockResolvedValue(mockFileHandle as any);
+    try {
+      await store.putObject(OBJECT_CONTENT, OBJECT_KEY);
+
+      expect(fsOpenSpy).toBeCalledWith(join(getTempAppDirs().data, OBJECT_KEY), 'w');
+      expect(mockFileHandle.write).toBeCalledWith(OBJECT_CONTENT);
+      expect(mockFileHandle.datasync).toBeCalled();
+      expect(mockFileHandle.close).toBeCalled();
+      expect(mockFileHandle.write).toHaveBeenCalledBefore(mockFileHandle.datasync);
+    } finally {
+      fsOpenSpy.mockRestore();
+    }
+  });
+
   test('Relative key outside app dir should be refused', async () => {
     await expect(store.putObject(OBJECT_CONTENT, OBJECT_KEY_OUTSIDE_STORE)).rejects.toBeInstanceOf(
       FileStoreError,

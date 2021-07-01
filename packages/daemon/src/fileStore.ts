@@ -49,11 +49,9 @@ export class FileStore {
     const objectDirPath = dirname(objectPath);
     await fs.mkdir(objectDirPath, { recursive: true });
 
-    // TODO: UNDO the following or add proper testing if it works on macOS/Win
-    // await fs.writeFile(objectPath, objectContent);
     const file = await fs.open(objectPath, 'w');
     await file.write(objectContent);
-    await file.sync();
+    await file.datasync(); // Important to call fdatasync to avoid data loss
     await file.close();
   }
 

@@ -159,6 +159,21 @@ describe('storeEndpointBound', () => {
     const parcelMetadata = deserialize(await fs.readFile(parcelMetadataPath));
     expect(parcelMetadata).toHaveProperty('expiryDate', parcel.expiryDate.getTime() / 1_000);
   });
+
+  test('Metadata should be stored before parcel', async () => {
+    const { parcel, parcelSerialized } = await makeEndpointBoundParcel();
+    const fileStore = Container.get(FileStore);
+    const fileStorePutSpy = jest.spyOn(fileStore, 'putObject');
+
+    try {
+      await parcelStore.storeEndpointBound(parcelSerialized, parcel);
+
+      expect(fileStorePutSpy).toBeCalledTimes(2);
+      expect(fileStorePutSpy).nthCalledWith(1, expect.anything(), expect.toEndWith('.pmeta'));
+    } finally {
+      fileStorePutSpy.mockRestore();
+    }
+  });
 });
 
 describe('listInternetBound', () => {
