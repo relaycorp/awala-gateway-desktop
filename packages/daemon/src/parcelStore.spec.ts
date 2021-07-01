@@ -439,34 +439,22 @@ describe('streamEndpointBound', () => {
   });
 
   describe('Keep alive on', () => {
-    test('New parcels via Internet should be output after queued ones', async () => {
+    test.each([
+      ['Internet', mockParcelCollectorManagerWatch],
+      ['courier', mockCourierSyncManagerStream],
+    ])('New parcels via %s should be output after queued ones', async (_, mock) => {
       const { parcel: parcel1, parcelSerialized: parcel1Serialized } =
         await makeEndpointBoundParcel();
       await parcelStore.storeEndpointBound(parcel1Serialized, parcel1);
       const parcel2Key = 'parcel2';
-      mockParcelCollectorManagerWatch.mockReturnValueOnce(arrayToAsyncIterable([parcel2Key]));
+      mock.mockReturnValueOnce(arrayToAsyncIterable([parcel2Key]));
 
       const parcelObjects = await asyncIterableToArray(
         parcelStore.streamEndpointBound([localEndpoint1Address], true),
       );
 
       expect(parcelObjects).toEqual([await computeEndpointBoundParcelKey(parcel1), parcel2Key]);
-      expect(mockParcelCollectorManagerWatch).toBeCalledWith([localEndpoint1Address]);
-    });
-
-    test('New parcels via courier should be output after queued ones', async () => {
-      const { parcel: parcel1, parcelSerialized: parcel1Serialized } =
-        await makeEndpointBoundParcel();
-      await parcelStore.storeEndpointBound(parcel1Serialized, parcel1);
-      const parcel2Key = 'parcel2';
-      mockCourierSyncManagerStream.mockReturnValueOnce(arrayToAsyncIterable([parcel2Key]));
-
-      const parcelObjects = await asyncIterableToArray(
-        parcelStore.streamEndpointBound([localEndpoint1Address], true),
-      );
-
-      expect(parcelObjects).toEqual([await computeEndpointBoundParcelKey(parcel1), parcel2Key]);
-      expect(mockCourierSyncManagerStream).toBeCalledWith([localEndpoint1Address]);
+      expect(mock).toBeCalledWith([localEndpoint1Address]);
     });
 
     test('Parcels from Internet and courier should be output in order received', async () => {
