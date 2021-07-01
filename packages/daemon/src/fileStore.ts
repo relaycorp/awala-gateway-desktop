@@ -48,7 +48,12 @@ export class FileStore {
     const objectPath = this.getObjectPath(key);
     const objectDirPath = dirname(objectPath);
     await fs.mkdir(objectDirPath, { recursive: true });
-    await fs.writeFile(objectPath, objectContent);
+
+    // TODO: UNDO the following or add proper testing if it works on macOS/Win
+    // await fs.writeFile(objectPath, objectContent);
+    const file = await fs.open(objectPath, 'w');
+    await file.writeFile(objectContent);
+    await file.sync();
   }
 
   public async deleteObject(key: string): Promise<void> {
