@@ -8,5 +8,6 @@ export interface CourierSyncStageNotification extends IPCMessage {
 
 export interface ParcelCollectionNotification extends IPCMessage {
   readonly parcelKey: string;
+  readonly recipientAddress: string;
   readonly type: 'parcelCollection';
 }

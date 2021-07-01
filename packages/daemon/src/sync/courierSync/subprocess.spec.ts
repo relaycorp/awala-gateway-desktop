@@ -377,6 +377,7 @@ describe('Cargo collection', () => {
 
       expect(getParentProcessMessages()).toContainEqual<ParcelCollectionNotification>({
         parcelKey: expect.stringContaining(parcel.recipientAddress),
+        recipientAddress: parcel.recipientAddress,
         type: 'parcelCollection',
       });
     });

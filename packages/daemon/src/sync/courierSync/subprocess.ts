@@ -240,6 +240,7 @@ async function processParcel(
   if (parcelKey) {
     const notification: ParcelCollectionNotification = {
       parcelKey,
+      recipientAddress: parcel.recipientAddress,
       type: 'parcelCollection',
     };
     parentStream.write(notification);
