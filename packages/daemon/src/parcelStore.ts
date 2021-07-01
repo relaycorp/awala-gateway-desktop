@@ -10,6 +10,7 @@ import { ParcelCollection } from './entity/ParcelCollection';
 import { FileStore } from './fileStore';
 import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 import { ParcelCollectorManager } from './sync/publicGateway/parcelCollection/ParcelCollectorManager';
+import { LOGGER } from './tokens';
 import { MessageDirection } from './utils/MessageDirection';
 
 const PARCEL_METADATA_EXTENSION = '.pmeta';
@@ -125,6 +126,8 @@ export class ParcelStore {
     parcel: Parcel,
     direction: MessageDirection,
   ): Promise<string> {
+    const logger = Container.get(LOGGER); // TODO: REMOVE NOW. Only for debugging CI.
+    logger.info({ parcelId: parcel.id }, 'About to store parcel');
     const parcelRelativeKey = await getRelativeParcelKey(parcel, direction);
     const parcelAbsoluteKey = getAbsoluteParcelKey(direction, parcelRelativeKey);
     await this.fileStore.putObject(parcelSerialized, parcelAbsoluteKey);
@@ -135,6 +138,7 @@ export class ParcelStore {
       parcelAbsoluteKey + PARCEL_METADATA_EXTENSION,
     );
 
+    logger.info({ parcelRelativeKey }, 'Parcel stored');
     return parcelRelativeKey;
   }
 
