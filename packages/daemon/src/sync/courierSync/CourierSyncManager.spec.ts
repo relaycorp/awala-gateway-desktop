@@ -36,9 +36,9 @@ beforeEach(() => {
   courierSync = new CourierSyncManager(Container.get(GatewayRegistrar), Container.get(Config));
 });
 
-describe('sync', () => {
-  const getSubprocess = mockFork();
+const getSubprocess = mockFork();
 
+describe('sync', () => {
   test('Error should be thrown if private gateway is unregistered', async () => {
     setImmediate(() => {
       getSubprocess().destroy(
@@ -245,8 +245,6 @@ describe('streamStatus', () => {
 });
 
 describe('streamCollectedParcelKeys', () => {
-  const getSubprocess = mockFork();
-
   const RECIPIENT_ADDRESS = 'the recipient';
 
   test('Keys for collected parcels should be output', async () => {
