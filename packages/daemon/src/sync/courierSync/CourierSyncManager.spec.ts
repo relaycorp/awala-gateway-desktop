@@ -11,9 +11,8 @@ import { setUpTestDBConnection } from '../../testUtils/db';
 import { asyncIterableToArray, iterableTake } from '../../testUtils/iterables';
 import { getMockInstance } from '../../testUtils/jest';
 import { getPromiseRejection } from '../../testUtils/promises';
-import { makeStubPassThrough } from '../../testUtils/stream';
+import { mockFork } from '../../testUtils/subprocess';
 import { setImmediateAsync } from '../../testUtils/timing';
-import * as child from '../../utils/subprocess/child';
 import { SubprocessError } from '../../utils/subprocess/SubprocessError';
 import { GatewayRegistrar } from '../publicGateway/GatewayRegistrar';
 import { CourierSyncManager } from './CourierSyncManager';
@@ -38,8 +37,7 @@ beforeEach(() => {
 });
 
 describe('sync', () => {
-  const getSubprocessStream = makeStubPassThrough();
-  jest.spyOn(child, 'fork').mockImplementation(getSubprocessStream);
+  const getSubprocessStream = mockFork();
 
   test('Error should be thrown if private gateway is unregistered', async () => {
     setImmediate(() => {
