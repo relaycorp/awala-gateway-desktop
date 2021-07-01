@@ -52,8 +52,9 @@ export class FileStore {
     // TODO: UNDO the following or add proper testing if it works on macOS/Win
     // await fs.writeFile(objectPath, objectContent);
     const file = await fs.open(objectPath, 'w');
-    await file.writeFile(objectContent);
+    await file.write(objectContent);
     await file.sync();
+    await file.close();
   }
 
   public async deleteObject(key: string): Promise<void> {
