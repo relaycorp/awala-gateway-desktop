@@ -139,6 +139,13 @@ function makeDeliveryStream(
 ): (parcelKeys: AsyncIterable<string>) => AsyncIterable<Buffer> {
   return async function* (parcelKeys): AsyncIterable<Buffer> {
     for await (const parcelKey of parcelKeys) {
+      // TODO: Undo this. See https://github.com/relaycorp/awala-gateway-desktop/issues/365.
+      // istanbul ignore next
+      if (socket.readyState !== socket.OPEN) {
+        // istanbul ignore next
+        break;
+      }
+
       const parcelSerialized = await parcelStore.retrieve(
         parcelKey,
         MessageDirection.FROM_INTERNET,
