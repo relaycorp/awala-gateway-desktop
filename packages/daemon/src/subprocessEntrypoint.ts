@@ -22,10 +22,16 @@ export default async function subprocessEntrypoint(subprocessName: string): Prom
   if (subprocessCallback) {
     await runStartup(subprocessName);
 
+    const logger = Container.get(LOGGER);
+
+    process.once('disconnect', () => {
+      process.exit();
+      logger.fatal('Exiting due to parent disconnection');
+    });
+
     try {
       exitCode = await subprocessCallback(await makeParentStream());
     } catch (err) {
-      const logger = Container.get(LOGGER);
       logger.fatal({ err }, 'Unhandled exception in subprocess');
       exitCode = 128;
     }

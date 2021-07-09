@@ -35,7 +35,7 @@
     "reflect-metadata": "^0.1.13",
     "split2": "^3.2.2",
     "sqlite3": "^5.0.2",
-    "stream-to-it": "^0.2.3",
+    "stream-to-it": "^0.2.4",
     "streaming-iterables": "^6.0.0",
     "tcp-port-used": "^1.0.2",
     "typedi": "^0.10.0",
@@ -63,6 +63,6 @@
     "jest-extended": "^0.11.5",
     "light-my-request": "^4.4.1",
     "ts-jest": "^27.0.3",
-    "ts-node-dev": "^1.1.6"
+    "ts-node-dev": "^1.1.8"
   }
 }
