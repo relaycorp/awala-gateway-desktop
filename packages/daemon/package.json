@@ -63,6 +63,6 @@
     "jest-extended": "^0.11.5",
     "light-my-request": "^4.4.1",
     "ts-jest": "^27.0.3",
-    "ts-node-dev": "^1.1.6"
+    "ts-node-dev": "^1.1.8"
   }
 }
