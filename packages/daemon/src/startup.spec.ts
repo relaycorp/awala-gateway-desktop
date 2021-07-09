@@ -7,8 +7,9 @@ import * as typeorm from 'typeorm';
 
 import envPaths from 'env-paths';
 import startUp from './startup';
-import { getMockContext, mockSpy } from './testUtils/jest';
+import { mockSpy } from './testUtils/jest';
 import { makeMockLoggingFixture, partialPinoLog } from './testUtils/logging';
+import { makeProcessOnceMock } from './testUtils/process';
 import { mockToken } from './testUtils/tokens';
 import { APP_DIRS, LOGGER } from './tokens';
 import * as logging from './utils/logging';
@@ -24,7 +25,7 @@ mockSpy(jest.spyOn(logging, 'makeLogger'), () => mockLogging.logger);
 
 const mockMkdir = mockSpy(jest.spyOn(fs, 'mkdir'));
 
-const mockProcessOn = mockSpy(jest.spyOn(process, 'on'));
+const getProcessOnceHandler = makeProcessOnceMock();
 const mockProcessExit = mockSpy(jest.spyOn(process, 'exit'));
 
 mockSpy(
@@ -80,7 +81,7 @@ describe('Logging', () => {
       '%s should be logged and end the process with code 128',
       async (eventName) => {
         await startUp(COMPONENT_NAME);
-        const handler = getProcessEventHandler(eventName);
+        const handler = getProcessOnceHandler(eventName);
 
         handler(ERROR);
 
@@ -93,13 +94,6 @@ describe('Logging', () => {
         expect(mockProcessExit).toBeCalledWith(128);
       },
     );
-
-    function getProcessEventHandler(eventName: string): (err?: Error) => void {
-      expect(mockProcessOn).toBeCalledWith(eventName, expect.any(Function));
-      const context = getMockContext(mockProcessOn);
-
-      return context.calls.find((c) => c[0] === eventName)[1];
-    }
   });
 });
 
