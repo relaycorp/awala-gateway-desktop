@@ -12,7 +12,7 @@
     "build": "run-s license-report tsc webpack",
     "rebuild": "npm rebuild --target=13.1.4 --runtime=electron --dist-url=https://atom.io/download/electron grpc",
     "webpack": "webpack --config ./webpack.config.js",
-    "tsc": "../../node_modules/.bin/tsc -p tsconfig.json",
+    "tsc": "tsc -p tsconfig.json",
     "start": "npm run build && electron ./app/main.js",
     "clean": "rimraf build test coverage dist app",
     "cov": "run-s build test:unit && opn coverage/lcov-report/index.html",
