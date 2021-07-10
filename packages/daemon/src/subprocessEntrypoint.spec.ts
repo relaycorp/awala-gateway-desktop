@@ -7,6 +7,7 @@ import runParcelCollection from './sync/publicGateway/parcelCollection/subproces
 import runParcelDelivery from './sync/publicGateway/parcelDelivery/subprocess';
 import { getMockInstance, mockSpy } from './testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from './testUtils/logging';
+import { makeProcessOnceMock } from './testUtils/process';
 import * as parentSubprocess from './utils/subprocess/parent';
 
 jest.mock('./sync/courierSync/subprocess');
@@ -18,6 +19,7 @@ const stubParentStream = new PassThrough();
 
 mockSpy(jest.spyOn(parentSubprocess, 'makeParentStream'), () => stubParentStream);
 
+const getProcessOnceHandler = makeProcessOnceMock();
 const mockProcessExit = mockSpy(jest.spyOn(process, 'exit'), () => undefined);
 
 const mockLogSet = mockLoggerToken();
@@ -66,6 +68,15 @@ test('Subprocess exceptions should be handled and exit with 128 code', async () 
       err: expect.objectContaining({ message: error.message }),
     }),
   );
+});
+
+test('Subprocess should exit when parent disconnects', async () => {
+  await subprocessEntrypoint(STUB_SUBPROCESS_NAME);
+
+  const handler = getProcessOnceHandler('disconnect');
+  handler();
+  expect(mockProcessExit).toBeCalledWith();
+  expect(mockLogSet).toContainEqual(partialPinoLog('fatal', 'Exiting due to parent disconnection'));
 });
 
 test.each(Object.entries(SUBPROCESSES))(
