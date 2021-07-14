@@ -18,7 +18,7 @@
     "@relaycorp/relaynet-poweb": "^1.6.2",
     "abort-controller": "^3.0.0",
     "abortable-iterator": "^3.0.0",
-    "bson": "^4.4.0",
+    "bson": "^4.4.1",
     "buffer-to-arraybuffer": "0.0.6",
     "bufferutil": "^4.0.3",
     "date-fns": "^2.22.1",
