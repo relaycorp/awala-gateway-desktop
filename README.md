@@ -26,7 +26,7 @@ The items below summarize the security and privacy considerations specific to th
 
 ### No encryption at rest
 
-This app does not (currently) support encryption at rest, so a malicious app on your computer could get hold of the private keys used by this gateway. Users are highly encouraged to use full-disk encryption to protect such keys in the event that the device were lost or stolen.
+[This app does not (currently) support encryption at rest](https://github.com/relaycorp/awala-gateway-desktop/issues/441), so a malicious app on your computer could get hold of the private keys used by this gateway. Users are highly encouraged to use full-disk encryption to protect such keys in the event that the device were lost or stolen.
 
 Note that because Awala employs end-to-end encryption, compromising these keys won't compromise the encryption of the messages exchanged by your Awala-compatible apps. The keys of any private gateway are used to sign messages and issue Awala PKI certificates, and to encrypt/decrypt cargo exchanged with its public gateway.
 
