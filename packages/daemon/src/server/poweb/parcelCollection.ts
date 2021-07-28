@@ -16,8 +16,9 @@ import WebSocket, { Server } from 'ws';
 
 import { POWEB_API_PREFIX } from '.';
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
-import { ParcelDirection, ParcelStore } from '../../parcelStore';
+import { ParcelStore } from '../../parcelStore';
 import { LOGGER } from '../../tokens';
+import { MessageDirection } from '../../utils/MessageDirection';
 import { makeWebSocketServer, WebSocketCode } from '../websocket';
 
 export const PATH = `${POWEB_API_PREFIX}/parcel-collection`;
@@ -43,7 +44,7 @@ export default function makeParcelCollectionServer(): Server {
     const tracker = new CollectionTracker();
     try {
       await pipe(
-        parcelStore.streamActiveBoundForEndpoints(endpointAddresses, keepAlive),
+        parcelStore.streamEndpointBound(endpointAddresses, keepAlive),
         makeDeliveryStream(parcelStore, tracker, socket, endpointAwareLogger),
         duplex(connectionStream),
         makeACKProcessor(parcelStore, tracker, socket, endpointAwareLogger),
@@ -138,9 +139,16 @@ function makeDeliveryStream(
 ): (parcelKeys: AsyncIterable<string>) => AsyncIterable<Buffer> {
   return async function* (parcelKeys): AsyncIterable<Buffer> {
     for await (const parcelKey of parcelKeys) {
+      // TODO: Undo this. See https://github.com/relaycorp/awala-gateway-desktop/issues/365.
+      // istanbul ignore next
+      if (socket.readyState !== socket.OPEN) {
+        // istanbul ignore next
+        break;
+      }
+
       const parcelSerialized = await parcelStore.retrieve(
         parcelKey,
-        ParcelDirection.INTERNET_TO_ENDPOINT,
+        MessageDirection.FROM_INTERNET,
       );
       if (parcelSerialized) {
         logger.debug({ parcelKey }, 'Sending parcel');
@@ -176,7 +184,7 @@ function makeACKProcessor(
       }
 
       logger.info({ parcelKey }, 'Deleting acknowledged parcel');
-      await parcelStore.delete(parcelKey, ParcelDirection.INTERNET_TO_ENDPOINT);
+      await parcelStore.delete(parcelKey, MessageDirection.FROM_INTERNET);
 
       if (tracker.isCollectionComplete) {
         logger.debug('All parcels have been collected and acknowledged');

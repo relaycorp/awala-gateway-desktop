@@ -8,8 +8,9 @@ import { source } from 'stream-to-it';
 import { Container } from 'typedi';
 
 import { DBPrivateKeyStore } from '../../../keystores/DBPrivateKeyStore';
-import { ParcelDirection, ParcelStore } from '../../../parcelStore';
+import { ParcelStore, ParcelWithExpiryDate } from '../../../parcelStore';
 import { LOGGER } from '../../../tokens';
+import { MessageDirection } from '../../../utils/MessageDirection';
 import { GatewayRegistrar } from '../GatewayRegistrar';
 import { makeGSCClient } from '../gscClient';
 
@@ -27,7 +28,7 @@ export default async function runParcelDelivery(parentStream: Duplex): Promise<n
   logger.info('Ready to deliver parcels');
   await pipe(async function* (): AsyncIterable<string> {
     // Deliver the queued parcels before delivering parcels streamed by the parent process
-    yield* await parcelStore.listActiveBoundForInternet();
+    yield* await convertParcelsWithExpiryDateToParcelKeys(parcelStore.listInternetBound());
     yield* source(parentStream);
   }, await deliverParcels(publicGateway.publicAddress, parcelStore, logger));
 
@@ -51,7 +52,7 @@ async function deliverParcels(
     for await (const parcelKey of parcelKeys) {
       const parcelSerialized = await parcelStore.retrieve(
         parcelKey,
-        ParcelDirection.ENDPOINT_TO_INTERNET,
+        MessageDirection.TOWARDS_INTERNET,
       );
       const parcelAwareLogger = logger.child({ parcelKey });
       if (parcelSerialized) {
@@ -73,11 +74,19 @@ async function deliverParcels(
         }
 
         if (deleteParcel) {
-          await parcelStore.delete(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET);
+          await parcelStore.delete(parcelKey, MessageDirection.TOWARDS_INTERNET);
         }
       } else {
         parcelAwareLogger.info('Skipping non-existing parcel');
       }
     }
   };
+}
+
+async function* convertParcelsWithExpiryDateToParcelKeys(
+  parcelsWithExpiryDate: AsyncIterable<ParcelWithExpiryDate>,
+): AsyncIterable<string> {
+  for await (const parcelWithExpiryDate of parcelsWithExpiryDate) {
+    yield parcelWithExpiryDate.parcelKey;
+  }
 }

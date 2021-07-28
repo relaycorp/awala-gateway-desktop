@@ -5,13 +5,14 @@ import { PassThrough } from 'stream';
 import { Container } from 'typedi';
 
 import { DEFAULT_PUBLIC_GATEWAY } from '../../../constants';
-import { ParcelDirection, ParcelStore } from '../../../parcelStore';
+import { ParcelStore } from '../../../parcelStore';
 import { useTemporaryAppDirs } from '../../../testUtils/appDirs';
 import { generatePKIFixture, mockGatewayRegistration } from '../../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../../testUtils/db';
 import { mockSpy } from '../../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../../testUtils/logging';
 import { GeneratedParcel, makeParcel } from '../../../testUtils/ramf';
+import { MessageDirection } from '../../../utils/MessageDirection';
 import * as gscClient from '../gscClient';
 import runParcelDelivery from './subprocess';
 
@@ -43,7 +44,7 @@ const pkiFixtureRetriever = generatePKIFixture((_keyPairSet, certPath) => {
 const undoGatewayRegistration = mockGatewayRegistration(pkiFixtureRetriever);
 
 test('Subprocess should abort if the gateway is unregistered', async () => {
-  undoGatewayRegistration();
+  await undoGatewayRegistration();
 
   await expect(runParcelDelivery(parentStream)).resolves.toEqual(1);
 
@@ -77,11 +78,7 @@ describe('Parcel delivery', () => {
 
   test('Pre-existing parcels should be delivered', async () => {
     const { parcel, parcelSerialized } = await makeDummyParcel();
-    const parcelKey = await parcelStore.store(
-      parcelSerialized,
-      parcel,
-      ParcelDirection.ENDPOINT_TO_INTERNET,
-    );
+    const parcelKey = await parcelStore.storeInternetBound(parcelSerialized, parcel);
     const parcelDeliveryCall = new DeliverParcelCall();
     mockGSCClient = new MockGSCClient([parcelDeliveryCall]);
 
@@ -100,26 +97,22 @@ describe('Parcel delivery', () => {
 
     let parcelKey: string;
     setImmediate(async () => {
-      parcelKey = await parcelStore.store(
-        parcelSerialized,
-        parcel,
-        ParcelDirection.ENDPOINT_TO_INTERNET,
-      );
+      parcelKey = await parcelStore.storeInternetBound(parcelSerialized, parcel);
       parentStream.write(parcelKey);
       parentStream.end();
     });
     await runParcelDelivery(parentStream);
 
+    expect(mockLogs).toContainEqual(
+      partialPinoLog('info', 'Delivered parcel', { parcelKey: parcelKey! }),
+    );
     expect(parcelDeliveryCall.wasCalled).toBeTrue();
     expect(Buffer.from(parcelDeliveryCall.arguments!.parcelSerialized)).toEqual(parcelSerialized);
-    expect(mockLogs).toContainEqual(
-      partialPinoLog('info', 'Delivered parcel', { parcelKey: parcelKey!! }),
-    );
   });
 
   test('Delivery should be signed with the right key', async () => {
     const { parcel, parcelSerialized } = await makeDummyParcel();
-    await parcelStore.store(parcelSerialized, parcel, ParcelDirection.ENDPOINT_TO_INTERNET);
+    await parcelStore.storeInternetBound(parcelSerialized, parcel);
     const parcelDeliveryCall = new DeliverParcelCall();
     mockGSCClient = new MockGSCClient([parcelDeliveryCall]);
 
@@ -134,18 +127,14 @@ describe('Parcel delivery', () => {
 
   test('Successfully delivered parcels should be deleted', async () => {
     const { parcel, parcelSerialized } = await makeDummyParcel();
-    const parcelKey = await parcelStore.store(
-      parcelSerialized,
-      parcel,
-      ParcelDirection.ENDPOINT_TO_INTERNET,
-    );
+    const parcelKey = await parcelStore.storeInternetBound(parcelSerialized, parcel);
     mockGSCClient = new MockGSCClient([new DeliverParcelCall()]);
 
     setImmediate(endParentStream);
     await runParcelDelivery(parentStream);
 
     await expect(
-      parcelStore.retrieve(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET),
+      parcelStore.retrieve(parcelKey, MessageDirection.TOWARDS_INTERNET),
     ).resolves.toBeNull();
   });
 
@@ -166,18 +155,14 @@ describe('Parcel delivery', () => {
 
   test('Parcels refused as invalid should be deleted', async () => {
     const { parcel, parcelSerialized } = await makeDummyParcel();
-    const parcelKey = await parcelStore.store(
-      parcelSerialized,
-      parcel,
-      ParcelDirection.ENDPOINT_TO_INTERNET,
-    );
+    const parcelKey = await parcelStore.storeInternetBound(parcelSerialized, parcel);
     mockGSCClient = new MockGSCClient([new DeliverParcelCall(new RefusedParcelError())]);
 
     setImmediate(endParentStream);
     await runParcelDelivery(parentStream);
 
     await expect(
-      parcelStore.retrieve(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET),
+      parcelStore.retrieve(parcelKey, MessageDirection.TOWARDS_INTERNET),
     ).resolves.toBeNull();
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Parcel was refused by the public gateway', { parcelKey }),
@@ -186,11 +171,7 @@ describe('Parcel delivery', () => {
 
   test('Parcel should be temporarily ignored if there was a server error', async () => {
     const { parcel, parcelSerialized } = await makeDummyParcel();
-    const parcelKey = await parcelStore.store(
-      parcelSerialized,
-      parcel,
-      ParcelDirection.ENDPOINT_TO_INTERNET,
-    );
+    const parcelKey = await parcelStore.storeInternetBound(parcelSerialized, parcel);
     const serverError = new ServerError('Planets are not aligned yet');
     mockGSCClient = new MockGSCClient([new DeliverParcelCall(serverError)]);
 
@@ -198,7 +179,7 @@ describe('Parcel delivery', () => {
     await runParcelDelivery(parentStream);
 
     await expect(
-      parcelStore.retrieve(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET),
+      parcelStore.retrieve(parcelKey, MessageDirection.TOWARDS_INTERNET),
     ).resolves.not.toBeNull();
     expect(mockLogs).toContainEqual(
       partialPinoLog('warn', 'Parcel delivery failed due to server error', {
@@ -210,11 +191,7 @@ describe('Parcel delivery', () => {
 
   test('Parcel should be temporarily ignored if there was an expected error', async () => {
     const { parcel, parcelSerialized } = await makeDummyParcel();
-    const parcelKey = await parcelStore.store(
-      parcelSerialized,
-      parcel,
-      ParcelDirection.ENDPOINT_TO_INTERNET,
-    );
+    const parcelKey = await parcelStore.storeInternetBound(parcelSerialized, parcel);
     const error = new Error('This is not really expected');
     mockGSCClient = new MockGSCClient([new DeliverParcelCall(error)]);
 
@@ -222,7 +199,7 @@ describe('Parcel delivery', () => {
     await runParcelDelivery(parentStream);
 
     await expect(
-      parcelStore.retrieve(parcelKey, ParcelDirection.ENDPOINT_TO_INTERNET),
+      parcelStore.retrieve(parcelKey, MessageDirection.TOWARDS_INTERNET),
     ).resolves.not.toBeNull();
     expect(mockLogs).toContainEqual(
       partialPinoLog('fatal', 'Parcel delivery failed due to unexpected error', {
@@ -233,8 +210,8 @@ describe('Parcel delivery', () => {
   });
 
   async function makeDummyParcel(): Promise<GeneratedParcel> {
-    const { certPath, keyPairSet } = pkiFixtureRetriever();
-    return makeParcel(ParcelDirection.ENDPOINT_TO_INTERNET, certPath, keyPairSet);
+    const { pdaCertPath, keyPairSet } = pkiFixtureRetriever();
+    return makeParcel(MessageDirection.TOWARDS_INTERNET, pdaCertPath, keyPairSet);
   }
 });
 

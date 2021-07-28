@@ -40,8 +40,8 @@ function registerExitHandler(logger: Logger): void {
       process.exit(128);
     });
 
-  process.on('uncaughtException', handler('uncaughtException'));
-  process.on('unhandledRejection', handler('unhandledRejection') as any);
+  process.once('uncaughtException', handler('uncaughtException'));
+  process.once('unhandledRejection', handler('unhandledRejection') as any);
 }
 
 async function registerTokens(logger: Logger, paths: Paths): Promise<void> {

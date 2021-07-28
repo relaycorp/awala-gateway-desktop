@@ -6,6 +6,7 @@ import { ConfigItem } from './entity/ConfigItem';
 
 export enum ConfigKey {
   NODE_KEY_SERIAL_NUMBER = 'node_key_serial_number',
+  NODE_CCA_ISSUER_KEY_SERIAL_NUMBER = 'node_cca_issuer_key_serial_number',
   PUBLIC_GATEWAY_ADDRESS = 'public_gateway_address',
 }
 
