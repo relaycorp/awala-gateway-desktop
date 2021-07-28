@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 import { Duplex } from 'stream';
 import WebSocket from 'ws';
 
+import { useFakeTimers } from '../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../testUtils/logging';
 import { mockWebsocketStream } from '../testUtils/websocket';
 import { makeWebSocketServer, WebSocketCode } from './websocket';
@@ -122,12 +123,7 @@ describe('WebSocket server configuration', () => {
   });
 
   describe('Pings', () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
-    });
-    afterEach(() => {
-      jest.useRealTimers();
-    });
+    useFakeTimers();
 
     test('Connection should be terminated if client does not respond to pings', async () => {
       const wsServer = makeWebSocketServer(wsHandler);
