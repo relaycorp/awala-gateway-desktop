@@ -14,18 +14,20 @@ export const PATH = `${CONTROL_API_PREFIX}/sync-status`;
 export default function makeConnectionStatusServer(authToken: string): Server {
   const statusMonitor = Container.get(StatusMonitor);
 
-  return makeWebSocketServer(async (connectionStream, socket) => {
-    const peerClosureController = new AbortController();
-    socket.once('close', () => {
-      peerClosureController.abort();
-      socket.close(1000);
-    });
+  return makeWebSocketServer(
+    async (connectionStream, socket) => {
+      const peerClosureController = new AbortController();
+      socket.once('close', () => {
+        peerClosureController.abort();
+      });
 
-    const abortableStatusStream = makeSourceAbortable(
-      statusMonitor.streamStatus(),
-      peerClosureController.signal,
-      { returnOnAbort: true },
-    );
-    await pipe(abortableStatusStream, sink(connectionStream));
-  }, authToken);
+      const abortableStatusStream = makeSourceAbortable(
+        statusMonitor.streamStatus(),
+        peerClosureController.signal,
+        { returnOnAbort: true },
+      );
+      await pipe(abortableStatusStream, sink(connectionStream));
+    },
+    { authToken },
+  );
 }

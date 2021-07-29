@@ -28,10 +28,6 @@ export default function makeParcelCollectionServer(): Server {
   const parcelStore = Container.get(ParcelStore);
 
   return makeWebSocketServer(async (connectionStream, socket, requestHeaders) => {
-    socket.once('close', (code, reason) => {
-      logger.debug({ code, reason }, 'Closing connection');
-    });
-
     const endpointAddresses = await doHandshake(connectionStream, socket, logger);
     if (!endpointAddresses) {
       return;

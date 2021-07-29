@@ -65,19 +65,20 @@ describe('Handshake', () => {
   test('Challenge should be sent as soon as client connects', async () => {
     const client = new MockParcelCollectionClient();
 
-    await client.connect();
+    await client.use(async () => {
+      const handshakeRaw = await client.receive();
+      HandshakeChallenge.deserialize(bufferToArray(handshakeRaw as Buffer));
+    });
 
-    const handshakeRaw = await client.receive();
-    HandshakeChallenge.deserialize(bufferToArray(handshakeRaw as Buffer));
     expect(mockLogs).toContainEqual(partialPinoLog('debug', 'Sending handshake challenge'));
   });
 
   test('Handshake should be aborted if client closes connection before responding', async () => {
     const client = new MockParcelCollectionClient();
-    await client.connect();
-    await client.receive(); // Discard challenge
 
-    client.close();
+    await client.use(async () => {
+      await client.receive(); // Discard challenge
+    });
 
     await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
       code: WebSocketCode.NORMAL,
@@ -88,15 +89,18 @@ describe('Handshake', () => {
 
   test('Handshake should fail if response is malformed', async () => {
     const client = new MockParcelCollectionClient();
-    await client.connect();
-    await client.receive(); // Discard challenge
 
-    await client.send(Buffer.from('malformed'));
+    await client.use(async () => {
+      await client.receive(); // Discard challenge
 
-    await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
-      code: WebSocketCode.CANNOT_ACCEPT,
-      reason: 'Malformed handshake response',
+      await client.send(Buffer.from('malformed'));
+
+      await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
+        code: WebSocketCode.CANNOT_ACCEPT,
+        reason: 'Malformed handshake response',
+      });
     });
+
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Refusing malformed handshake response'),
     );
@@ -104,15 +108,18 @@ describe('Handshake', () => {
 
   test('Handshake should fail if response is a text frame', async () => {
     const client = new MockParcelCollectionClient();
-    await client.connect();
-    await client.receive(); // Discard challenge
 
-    await client.send('this should have been a buffer, not a string');
+    await client.use(async () => {
+      await client.receive(); // Discard challenge
 
-    await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
-      code: WebSocketCode.CANNOT_ACCEPT,
-      reason: 'Malformed handshake response',
+      await client.send('this should have been a buffer, not a string');
+
+      await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
+        code: WebSocketCode.CANNOT_ACCEPT,
+        reason: 'Malformed handshake response',
+      });
     });
+
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Refusing malformed handshake response'),
     );
@@ -120,14 +127,16 @@ describe('Handshake', () => {
 
   test('Handshake should fail if response contains zero signatures', async () => {
     const client = new MockParcelCollectionClient();
-    await client.connect();
 
-    await client.doHandshake([]);
+    await client.use(async () => {
+      await client.doHandshake([]);
 
-    await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
-      code: WebSocketCode.CANNOT_ACCEPT,
-      reason: 'Handshake response does not include any signatures',
+      await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
+        code: WebSocketCode.CANNOT_ACCEPT,
+        reason: 'Handshake response does not include any signatures',
+      });
     });
+
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Refusing handshake response with zero signatures'),
     );
@@ -135,22 +144,27 @@ describe('Handshake', () => {
 
   test('Handshake should fail if a response signature is invalid', async () => {
     const client = new MockParcelCollectionClient();
-    await client.connect();
 
-    const challenge = HandshakeChallenge.deserialize(
-      bufferToArray((await client.receive()) as Buffer),
-    );
-    const validSignature = await trustedEndpointSigner.sign(
-      challenge.nonce,
-      DETACHED_SIGNATURE_TYPES.NONCE,
-    );
-    const handshakeResponse = new HandshakeResponse([validSignature, arrayBufferFrom('malformed')]);
-    await client.send(handshakeResponse.serialize());
+    await client.use(async () => {
+      const challenge = HandshakeChallenge.deserialize(
+        bufferToArray((await client.receive()) as Buffer),
+      );
+      const validSignature = await trustedEndpointSigner.sign(
+        challenge.nonce,
+        DETACHED_SIGNATURE_TYPES.NONCE,
+      );
+      const handshakeResponse = new HandshakeResponse([
+        validSignature,
+        arrayBufferFrom('malformed'),
+      ]);
+      await client.send(handshakeResponse.serialize());
 
-    await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
-      code: WebSocketCode.CANNOT_ACCEPT,
-      reason: 'Handshake response includes malformed/invalid signature(s)',
+      await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
+        code: WebSocketCode.CANNOT_ACCEPT,
+        reason: 'Handshake response includes malformed/invalid signature(s)',
+      });
     });
+
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Refusing handshake response with malformed/invalid signatures', {
         err: expect.objectContaining({ type: CMSError.name }),
@@ -170,14 +184,16 @@ describe('Handshake', () => {
       untrustedEndpointKeyPair.privateKey,
     );
     const client = new MockParcelCollectionClient();
-    await client.connect();
 
-    await client.doHandshake([trustedEndpointSigner, untrustedEndpointSigner]);
+    await client.use(async () => {
+      await client.doHandshake([trustedEndpointSigner, untrustedEndpointSigner]);
 
-    await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
-      code: WebSocketCode.CANNOT_ACCEPT,
-      reason: 'Handshake response includes malformed/invalid signature(s)',
+      await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
+        code: WebSocketCode.CANNOT_ACCEPT,
+        reason: 'Handshake response includes malformed/invalid signature(s)',
+      });
     });
+
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Refusing handshake response with malformed/invalid signatures', {
         err: expect.objectContaining({ type: CertificateError.name }),
@@ -196,9 +212,10 @@ describe('Handshake', () => {
     });
     const trustedEndpoint2Signer = new Signer(endpoint2Certificate, endpoint2KeyPair.privateKey);
     const client = new MockParcelCollectionClient();
-    await client.connect();
 
-    await client.doHandshake([trustedEndpointSigner, trustedEndpoint2Signer]);
+    await client.use(async () => {
+      await client.doHandshake([trustedEndpointSigner, trustedEndpoint2Signer]);
+    });
 
     const endpointAddresses: readonly string[] = [
       trustedEndpointAddress,
@@ -218,13 +235,15 @@ test('Active parcels should be sent to client', async () => {
   const parcelSerialized = Buffer.from('the parcel');
   setParcelsInStore({ key: parcelKey, serialization: parcelSerialized });
   const client = new MockParcelCollectionClient();
-  await client.connect();
-  await client.doHandshake();
 
-  const parcelDelivery = await client.receiveParcelDelivery();
+  await client.use(async () => {
+    await client.doHandshake();
 
-  expect(Buffer.from(parcelDelivery.parcelSerialized).equals(parcelSerialized)).toBeTrue();
-  expect(uuid.test(parcelDelivery.deliveryId));
+    const parcelDelivery = await client.receiveParcelDelivery();
+    expect(Buffer.from(parcelDelivery.parcelSerialized).equals(parcelSerialized)).toBeTrue();
+    expect(uuid.test(parcelDelivery.deliveryId));
+  });
+
   expect(mockLogs).toContainEqual(partialPinoLog('debug', 'Sending parcel', { parcelKey }));
   expect(mockParcelStoreStream).toBeCalledWith([trustedEndpointAddress], expect.anything());
   expect(mockParcelStoreRetrieve).toBeCalledWith(parcelKey, MessageDirection.FROM_INTERNET);
@@ -235,12 +254,15 @@ test('Recently-deleted parcels should be gracefully skipped', async () => {
   const parcelSerialized = Buffer.from('the parcel');
   setParcelsInStore({ key: missingParcelKey }, { key: 'parcel2', serialization: parcelSerialized });
   const client = new MockParcelCollectionClient();
-  await client.connect();
-  await client.doHandshake();
 
-  const parcelDelivery = await client.receiveParcelDelivery();
+  await client.use(async () => {
+    await client.doHandshake();
 
-  expect(Buffer.from(parcelDelivery.parcelSerialized).equals(parcelSerialized)).toBeTrue();
+    const parcelDelivery = await client.receiveParcelDelivery();
+
+    expect(Buffer.from(parcelDelivery.parcelSerialized).equals(parcelSerialized)).toBeTrue();
+  });
+
   expect(mockLogs).toContainEqual(
     partialPinoLog('debug', 'Skipping missing parcel', { parcelKey: missingParcelKey }),
   );
@@ -249,11 +271,13 @@ test('Recently-deleted parcels should be gracefully skipped', async () => {
 describe('Keep alive', () => {
   test('Connection should be closed if Keep-Alive is off and there are no parcels', async () => {
     const client = new MockParcelCollectionClient(StreamingMode.CLOSE_UPON_COMPLETION);
-    await client.connect();
-    await client.doHandshake();
 
-    await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
-      code: WebSocketCode.NORMAL,
+    await client.use(async () => {
+      await client.doHandshake();
+
+      await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
+        code: WebSocketCode.NORMAL,
+      });
     });
 
     expect(mockParcelStoreStream).toBeCalledWith(expect.anything(), false);
@@ -266,16 +290,20 @@ describe('Keep alive', () => {
 
   test('Connection should be kept alive indefinitely if Keep-Alive is on', async () => {
     const client = new MockParcelCollectionClient(StreamingMode.KEEP_ALIVE);
-    await client.connect();
-    await client.doHandshake();
+
+    await client.use(async () => {
+      await client.doHandshake();
+    });
 
     expect(mockParcelStoreStream).toBeCalledWith(expect.anything(), true);
   });
 
   test('Connection should be kept alive indefinitely if Keep-Alive value is invalid', async () => {
     const client = new MockParcelCollectionClient('invalid mode' as any);
-    await client.connect();
-    await client.doHandshake();
+
+    await client.use(async () => {
+      await client.doHandshake();
+    });
 
     expect(mockParcelStoreStream).toBeCalledWith(expect.anything(), true);
   });
@@ -292,25 +320,29 @@ describe('Acknowledgements', () => {
       { key: parcel2Key, serialization: parcel2Serialized },
     );
     const client = new MockParcelCollectionClient();
-    await client.connect();
-    await client.doHandshake();
 
-    const parcel1Delivery = await client.receiveParcelDelivery();
-    expect(Buffer.from(parcel1Delivery.parcelSerialized)).toEqual(parcel1Serialized);
+    await client.use(async () => {
+      await client.doHandshake();
 
-    const parcel2Delivery = await client.receiveParcelDelivery();
-    expect(Buffer.from(parcel2Delivery.parcelSerialized)).toEqual(parcel2Serialized);
+      const parcel1Delivery = await client.receiveParcelDelivery();
+      expect(Buffer.from(parcel1Delivery.parcelSerialized)).toEqual(parcel1Serialized);
+
+      const parcel2Delivery = await client.receiveParcelDelivery();
+      expect(Buffer.from(parcel2Delivery.parcelSerialized)).toEqual(parcel2Serialized);
+    });
   });
 
   test('Parcel should be deleted when client acknowledges it', async () => {
     const parcelKey = 'parcel1 key';
     setParcelsInStore({ key: parcelKey, serialization: Buffer.from('parcel1') });
     const client = new MockParcelCollectionClient();
-    await client.connect();
-    await client.doHandshake();
-    const parcelDelivery = await client.receiveParcelDelivery();
 
-    await client.acknowledgeDelivery(parcelDelivery.deliveryId);
+    await client.use(async () => {
+      await client.doHandshake();
+      const parcelDelivery = await client.receiveParcelDelivery();
+
+      await client.acknowledgeDelivery(parcelDelivery.deliveryId);
+    });
 
     expect(mockParcelStoreDelete).toBeCalledWith(parcelKey, MessageDirection.FROM_INTERNET);
     expect(mockLogs).toContainEqual(
@@ -324,11 +356,13 @@ describe('Acknowledgements', () => {
   test('Parcel should not be deleted if client never acknowledges it', async () => {
     setParcelsInStore({ key: 'parcel1 key', serialization: Buffer.from('parcel1') });
     const client = new MockParcelCollectionClient();
-    await client.connect();
-    await client.doHandshake();
-    await client.receiveParcelDelivery();
 
-    await sleepSeconds(0.5);
+    await client.use(async () => {
+      await client.doHandshake();
+      await client.receiveParcelDelivery();
+
+      await sleepSeconds(0.5);
+    });
 
     expect(mockParcelStoreDelete).not.toBeCalled();
   });
@@ -336,16 +370,19 @@ describe('Acknowledgements', () => {
   test('Connection should be closed with an error if client sends unknown ACK', async () => {
     setParcelsInStore({ key: 'parcel1 key', serialization: Buffer.from('parcel1') });
     const client = new MockParcelCollectionClient();
-    await client.connect();
-    await client.doHandshake();
-    await client.receiveParcelDelivery();
 
-    await client.acknowledgeDelivery('invalid delivery id');
+    await client.use(async () => {
+      await client.doHandshake();
+      await client.receiveParcelDelivery();
 
-    await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
-      code: WebSocketCode.CANNOT_ACCEPT,
-      reason: 'Unknown delivery id sent as acknowledgement',
+      await client.acknowledgeDelivery('invalid delivery id');
+
+      await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
+        code: WebSocketCode.CANNOT_ACCEPT,
+        reason: 'Unknown delivery id sent as acknowledgement',
+      });
     });
+
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Closing connection due to unknown acknowledgement', {
         endpointAddresses: [trustedEndpointAddress],
@@ -365,42 +402,27 @@ describe('Acknowledgements', () => {
         { key: parcel2Key, serialization: parcel2Serialized },
       );
       const client = new MockParcelCollectionClient(mode);
-      await client.connect();
-      await client.doHandshake();
 
-      const parcel1Delivery = await client.receiveParcelDelivery();
-      const parcel2Delivery = await client.receiveParcelDelivery();
-      // ACK out of order:
-      await client.acknowledgeDelivery(parcel2Delivery.deliveryId);
-      await client.acknowledgeDelivery(parcel1Delivery.deliveryId);
+      await client.use(async () => {
+        await client.doHandshake();
 
-      await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
-        code: WebSocketCode.NORMAL,
+        const parcel1Delivery = await client.receiveParcelDelivery();
+        const parcel2Delivery = await client.receiveParcelDelivery();
+        // ACK out of order:
+        await client.acknowledgeDelivery(parcel2Delivery.deliveryId);
+        await client.acknowledgeDelivery(parcel1Delivery.deliveryId);
+
+        await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
+          code: WebSocketCode.NORMAL,
+        });
       });
+
       expect(mockLogs).toContainEqual(
         partialPinoLog('debug', 'All parcels have been collected and acknowledged', {
           endpointAddresses: [trustedEndpointAddress],
         }),
       );
     },
-  );
-});
-
-test('Connection closure should be logged', async () => {
-  setParcelsInStore({ key: 'parcel1 key', serialization: Buffer.from('parcel1') });
-  const client = new MockParcelCollectionClient();
-  await client.connect();
-  await client.doHandshake();
-  const closureReason = 'I have to run';
-
-  client.close(WebSocketCode.NORMAL, closureReason);
-
-  await setImmediateAsync();
-  expect(mockLogs).toContainEqual(
-    partialPinoLog('debug', 'Closing connection', {
-      code: WebSocketCode.NORMAL,
-      reason: closureReason,
-    }),
   );
 });
 
