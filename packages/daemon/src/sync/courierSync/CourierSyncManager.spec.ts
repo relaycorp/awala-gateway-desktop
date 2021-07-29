@@ -1,4 +1,4 @@
-import { v4 as v4 } from 'default-gateway';
+import { v4 as getDefaultGateway } from 'default-gateway';
 import pipe from 'it-pipe';
 import { waitUntilUsedOnHost } from 'tcp-port-used';
 import { Container } from 'typedi';
@@ -22,8 +22,8 @@ import { CourierSyncStageNotification, ParcelCollectionNotification } from './me
 jest.mock('default-gateway', () => ({ v4: jest.fn() }));
 const mockGatewayIPAddress = '192.168.0.12';
 beforeEach(() => {
-  getMockInstance(v4).mockRestore();
-  getMockInstance(v4).mockResolvedValue({ gateway: mockGatewayIPAddress });
+  getMockInstance(getDefaultGateway).mockRestore();
+  getMockInstance(getDefaultGateway).mockResolvedValue({ gateway: mockGatewayIPAddress });
 });
 
 jest.mock('tcp-port-used', () => ({ waitUntilUsedOnHost: jest.fn() }));
@@ -154,7 +154,9 @@ describe('streamStatus', () => {
   const sleepSecondsMock = mockSleepSeconds();
 
   test('Failure to get default gateway should be skip ping', async () => {
-    getMockInstance(v4).mockRejectedValue(new Error('Device is not connected to any network'));
+    getMockInstance(getDefaultGateway).mockRejectedValue(
+      new Error('Device is not connected to any network'),
+    );
 
     await pipe(courierSync.streamStatus(), iterableTake(1), asyncIterableToArray);
 
@@ -168,10 +170,10 @@ describe('streamStatus', () => {
   });
 
   test('Any change to the default gateway should be reflected in pings', async () => {
-    getMockInstance(v4).mockRestore();
-    getMockInstance(v4).mockResolvedValueOnce({ gateway: mockGatewayIPAddress });
+    getMockInstance(getDefaultGateway).mockRestore();
+    getMockInstance(getDefaultGateway).mockResolvedValueOnce({ gateway: mockGatewayIPAddress });
     const newGatewayIPAddr = `${mockGatewayIPAddress}1`;
-    getMockInstance(v4).mockResolvedValueOnce({ gateway: newGatewayIPAddr });
+    getMockInstance(getDefaultGateway).mockResolvedValueOnce({ gateway: newGatewayIPAddr });
 
     await pipe(courierSync.streamStatus(), iterableTake(2), asyncIterableToArray);
 
