@@ -19,7 +19,7 @@ export function makeMockLoggingFixture(): MockLogging {
   const stream = split2((data) => {
     logs.push(JSON.parse(data));
   });
-  const logger = pino({ level: 'debug' }, stream);
+  const logger = pino({ level: 'trace' }, stream);
 
   beforeEach(() => {
     logs.splice(0, logs.length);
