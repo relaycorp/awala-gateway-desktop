@@ -9,6 +9,7 @@ import { COURIER_PORT, CourierConnectionStatus, CourierSyncStage } from '.';
 import { Config } from '../../Config';
 import { UnregisteredGatewayError } from '../../errors';
 import { fork } from '../../utils/subprocess/child';
+import { sleepSeconds } from '../../utils/timing';
 import { IPCMessage } from '../ipc';
 import { GatewayRegistrar } from '../publicGateway/GatewayRegistrar';
 import { DisconnectedFromCourierError } from './errors';
@@ -34,6 +35,7 @@ export class CourierSyncManager {
         lastStatus = newStatus;
         yield newStatus;
       }
+      await sleepSeconds(2);
     }
   }
 
