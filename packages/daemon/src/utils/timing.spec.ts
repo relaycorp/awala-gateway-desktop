@@ -1,12 +1,26 @@
+import { addMilliseconds, addSeconds, subMilliseconds } from 'date-fns';
+
+import { useFakeTimers } from '../testUtils/jest';
 import { sleepSeconds } from './timing';
 
-jest.useFakeTimers('legacy');
+useFakeTimers();
 
 describe('sleepSeconds', () => {
   test('Should wait for the specified number of seconds', async () => {
-    setImmediate(() => jest.runAllTimers());
-    await sleepSeconds(2);
+    const startDate = new Date();
 
-    expect(setTimeout).toBeCalledWith(expect.any(Function), 2_000);
+    await Promise.race([
+      sleepSeconds(2),
+      new Promise((resolve) => {
+        jest.advanceTimersByTime(2_000);
+        resolve(undefined);
+      }),
+    ]);
+
+    const endDate = new Date();
+
+    const expectedEndDate = addSeconds(startDate, 2);
+    expect(endDate).toBeBefore(addMilliseconds(expectedEndDate, 100));
+    expect(endDate).toBeAfter(subMilliseconds(expectedEndDate, 100));
   });
 });
