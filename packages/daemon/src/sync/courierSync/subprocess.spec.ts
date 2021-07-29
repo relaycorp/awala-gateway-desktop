@@ -139,6 +139,12 @@ describe('Cargo collection', () => {
     });
   });
 
+  test('Start of collection should be logged', async () => {
+    await runCourierSync(getParentStream());
+
+    expect(mockLogs).toContainEqual(partialPinoLog('info', 'Starting cargo collection'));
+  });
+
   test('CogRPC client should be closed when collection fails', async () => {
     const error = new Error('nope.jpeg');
     mockCollectCargo.mockImplementation(async function* (): AsyncIterable<any> {
@@ -305,9 +311,23 @@ describe('Cargo collection', () => {
     );
   });
 
+  test('Processing of valid cargo should be logged', async () => {
+    const { parcelSerialized } = await makeDummyParcel();
+    const { cargo, cargoSerialized } = await makeDummyCargoFromMessages(parcelSerialized);
+    mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
+
+    await runCourierSync(getParentStream());
+
+    expect(mockLogs).toContainEqual(
+      partialPinoLog('info', 'Processing collected cargo', {
+        cargoId: cargo.id,
+      }),
+    );
+  });
+
   describe('Encapsulated parcels', () => {
     test('Well-formed yet invalid parcels should be logged and ignored', async () => {
-      const { pdaCertPath, keyPairSet } = await pkiFixtureRetriever();
+      const { pdaCertPath, keyPairSet } = pkiFixtureRetriever();
       const { parcelSerialized: invalidParcelSerialized } = await makeParcel(
         MessageDirection.FROM_INTERNET,
         { ...pdaCertPath, pdaGrantee: pdaCertPath.publicGateway },
@@ -411,7 +431,7 @@ describe('Cargo collection', () => {
 
   describe('Encapsulated parcel collection ACKs', () => {
     test('ACKed parcel should be deleted', async () => {
-      const { pdaCertPath, keyPairSet } = await pkiFixtureRetriever();
+      const { pdaCertPath, keyPairSet } = pkiFixtureRetriever();
       const { parcel, parcelSerialized } = await makeParcel(
         MessageDirection.TOWARDS_INTERNET,
         pdaCertPath,
@@ -470,7 +490,7 @@ describe('Cargo collection', () => {
 
     await runCourierSync(getParentStream());
 
-    const { pdaCertPath } = await pkiFixtureRetriever();
+    const { pdaCertPath } = pkiFixtureRetriever();
     const parcelKeys = await asyncIterableToArray(
       parcelStore.streamEndpointBound(
         [await pdaCertPath.privateEndpoint.calculateSubjectPrivateAddress()],
@@ -481,7 +501,7 @@ describe('Cargo collection', () => {
   });
 
   async function makeDummyParcel(): Promise<GeneratedParcel> {
-    const { pdaCertPath, keyPairSet } = await pkiFixtureRetriever();
+    const { pdaCertPath, keyPairSet } = pkiFixtureRetriever();
     return makeParcel(MessageDirection.FROM_INTERNET, pdaCertPath, keyPairSet);
   }
 
@@ -529,6 +549,12 @@ describe('Wait period', () => {
     });
   });
 
+  test('Start of wait should be logged', async () => {
+    await runCourierSync(getParentStream());
+
+    expect(mockLogs).toContainEqual(partialPinoLog('info', 'Waiting before delivering cargo'));
+  });
+
   test('Client should wait for 5 seconds before delivering cargo', async () => {
     await runCourierSync(getParentStream());
 
@@ -562,6 +588,12 @@ describe('Cargo delivery', () => {
       stage: CourierSyncStage.DELIVERY,
       type: 'stage',
     });
+  });
+
+  test('Start of delivery should be logged', async () => {
+    await runCourierSync(getParentStream());
+
+    expect(mockLogs).toContainEqual(partialPinoLog('info', 'Starting cargo delivery'));
   });
 
   test('CogRPC client should be closed when delivery fails', async () => {
@@ -638,13 +670,21 @@ describe('Cargo delivery', () => {
     expect(cargo.senderCaCertificateChain).toHaveLength(0);
   });
 
+  test('No cargo should be delivered if there are no parcels or collection ACKs', async () => {
+    await runCourierSync(getParentStream());
+
+    await expect(getCargoDeliveryRequests()).resolves.toHaveLength(0);
+  });
+
+  test('Cargo delivery should be logged', async () => {
+    await makeAndStoreParcel();
+
+    await runCourierSync(getParentStream());
+
+    expect(mockLogs).toContainEqual(partialPinoLog('info', 'Delivering one cargo'));
+  });
+
   describe('Cargo contents', () => {
-    test('No cargo should be delivered if there are no parcels or collection ACKs', async () => {
-      await runCourierSync(getParentStream());
-
-      await expect(getCargoDeliveryRequests()).resolves.toHaveLength(0);
-    });
-
     test('Queued parcels should be included in cargo', async () => {
       const { parcelSerialized } = await makeAndStoreParcel();
 
@@ -737,7 +777,7 @@ describe('Cargo delivery', () => {
   }
 
   async function makeAndStoreParcel(): Promise<GeneratedParcel> {
-    const { pdaCertPath, keyPairSet } = await pkiFixtureRetriever();
+    const { pdaCertPath, keyPairSet } = pkiFixtureRetriever();
     const { parcel, parcelSerialized } = await makeParcel(
       MessageDirection.TOWARDS_INTERNET,
       pdaCertPath,
