@@ -80,10 +80,7 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
       privateKeyStore,
       logger,
     );
-
-    sendStageNotificationToParent(parentStream, CourierSyncStage.WAIT);
-    await sleepSeconds(DELAY_BETWEEN_COLLECTION_AND_DELIVERY_SECONDS);
-
+    await waitBeforeDelivery(parentStream, logger);
     await deliverCargo(
       publicGateway,
       gateway,
@@ -114,6 +111,7 @@ async function collectCargo(
   privateKeyStore: DBPrivateKeyStore,
   logger: Logger,
 ): Promise<void> {
+  logger.debug('Starting cargo collection');
   sendStageNotificationToParent(parentStream, CourierSyncStage.COLLECTION);
 
   const ccaSerialized = await generateCCA(publicGateway, currentKey, privateKeyStore);
@@ -133,15 +131,15 @@ async function collectCargo(
         try {
           cargo = await Cargo.deserialize(bufferToArray(cargoSerialized));
         } catch (err) {
-          logger.info({ err }, 'Ignoring malformed/invalid cargo');
+          logger.warn({ err }, 'Ignoring malformed/invalid cargo');
           continue;
         }
-        const cargoAwareLogger = logger.child({ cargoId: cargo.id });
+        const cargoAwareLogger = logger.child({ cargo: { id: cargo.id } });
 
         try {
           await cargo.validate(RecipientAddressType.PRIVATE, ownCDACertificates);
         } catch (err) {
-          cargoAwareLogger.info({ err }, 'Ignoring cargo by unauthorized sender');
+          cargoAwareLogger.warn({ err }, 'Ignoring cargo by unauthorized sender');
           continue;
         }
 
@@ -149,16 +147,18 @@ async function collectCargo(
         try {
           cargoMessageSet = await privateGateway.unwrapMessagePayload(cargo);
         } catch (err) {
-          cargoAwareLogger.info({ err }, 'Ignored cargo with invalid payload');
+          cargoAwareLogger.warn({ err }, 'Ignored invalid message in cargo');
           continue;
         }
+
+        cargoAwareLogger.debug('Processing collected cargo');
 
         for (const itemSerialized of cargoMessageSet.messages) {
           let item: Parcel | ParcelCollectionAck;
           try {
             item = await CargoMessageSet.deserializeItem(itemSerialized);
           } catch (err) {
-            cargoAwareLogger.info({ err }, 'Ignoring invalid/malformed message');
+            cargoAwareLogger.warn({ err }, 'Ignoring invalid/malformed message');
             continue;
           }
           if (item instanceof Parcel) {
@@ -224,7 +224,7 @@ async function processParcel(
   try {
     await parcel.validate(RecipientAddressType.PRIVATE, ownCertificates);
   } catch (err) {
-    logger.info({ err }, 'Ignoring invalid parcel');
+    logger.warn({ err }, 'Ignoring invalid parcel');
     return;
   }
   const parcelKey = await parcelStore.storeEndpointBound(Buffer.from(parcelSerialized), parcel);
@@ -270,6 +270,12 @@ async function processParcelCollectionAck(
   await parcelStore.deleteInternetBoundFromACK(ack);
 }
 
+async function waitBeforeDelivery(parentStream: Duplex, logger: Logger): Promise<void> {
+  logger.debug('Waiting before delivering cargo');
+  sendStageNotificationToParent(parentStream, CourierSyncStage.WAIT);
+  await sleepSeconds(DELAY_BETWEEN_COLLECTION_AND_DELIVERY_SECONDS);
+}
+
 async function deliverCargo(
   publicGateway: PublicGateway,
   privateGateway: Gateway,
@@ -279,6 +285,7 @@ async function deliverCargo(
   parentStream: Duplex,
   logger: Logger,
 ): Promise<void> {
+  logger.debug('Starting cargo delivery');
   sendStageNotificationToParent(parentStream, CourierSyncStage.DELIVERY);
 
   const cargoDeliveryStream = makeCargoDeliveryStream(
@@ -288,11 +295,17 @@ async function deliverCargo(
     parcelStore,
     logger,
   );
-  await pipe(client.deliverCargo(cargoDeliveryStream), async (ackIds: AsyncIterable<string>) => {
-    for await (const ackId of ackIds) {
-      logger.debug({ ackId }, 'Received parcel delivery acknowledgement');
-    }
-  });
+  await pipe(
+    client.deliverCargo(cargoDeliveryStream),
+    async (ackDeliveryIds: AsyncIterable<string>) => {
+      for await (const ackDeliveryId of ackDeliveryIds) {
+        logger.debug(
+          { localDeliveryId: ackDeliveryId },
+          'Received parcel delivery acknowledgement',
+        );
+      }
+    },
+  );
 }
 
 async function* makeCargoDeliveryStream(
@@ -311,9 +324,16 @@ async function* makeCargoDeliveryStream(
   );
   yield* await pipe(
     cargoStream,
-    async function* (cargoes: AsyncIterable<Buffer>): AsyncIterable<CargoDeliveryRequest> {
-      for await (const cargo of cargoes) {
-        yield { cargo, localId: uuid() };
+    async function* (
+      cargoesSerialized: AsyncIterable<Buffer>,
+    ): AsyncIterable<CargoDeliveryRequest> {
+      for await (const cargoSerialized of cargoesSerialized) {
+        const localId = uuid();
+        logger.info(
+          { cargo: { octets: cargoSerialized.byteLength }, localDeliveryId: localId },
+          'Delivering cargo',
+        );
+        yield { cargo: cargoSerialized, localId };
       }
     },
   );
@@ -331,6 +351,17 @@ async function* makeCargoMessageStream(
       pendingACK.recipientEndpointAddress,
       pendingACK.parcelId,
     );
+    logger.debug(
+      {
+        parcelCollectionAck: {
+          parcelExpiryDate: pendingACK.parcelExpiryDate,
+          parcelId: pendingACK.parcelId,
+          recipientEndpointAddress: pendingACK.recipientEndpointAddress,
+          senderEndpointPrivateAddress: pendingACK.senderEndpointPrivateAddress,
+        },
+      },
+      'Adding parcel collection acknowledgement to cargo',
+    );
     yield { message: Buffer.from(ack.serialize()), expiryDate: pendingACK.parcelExpiryDate };
   }
 
@@ -340,9 +371,18 @@ async function* makeCargoMessageStream(
       MessageDirection.TOWARDS_INTERNET,
     );
     if (parcelSerialized) {
+      logger.debug(
+        {
+          parcel: {
+            expiryDate: parcelWithExpiryDate.expiryDate,
+            key: parcelWithExpiryDate.parcelKey,
+          },
+        },
+        'Adding parcel to cargo',
+      );
       yield { message: parcelSerialized, expiryDate: parcelWithExpiryDate.expiryDate };
     } else {
-      logger.debug({ parcelKey: parcelWithExpiryDate.parcelKey }, 'Skipped deleted parcel');
+      logger.debug({ parcel: { key: parcelWithExpiryDate.parcelKey } }, 'Skipped deleted parcel');
     }
   }
 }
