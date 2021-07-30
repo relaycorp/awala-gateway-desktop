@@ -38,7 +38,7 @@ class Status extends Component<Props> {
               So you’re good to go!
             </p>
             <p>
-              <b>Remember</b>: Your data is safe while it isn’t in transit
+              <b>Remember</b>: Your data remains safe while it’s in transit
               and if it gets lost we’ll try to deliver it again.
             </p>
             <button onClick={this.props.onSynchronize}>Start sync</button>
