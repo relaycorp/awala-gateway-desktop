@@ -142,7 +142,7 @@ describe('Cargo collection', () => {
   test('Start of collection should be logged', async () => {
     await runCourierSync(getParentStream());
 
-    expect(mockLogs).toContainEqual(partialPinoLog('info', 'Starting cargo collection'));
+    expect(mockLogs).toContainEqual(partialPinoLog('debug', 'Starting cargo collection'));
   });
 
   test('CogRPC client should be closed when collection fails', async () => {
@@ -254,7 +254,7 @@ describe('Cargo collection', () => {
     await runCourierSync(getParentStream());
 
     expect(mockLogs).toContainEqual(
-      partialPinoLog('info', 'Ignoring malformed/invalid cargo', {
+      partialPinoLog('warn', 'Ignoring malformed/invalid cargo', {
         err: expect.objectContaining({ type: RAMFSyntaxError.name }),
       }),
     );
@@ -273,23 +273,23 @@ describe('Cargo collection', () => {
     await runCourierSync(getParentStream());
 
     expect(mockLogs).toContainEqual(
-      partialPinoLog('info', 'Ignoring cargo by unauthorized sender', {
-        cargoId: cargo.id,
+      partialPinoLog('warn', 'Ignoring cargo by unauthorized sender', {
+        cargo: { id: cargo.id },
         err: expect.objectContaining({ type: InvalidMessageError.name }),
       }),
     );
     await expect(getStoredParcelKeys()).resolves.toHaveLength(0);
   });
 
-  test('Cargo with invalid payload should be logged and ignored', async () => {
+  test('Invalid encapsulated message should be logged and ignored', async () => {
     const { cargo, cargoSerialized } = await makeDummyCargo(Buffer.from('malformed payload'));
     mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
 
     await runCourierSync(getParentStream());
 
     expect(mockLogs).toContainEqual(
-      partialPinoLog('info', 'Ignored cargo with invalid payload', {
-        cargoId: cargo.id,
+      partialPinoLog('warn', 'Ignored invalid message in cargo', {
+        cargo: { id: cargo.id },
         err: expect.objectContaining({ type: CMSError.name }),
       }),
     );
@@ -304,8 +304,8 @@ describe('Cargo collection', () => {
     await runCourierSync(getParentStream());
 
     expect(mockLogs).toContainEqual(
-      partialPinoLog('info', 'Ignoring invalid/malformed message', {
-        cargoId: cargo.id,
+      partialPinoLog('warn', 'Ignoring invalid/malformed message', {
+        cargo: { id: cargo.id },
         err: expect.objectContaining({ type: InvalidMessageError.name }),
       }),
     );
@@ -313,16 +313,12 @@ describe('Cargo collection', () => {
 
   test('Processing of valid cargo should be logged', async () => {
     const { parcelSerialized } = await makeDummyParcel();
-    const { cargo, cargoSerialized } = await makeDummyCargoFromMessages(parcelSerialized);
+    const { cargoSerialized } = await makeDummyCargoFromMessages(parcelSerialized);
     mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
 
     await runCourierSync(getParentStream());
 
-    expect(mockLogs).toContainEqual(
-      partialPinoLog('info', 'Processing collected cargo', {
-        cargoId: cargo.id,
-      }),
-    );
+    expect(mockLogs).toContainEqual(partialPinoLog('debug', 'Processing collected cargo'));
   });
 
   describe('Encapsulated parcels', () => {
@@ -339,8 +335,8 @@ describe('Cargo collection', () => {
       await runCourierSync(getParentStream());
 
       expect(mockLogs).toContainEqual(
-        partialPinoLog('info', 'Ignoring invalid parcel', {
-          cargoId: cargo.id,
+        partialPinoLog('warn', 'Ignoring invalid parcel', {
+          cargo: { id: cargo.id },
           err: expect.objectContaining({ type: InvalidMessageError.name }),
         }),
       );
@@ -363,7 +359,7 @@ describe('Cargo collection', () => {
       ).resolves.toEqual(parcelSerialized);
       expect(mockLogs).toContainEqual(
         partialPinoLog('info', 'Stored parcel', {
-          cargoId: cargo.id,
+          cargo: { id: cargo.id },
           parcel: { id: parcel.id, recipientAddress: parcel.recipientAddress, key: parcelKeys[0] },
         }),
       );
@@ -451,7 +447,7 @@ describe('Cargo collection', () => {
       await expect(asyncIterableToArray(parcelStore.listInternetBound())).resolves.toHaveLength(0);
       expect(mockLogs).toContainEqual(
         partialPinoLog('info', 'Deleting ACKed parcel', {
-          cargoId: cargo.id,
+          cargo: { id: cargo.id },
           parcel: {
             id: parcel.id,
             recipientAddress: parcel.recipientAddress,
@@ -552,7 +548,7 @@ describe('Wait period', () => {
   test('Start of wait should be logged', async () => {
     await runCourierSync(getParentStream());
 
-    expect(mockLogs).toContainEqual(partialPinoLog('info', 'Waiting before delivering cargo'));
+    expect(mockLogs).toContainEqual(partialPinoLog('debug', 'Waiting before delivering cargo'));
   });
 
   test('Client should wait for 5 seconds before delivering cargo', async () => {
@@ -593,7 +589,7 @@ describe('Cargo delivery', () => {
   test('Start of delivery should be logged', async () => {
     await runCourierSync(getParentStream());
 
-    expect(mockLogs).toContainEqual(partialPinoLog('info', 'Starting cargo delivery'));
+    expect(mockLogs).toContainEqual(partialPinoLog('debug', 'Starting cargo delivery'));
   });
 
   test('CogRPC client should be closed when delivery fails', async () => {
@@ -677,11 +673,17 @@ describe('Cargo delivery', () => {
   });
 
   test('Cargo delivery should be logged', async () => {
-    await makeAndStoreParcel();
+    const { parcelSerialized } = await makeAndStoreParcel();
 
     await runCourierSync(getParentStream());
 
-    expect(mockLogs).toContainEqual(partialPinoLog('info', 'Delivering one cargo'));
+    const deliveryRequests = await getCargoDeliveryRequests();
+    expect(mockLogs).toContainEqual(
+      partialPinoLog('info', 'Delivering cargo', {
+        cargo: { octets: expect.toSatisfy((octets) => parcelSerialized.byteLength < octets) },
+        localDeliveryId: deliveryRequests[0].localId,
+      }),
+    );
   });
 
   describe('Cargo contents', () => {
@@ -694,6 +696,22 @@ describe('Cargo delivery', () => {
       expect(deliveryRequests).toHaveLength(1);
       const cargoMessages = await unwrapCargoMessages(deliveryRequests[0].cargo);
       expect(cargoMessages).toEqual([parcelSerialized]);
+    });
+
+    test('Encapsulation of parcels should be logged', async () => {
+      const { parcel, parcelKey } = await makeAndStoreParcel();
+
+      await runCourierSync(getParentStream());
+
+      await getCargoDeliveryRequests();
+      expect(mockLogs).toContainEqual(
+        partialPinoLog('debug', 'Adding parcel to cargo', {
+          parcel: {
+            expiryDate: parcel.expiryDate.toISOString(),
+            key: parcelKey,
+          },
+        }),
+      );
     });
 
     test('Recently-deleted parcels should be gracefully skipped', async () => {
@@ -717,7 +735,7 @@ describe('Cargo delivery', () => {
       expect(cargoMessages).toEqual([parcel2Serialized]);
       expect(mockLogs).toContainEqual(
         partialPinoLog('debug', 'Skipped deleted parcel', {
-          parcelKey: parcel1Key,
+          parcel: { key: parcel1Key },
         }),
       );
     });
@@ -742,6 +760,24 @@ describe('Cargo delivery', () => {
         collectionACK.senderEndpointPrivateAddress,
       );
     });
+
+    test('Encapsulation of parcel collection acknowledgement should be logged', async () => {
+      const collectionACK = await storeParcelCollection(addSeconds(new Date(), 2));
+
+      await runCourierSync(getParentStream());
+
+      await getCargoDeliveryRequests();
+      expect(mockLogs).toContainEqual(
+        partialPinoLog('debug', 'Adding parcel collection acknowledgement to cargo', {
+          parcelCollectionAck: {
+            parcelExpiryDate: collectionACK.parcelExpiryDate.toISOString(),
+            parcelId: collectionACK.parcelId,
+            recipientEndpointAddress: collectionACK.recipientEndpointAddress,
+            senderEndpointPrivateAddress: collectionACK.senderEndpointPrivateAddress,
+          },
+        }),
+      );
+    });
   });
 
   describe('Delivery ACKs', () => {
@@ -755,15 +791,15 @@ describe('Cargo delivery', () => {
     });
 
     test('ACK should be logged when received', async () => {
-      const ackId = 'the ack';
-      mockDeliverCargo.mockReturnValueOnce(arrayToAsyncIterable([ackId]));
+      const localDeliveryId = 'the ack';
+      mockDeliverCargo.mockReturnValueOnce(arrayToAsyncIterable([localDeliveryId]));
       await makeAndStoreParcel();
 
       await runCourierSync(getParentStream());
 
       expect(mockLogs).toContainEqual(
         partialPinoLog('debug', 'Received parcel delivery acknowledgement', {
-          ackId,
+          localDeliveryId,
         }),
       );
     });
@@ -776,7 +812,7 @@ describe('Cargo delivery', () => {
     return asyncIterableToArray(iterable);
   }
 
-  async function makeAndStoreParcel(): Promise<GeneratedParcel> {
+  async function makeAndStoreParcel(): Promise<GeneratedParcel & { readonly parcelKey: string }> {
     const { pdaCertPath, keyPairSet } = pkiFixtureRetriever();
     const { parcel, parcelSerialized } = await makeParcel(
       MessageDirection.TOWARDS_INTERNET,
@@ -784,9 +820,9 @@ describe('Cargo delivery', () => {
       keyPairSet,
     );
 
-    await parcelStore.storeInternetBound(parcelSerialized, parcel);
+    const parcelKey = await parcelStore.storeInternetBound(parcelSerialized, parcel);
 
-    return { parcel, parcelSerialized };
+    return { parcel, parcelKey, parcelSerialized };
   }
 
   async function storeParcelCollection(parcelExpiryDate: Date): Promise<ParcelCollection> {
