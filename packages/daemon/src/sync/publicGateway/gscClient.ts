@@ -9,6 +9,7 @@ export class NonExistingAddressError extends PrivateGatewayError {}
  * Resolve the PoWeb address and return a client bound to it.
  *
  * @param publicGatewayAddress
+ * @throws UnreachableResolverError if DNS resolver is unreachable
  * @throws PublicAddressingError if the DNS lookup or DNSSEC verification failed
  * @throws NonExistingAddressError if the DNS+DNSSEC lookup succeeded but the address doesn't exist
  */

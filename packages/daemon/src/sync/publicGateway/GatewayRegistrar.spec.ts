@@ -4,7 +4,7 @@ import {
   GSCClient,
   PrivateNodeRegistration,
   PrivateNodeRegistrationRequest,
-  PublicAddressingError,
+  UnreachableResolverError,
 } from '@relaycorp/relaynet-core';
 import {
   generateNodeKeyPairSet,
@@ -184,11 +184,11 @@ describe('waitForRegistration', () => {
     expect(sleepSeconds).not.toBeCalled();
   });
 
-  test('Registration should be reattempted if DNS resolution failed', async () => {
+  test('Registration should be reattempted if DNS resolver is unreachable', async () => {
     mockIsRegistered.mockResolvedValueOnce(false);
     mockIsRegistered.mockResolvedValueOnce(false);
     mockIsRegistered.mockResolvedValueOnce(true);
-    mockRegister.mockRejectedValueOnce(new PublicAddressingError());
+    mockRegister.mockRejectedValueOnce(new UnreachableResolverError());
     mockRegister.mockResolvedValueOnce(undefined);
 
     await registrar.waitForRegistration();
@@ -198,13 +198,13 @@ describe('waitForRegistration', () => {
     expect(sleepSeconds).toBeCalledWith(5);
     expect(logs).toContainEqual(
       partialPinoLog(
-        'info',
-        'Failed to register with public gateway due to DNS failure; will retry later',
+        'debug',
+        'Failed to register with public gateway because DNS resolver is unreachable',
       ),
     );
   });
 
-  test('Registration should be reattempted if public address does not exist', async () => {
+  test('Registration should be reattempted if DNS resolution failed', async () => {
     mockIsRegistered.mockResolvedValueOnce(false);
     mockIsRegistered.mockResolvedValueOnce(false);
     mockIsRegistered.mockResolvedValueOnce(true);

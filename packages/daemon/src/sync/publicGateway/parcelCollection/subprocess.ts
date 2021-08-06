@@ -5,6 +5,7 @@ import {
   PublicAddressingError,
   Signer,
   StreamingMode,
+  UnreachableResolverError,
 } from '@relaycorp/relaynet-core';
 import pipe from 'it-pipe';
 import { Logger } from 'pino';
@@ -90,12 +91,16 @@ async function makeGSCClientAndRetryIfNeeded(
       client = await makeGSCClient(publicGatewayAddress);
     } catch (err) {
       notifyStatusToParent('disconnected', parentStream);
-      if (err instanceof PublicAddressingError) {
-        logger.info({ err }, 'Failed to resolve DNS record for public gateway');
+      if (err instanceof UnreachableResolverError) {
+        // Don't log the actual error because it'll waste disk space and won't add anything
+        logger.debug('DNS resolver is unreachable');
         await sleepSeconds(3);
+      } else if (err instanceof PublicAddressingError) {
+        logger.error({ err }, 'Failed to resolve DNS record for public gateway');
+        await sleepSeconds(30);
       } else {
-        logger.warn({ err, publicGatewayAddress }, 'Public gateway does not appear to exist');
-        await sleepSeconds(10);
+        logger.error({ err, publicGatewayAddress }, 'Public gateway does not appear to exist');
+        await sleepSeconds(60);
       }
     }
   }
