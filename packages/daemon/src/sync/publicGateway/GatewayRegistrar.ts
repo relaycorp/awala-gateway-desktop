@@ -4,7 +4,7 @@ import {
   PrivateKeyStore,
   PrivateNodeRegistration,
   PrivateNodeRegistrationRequest,
-  PublicAddressingError,
+  UnreachableResolverError,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { Container, Inject, Service } from 'typedi';
@@ -32,6 +32,7 @@ export class GatewayRegistrar {
    * Register with the `publicGatewayAddress`.
    *
    * @param publicGatewayAddress
+   * @throws UnreachableResolverError if DNS resolver is unreachable
    * @throws PublicAddressingError if the DNS lookup or DNSSEC verification failed
    * @throws NonExistingAddressError if the DNS+DNSSEC lookup succeeded but the address doesn't exist
    */
@@ -63,10 +64,10 @@ export class GatewayRegistrar {
       try {
         await this.register(DEFAULT_PUBLIC_GATEWAY);
       } catch (err) {
-        if (err instanceof PublicAddressingError) {
-          // DNS lookup failed. The device may be disconnected from the Internet.
-          logger.info(
-            'Failed to register with public gateway due to DNS failure; will retry later',
+        if (err instanceof UnreachableResolverError) {
+          // The device may be disconnected from the Internet or the DNS resolver may be blocked.
+          logger.debug(
+            'Failed to register with public gateway because DNS resolver is unreachable',
           );
           await sleepSeconds(5);
         } else {

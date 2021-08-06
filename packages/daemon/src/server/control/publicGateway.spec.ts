@@ -1,4 +1,4 @@
-import { PublicAddressingError } from '@relaycorp/relaynet-core';
+import { PublicAddressingError, UnreachableResolverError } from '@relaycorp/relaynet-core';
 import LightMyRequest from 'light-my-request';
 import { Container } from 'typedi';
 
@@ -125,6 +125,19 @@ describe('Set public gateway', () => {
         publicAddress: NEW_PUBLIC_ADDRESS,
       }),
     );
+    expect(mockParcelCollectorManagerRestart).not.toBeCalled();
+  });
+
+  test('Change should be refused if DNS resolver is unreachable', async () => {
+    const error = new UnreachableResolverError('Disconnected');
+    getMockInstance(mockRegister).mockRejectedValue(error);
+
+    const response = await requestPublicAddressChange(NEW_PUBLIC_ADDRESS);
+
+    expect(mockRegister).toBeCalledWith(NEW_PUBLIC_ADDRESS);
+    expect(response.statusCode).toEqual(500);
+    expect(JSON.parse(response.body)).toHaveProperty('code', 'ADDRESS_RESOLUTION_FAILURE');
+    expect(mockLogs).toContainEqual(partialPinoLog('warn', 'Failed to reach DNS resolver'));
     expect(mockParcelCollectorManagerRestart).not.toBeCalled();
   });
 
