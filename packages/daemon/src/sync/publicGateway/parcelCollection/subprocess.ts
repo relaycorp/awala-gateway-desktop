@@ -92,7 +92,8 @@ async function makeGSCClientAndRetryIfNeeded(
     } catch (err) {
       notifyStatusToParent('disconnected', parentStream);
       if (err instanceof UnreachableResolverError) {
-        logger.debug({ err }, 'DNS resolver is unreachable');
+        // Don't log the actual error because it'll waste disk space and won't add anything
+        logger.debug('DNS resolver is unreachable');
         await sleepSeconds(3);
       } else if (err instanceof PublicAddressingError) {
         logger.error({ err }, 'Failed to resolve DNS record for public gateway');

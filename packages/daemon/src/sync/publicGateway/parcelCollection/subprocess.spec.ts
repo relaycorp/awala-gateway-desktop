@@ -262,11 +262,7 @@ describe('Public gateway resolution failures', () => {
 
     expect(sleepSeconds).toBeCalledWith(3);
     expect(mockMakeGSCClient).toBeCalledTimes(2);
-    expect(mockLogs).toContainEqual(
-      partialPinoLog('debug', 'DNS resolver is unreachable', {
-        err: expect.objectContaining({ message: error.message }),
-      }),
-    );
+    expect(mockLogs).toContainEqual(partialPinoLog('debug', 'DNS resolver is unreachable'));
   });
 
   test('Reconnection should be attempted after 30 seconds if DNS lookup failed', async () => {
