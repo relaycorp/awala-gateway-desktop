@@ -23,32 +23,37 @@ import { makeWebSocketServer, WebSocketCode } from '../websocket';
 
 export const PATH = `${POWEB_API_PREFIX}/parcel-collection`;
 
+const WEBSOCKET_PING_INTERVAL_SECONDS = 5;
+
 export default function makeParcelCollectionServer(): Server {
   const logger = Container.get(LOGGER);
   const parcelStore = Container.get(ParcelStore);
 
-  return makeWebSocketServer(async (connectionStream, socket, requestHeaders) => {
-    const endpointAddresses = await doHandshake(connectionStream, socket, logger);
-    if (!endpointAddresses) {
-      return;
-    }
-    const endpointAwareLogger = logger.child({ endpointAddresses });
+  return makeWebSocketServer(
+    async (connectionStream, socket, requestHeaders) => {
+      const endpointAddresses = await doHandshake(connectionStream, socket, logger);
+      if (!endpointAddresses) {
+        return;
+      }
+      const endpointAwareLogger = logger.child({ endpointAddresses });
 
-    // "keep-alive" or any value other than "close-upon-completion" should keep the connection alive
-    const keepAlive = requestHeaders['x-relaynet-streaming-mode'] !== 'close-upon-completion';
+      // "keep-alive" or any value other than "close-upon-completion" should keep the connection alive
+      const keepAlive = requestHeaders['x-relaynet-streaming-mode'] !== 'close-upon-completion';
 
-    const tracker = new CollectionTracker();
-    try {
-      await pipe(
-        parcelStore.streamEndpointBound(endpointAddresses, keepAlive),
-        makeDeliveryStream(parcelStore, tracker, socket, endpointAwareLogger),
-        duplex(connectionStream),
-        makeACKProcessor(parcelStore, tracker, socket, endpointAwareLogger),
-      );
-    } catch (err) {
-      logger.error({ err }, 'Unexpected error');
-    }
-  });
+      const tracker = new CollectionTracker();
+      try {
+        await pipe(
+          parcelStore.streamEndpointBound(endpointAddresses, keepAlive),
+          makeDeliveryStream(parcelStore, tracker, socket, endpointAwareLogger),
+          duplex(connectionStream),
+          makeACKProcessor(parcelStore, tracker, socket, endpointAwareLogger),
+        );
+      } catch (err) {
+        logger.error({ err }, 'Unexpected error');
+      }
+    },
+    { pingFrequencySeconds: WEBSOCKET_PING_INTERVAL_SECONDS },
+  );
 }
 
 async function doHandshake(
