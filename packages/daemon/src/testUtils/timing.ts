@@ -2,7 +2,10 @@ import * as timing from '../utils/timing';
 import { mockSpy } from './jest';
 
 export async function setImmediateAsync(): Promise<void> {
-  return new Promise((resolve) => setImmediate(resolve));
+  const isUsingJestFakeTimers = Object.getOwnPropertyNames(setImmediate).includes('clock');
+  if (!isUsingJestFakeTimers) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
 }
 
 export function mockSleepSeconds(): jest.SpyInstance {
