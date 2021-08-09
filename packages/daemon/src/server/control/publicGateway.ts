@@ -1,4 +1,4 @@
-import { PublicAddressingError } from '@relaycorp/relaynet-core';
+import { PublicAddressingError, UnreachableResolverError } from '@relaycorp/relaynet-core';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import isValidDomain from 'is-valid-domain';
 import { Container } from 'typedi';
@@ -77,24 +77,20 @@ function abortFailedMigration(
   publicAddress: any,
   reply: FastifyReply<any>,
 ): FastifyReply<any> {
+  const statusCode = err instanceof NonExistingAddressError ? 400 : 500;
+  const baseResponse = reply.header('Content-Type', 'application/json').code(statusCode);
   if (err instanceof NonExistingAddressError) {
     request.log.warn({ publicAddress }, 'Public address does not exist');
-    return reply
-      .header('Content-Type', 'application/json')
-      .code(400)
-      .send({ code: ErrorCode.INVALID_ADDRESS });
+    return baseResponse.send({ code: ErrorCode.INVALID_ADDRESS });
+  } else if (err instanceof UnreachableResolverError) {
+    request.log.warn('Failed to reach DNS resolver');
+    return baseResponse.send({ code: ErrorCode.ADDRESS_RESOLUTION_FAILURE });
   } else if (err instanceof PublicAddressingError) {
     request.log.warn({ err, publicAddress }, 'Failed to resolve public address');
-    return reply
-      .header('Content-Type', 'application/json')
-      .code(500)
-      .send({ code: ErrorCode.ADDRESS_RESOLUTION_FAILURE });
+    return baseResponse.send({ code: ErrorCode.ADDRESS_RESOLUTION_FAILURE });
   }
   request.log.warn({ err, publicAddress }, 'Failed to complete registration');
-  return reply
-    .header('Content-Type', 'application/json')
-    .code(500)
-    .send({ code: ErrorCode.REGISTRATION_FAILURE });
+  return baseResponse.send({ code: ErrorCode.REGISTRATION_FAILURE });
 }
 
 function makeAuthEnforcementHook(

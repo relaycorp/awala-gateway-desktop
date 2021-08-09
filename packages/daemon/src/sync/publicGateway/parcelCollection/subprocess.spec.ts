@@ -5,6 +5,7 @@ import {
   PublicAddressingError,
   RAMFSyntaxError,
   StreamingMode,
+  UnreachableResolverError,
 } from '@relaycorp/relaynet-core';
 import { CollectParcelsCall, MockGSCClient } from '@relaycorp/relaynet-testing';
 import bufferToArray from 'buffer-to-arraybuffer';
@@ -252,8 +253,8 @@ describe('Public gateway resolution failures', () => {
     });
   });
 
-  test('Reconnection should be attempted after 3 seconds if DNS lookup failed', async () => {
-    const error = new PublicAddressingError('we probably do not have access to the Internet');
+  test('Reconnection should be attempted after 3 seconds if DNS resolver is unreachable', async () => {
+    const error = new UnreachableResolverError('Disconnected');
     mockMakeGSCClient.mockRejectedValueOnce(error);
     addEmptyParcelCollectionCall();
 
@@ -261,24 +262,36 @@ describe('Public gateway resolution failures', () => {
 
     expect(sleepSeconds).toBeCalledWith(3);
     expect(mockMakeGSCClient).toBeCalledTimes(2);
+    expect(mockLogs).toContainEqual(partialPinoLog('debug', 'DNS resolver is unreachable'));
+  });
+
+  test('Reconnection should be attempted after 30 seconds if DNS lookup failed', async () => {
+    const error = new PublicAddressingError('Invalid DNS record');
+    mockMakeGSCClient.mockRejectedValueOnce(error);
+    addEmptyParcelCollectionCall();
+
+    await runParcelCollection(parentStream);
+
+    expect(sleepSeconds).toBeCalledWith(30);
+    expect(mockMakeGSCClient).toBeCalledTimes(2);
     expect(mockLogs).toContainEqual(
-      partialPinoLog('info', 'Failed to resolve DNS record for public gateway', {
+      partialPinoLog('error', 'Failed to resolve DNS record for public gateway', {
         err: expect.objectContaining({ message: error.message }),
       }),
     );
   });
 
-  test('Reconnection should be attempted after 10 seconds if DNS record does not exist', async () => {
+  test('Reconnection should be attempted after 60 seconds if DNS record does not exist', async () => {
     const error = new gscClient.NonExistingAddressError('Not found');
     mockMakeGSCClient.mockRejectedValueOnce(error);
     addEmptyParcelCollectionCall();
 
     await runParcelCollection(parentStream);
 
-    expect(sleepSeconds).toBeCalledWith(10);
+    expect(sleepSeconds).toBeCalledWith(60);
     expect(mockMakeGSCClient).toBeCalledTimes(2);
     expect(mockLogs).toContainEqual(
-      partialPinoLog('warn', 'Public gateway does not appear to exist', {
+      partialPinoLog('error', 'Public gateway does not appear to exist', {
         err: expect.objectContaining({ message: error.message }),
         publicGatewayAddress: DEFAULT_PUBLIC_GATEWAY,
       }),
