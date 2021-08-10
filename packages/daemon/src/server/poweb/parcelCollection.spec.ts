@@ -13,6 +13,7 @@ import {
 } from '@relaycorp/relaynet-core';
 import { CloseFrame, MockClient } from '@relaycorp/ws-mock';
 import bufferToArray from 'buffer-to-arraybuffer';
+import { addSeconds } from 'date-fns';
 import uuid from 'uuid-random';
 import { Data } from 'ws';
 
@@ -22,7 +23,7 @@ import { arrayBufferFrom } from '../../testUtils/buffer';
 import { generatePKIFixture, mockGatewayRegistration } from '../../testUtils/crypto';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { arrayToAsyncIterable } from '../../testUtils/iterables';
-import { mockSpy } from '../../testUtils/jest';
+import { mockSpy, useFakeTimers } from '../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
 import { setImmediateAsync } from '../../testUtils/timing';
 import { mockWebsocketStream } from '../../testUtils/websocket';
@@ -424,6 +425,32 @@ describe('Acknowledgements', () => {
       );
     },
   );
+});
+
+describe('Pings', () => {
+  useFakeTimers();
+
+  const PING_INTERVAL_SEC = 5;
+  const PING_INTERVAL_MS = PING_INTERVAL_SEC * 1_000;
+
+  test('Server should send ping every 5 seconds', async () => {
+    const client = new MockParcelCollectionClient(StreamingMode.KEEP_ALIVE);
+    const connectionDate = new Date();
+
+    await client.use(async () => {
+      await client.doHandshake();
+
+      jest.advanceTimersByTime(PING_INTERVAL_MS + 100);
+      const [ping1] = client.incomingPings;
+      expect(ping1.date).toBeAfter(addSeconds(connectionDate, PING_INTERVAL_SEC - 1));
+      expect(ping1.date).toBeBefore(addSeconds(connectionDate, PING_INTERVAL_SEC + 1));
+
+      jest.advanceTimersByTime(PING_INTERVAL_MS);
+      const [, ping2] = client.incomingPings;
+      expect(ping2.date).toBeAfter(addSeconds(ping1.date, PING_INTERVAL_SEC - 1));
+      expect(ping2.date).toBeBefore(addSeconds(ping1.date, PING_INTERVAL_SEC + 1));
+    });
+  });
 });
 
 test('Abrupt connection closure should be logged', async () => {
