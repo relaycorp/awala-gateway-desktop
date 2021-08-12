@@ -6,11 +6,10 @@
   ],
   "main": "app/main.js",
   "scripts": {
-    "postinstall": "run-s link-daemon rebuild",
+    "postinstall": "run-s link-daemon",
     "link-daemon": "npm link --force ../daemon",
     "license-report": "node ./license-report.js",
     "build": "run-s license-report tsc webpack",
-    "rebuild": "npm rebuild --target=13.1.6 --runtime=electron --dist-url=https://atom.io/download/electron grpc",
     "webpack": "webpack --config ./webpack.config.js",
     "tsc": "tsc -p tsconfig.json",
     "start": "npm run build && electron ./app/main.js",
