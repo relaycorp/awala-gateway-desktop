@@ -54,7 +54,7 @@ However, we do use the terms "private gateway" or "gateway" in the code base bec
 
 ### System dependencies
 
-You only need Node.js 14+ installed.
+You only need Node.js 16+ installed.
 
 ### Setup
 
