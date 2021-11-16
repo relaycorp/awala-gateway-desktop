@@ -7,7 +7,7 @@ import {
   UnreachableResolverError,
 } from '@relaycorp/relaynet-core';
 import {
-  generateNodeKeyPairSet,
+  generateIdentityKeyPairSet,
   generatePDACertificationPath,
   MockGSCClient,
   PreRegisterNodeCall,
@@ -54,7 +54,7 @@ const mockFileStorePutObject = mockSpy(jest.spyOn(FileStore.prototype, 'putObjec
 let publicGatewayIdCertificate: Certificate;
 let idCertificate: Certificate;
 beforeAll(async () => {
-  const certPath = await generatePDACertificationPath(await generateNodeKeyPairSet());
+  const certPath = await generatePDACertificationPath(await generateIdentityKeyPairSet());
   publicGatewayIdCertificate = certPath.publicGateway;
   idCertificate = certPath.privateGateway;
 });

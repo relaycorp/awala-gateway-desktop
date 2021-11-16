@@ -155,7 +155,7 @@ describe('EndpointRegistration', () => {
         Buffer.from(requestSerialized),
       );
 
-      PrivateNodeRegistration.deserialize(bufferToArray(registrationSerialized));
+      await PrivateNodeRegistration.deserialize(bufferToArray(registrationSerialized));
     });
 
     test('Endpoint certificate should be issued by public gateway', async () => {
@@ -166,7 +166,7 @@ describe('EndpointRegistration', () => {
         Buffer.from(requestSerialized),
       );
 
-      const registration = PrivateNodeRegistration.deserialize(
+      const registration = await PrivateNodeRegistration.deserialize(
         bufferToArray(registrationSerialized),
       );
       const endpointCertificate = registration.privateNodeCertificate;
@@ -181,7 +181,7 @@ describe('EndpointRegistration', () => {
         Buffer.from(requestSerialized),
       );
 
-      const registration = PrivateNodeRegistration.deserialize(
+      const registration = await PrivateNodeRegistration.deserialize(
         bufferToArray(registrationSerialized),
       );
       const endpointCertificate = registration.privateNodeCertificate;
@@ -200,7 +200,7 @@ describe('EndpointRegistration', () => {
         Buffer.from(requestSerialized),
       );
 
-      const registration = PrivateNodeRegistration.deserialize(
+      const registration = await PrivateNodeRegistration.deserialize(
         bufferToArray(registrationSerialized),
       );
       const endpointCertificate = registration.privateNodeCertificate;
@@ -219,7 +219,7 @@ describe('EndpointRegistration', () => {
         Buffer.from(requestSerialized),
       );
 
-      const registration = PrivateNodeRegistration.deserialize(
+      const registration = await PrivateNodeRegistration.deserialize(
         bufferToArray(registrationSerialized),
       );
       const endpointCertificate = registration.privateNodeCertificate;
@@ -236,7 +236,7 @@ describe('EndpointRegistration', () => {
         Buffer.from(requestSerialized),
       );
 
-      const registration = PrivateNodeRegistration.deserialize(
+      const registration = await PrivateNodeRegistration.deserialize(
         bufferToArray(registrationSerialized),
       );
       expect(registration.gatewayCertificate.isEqual(gatewayCertificate)).toBeTrue();

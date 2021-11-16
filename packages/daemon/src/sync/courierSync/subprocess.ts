@@ -7,7 +7,7 @@ import {
   CargoMessageSet,
   CargoMessageStream,
   Certificate,
-  Gateway,
+  GatewayManager,
   issueGatewayCertificate,
   Parcel,
   ParcelCollectionAck,
@@ -64,7 +64,7 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
   const parcelStore = Container.get(ParcelStore);
   const privateKeyStore = Container.get(DBPrivateKeyStore);
   const publicKeyStore = Container.get(DBPublicKeyStore);
-  const gateway = new Gateway(privateKeyStore, publicKeyStore);
+  const gateway = new GatewayManager(privateKeyStore, publicKeyStore);
   const currentKey = (await privateKeyStore.getCurrentKey())!;
   let client: CogRPCClient | null = null;
   try {
@@ -103,7 +103,7 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
 
 async function collectCargo(
   publicGateway: PublicGateway,
-  privateGateway: Gateway,
+  privateGateway: GatewayManager,
   client: CogRPCClient,
   currentKey: UnboundKeyPair,
   parcelStore: ParcelStore,
@@ -278,7 +278,7 @@ async function waitBeforeDelivery(parentStream: Duplex, logger: Logger): Promise
 
 async function deliverCargo(
   publicGateway: PublicGateway,
-  privateGateway: Gateway,
+  privateGateway: GatewayManager,
   client: CogRPCClient,
   currentKey: UnboundKeyPair,
   parcelStore: ParcelStore,
@@ -310,7 +310,7 @@ async function deliverCargo(
 
 async function* makeCargoDeliveryStream(
   publicGateway: PublicGateway,
-  privateGateway: Gateway,
+  privateGateway: GatewayManager,
   currentKey: UnboundKeyPair,
   parcelStore: ParcelStore,
   logger: Logger,

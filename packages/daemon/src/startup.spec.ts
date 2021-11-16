@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 import pino from 'pino';
 import { Container } from 'typedi';
-import * as typeorm from 'typeorm';
+import { ConnectionOptions, getConnection } from 'typeorm';
 
 import envPaths from 'env-paths';
 import startUp from './startup';
@@ -14,14 +14,16 @@ import { mockToken } from './testUtils/tokens';
 import { APP_DIRS, LOGGER } from './tokens';
 import * as logging from './utils/logging';
 
-const mockCreateConnection = mockSpy(jest.spyOn(typeorm, 'createConnection'));
-
 mockToken(APP_DIRS);
 
 mockToken(LOGGER);
 const mockLogging = makeMockLoggingFixture();
 const mockFinalLogging = makeMockLoggingFixture();
 mockSpy(jest.spyOn(logging, 'makeLogger'), () => mockLogging.logger);
+
+afterEach(async () => {
+  await getConnection().close();
+});
 
 const mockMkdir = mockSpy(jest.spyOn(fs, 'mkdir'));
 
@@ -98,7 +100,7 @@ describe('Logging', () => {
 });
 
 test('DB connection should be established', async () => {
-  const originalConnectionOptions = await typeorm.getConnectionOptions();
+  expect(getConnection().isConnected).toBeFalse();
 
   await startUp(COMPONENT_NAME);
 
@@ -106,9 +108,13 @@ test('DB connection should be established', async () => {
     ? join(__dirname, 'entity', '**', '*.ts')
     : join(__dirname, 'entity', '**', '*.js');
   const dbPath = join(PATHS.data, 'db.sqlite');
-  expect(mockCreateConnection).toBeCalledWith({
-    ...originalConnectionOptions,
+  const connection = getConnection();
+  expect(connection.isConnected).toBeTrue();
+  expect(connection.options).toMatchObject<Partial<ConnectionOptions>>({
     database: dbPath,
     entities: [entitiesDir, PrivateKey, PublicKey],
+    logging: false,
+    synchronize: true,
+    type: 'sqlite',
   });
 });

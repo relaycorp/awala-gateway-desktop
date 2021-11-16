@@ -2,7 +2,7 @@ import { PrivateKey } from '@relaycorp/keystore-db';
 import {
   CDACertPath,
   generateCDACertificationPath,
-  generateNodeKeyPairSet,
+  generateIdentityKeyPairSet,
   generatePDACertificationPath,
   NodeKeyPairSet,
   PDACertPath,
@@ -40,7 +40,7 @@ export function generatePKIFixture(
   let cdaCertPath: CDACertPath;
 
   beforeAll(async () => {
-    keyPairSet = await generateNodeKeyPairSet();
+    keyPairSet = await generateIdentityKeyPairSet();
     pdaCertPath = await generatePDACertificationPath(keyPairSet);
     cdaCertPath = await generateCDACertificationPath(keyPairSet);
 
