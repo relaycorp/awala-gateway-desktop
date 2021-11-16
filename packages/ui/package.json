@@ -16,9 +16,9 @@
     "clean": "rimraf build test coverage dist app",
     "cov": "run-s build test:unit && opn coverage/lcov-report/index.html",
     "dist": "electron-builder --config electron-builder.yml --publish=never",
-    "test": "jest --coverage",
+    "test": "node --unhandled-rejections=warn node_modules/.bin/jest --coverage",
     "test:functional": "jest --config jest.config.functional.js --runInBand --detectOpenHandles",
-    "test:ci:unit:jest": "jest --config jest.config.ci.js --coverage"
+    "test:ci:unit:jest": "node --unhandled-rejections=warn node_modules/.bin/jest --config jest.config.ci.js --coverage"
   },
   "private": "true",
   "dependencies": {
