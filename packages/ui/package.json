@@ -9,7 +9,7 @@
     "postinstall": "run-s link-daemon",
     "link-daemon": "npm link --force ../daemon",
     "report-dependencies": "node report-dependencies.js",
-    "build": "run-s report-dependencies tsc webpack",
+    "build": "run-s --print-name report-dependencies tsc webpack",
     "webpack": "webpack --config ./webpack.config.js",
     "tsc": "tsc -p tsconfig.json",
     "start": "npm run build && electron ./app/main.js",
