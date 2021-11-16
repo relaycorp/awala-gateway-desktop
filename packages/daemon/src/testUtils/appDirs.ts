@@ -23,11 +23,14 @@ export function useTemporaryAppDirs(): () => Paths {
     };
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     Container.set(APP_DIRS, tempAppDirs);
+
+    await fs.rmdir(tempDir, { recursive: true });
+    await fs.mkdir(tempDir);
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     await fs.rmdir(tempDir, { recursive: true });
   });
 

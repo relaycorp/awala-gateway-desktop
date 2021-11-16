@@ -22,12 +22,7 @@ export default function makeCourierSyncServer(authToken: string): Server {
 
       // Wrap the WS writable stream to prevent it from closing with a 1006:
       // https://github.com/websockets/ws/issues/1811
-      const sinkWrapper = new PassThrough({
-        final(): void {
-          socket.close(1000);
-        },
-        objectMode: true,
-      });
+      const sinkWrapper = new PassThrough({ objectMode: true });
       sinkWrapper.pipe(connectionStream);
 
       try {
@@ -51,6 +46,7 @@ export default function makeCourierSyncServer(authToken: string): Server {
         socket.close(closeCode, closeReason);
         return;
       }
+      socket.close(1000);
     },
     { authToken },
   );
