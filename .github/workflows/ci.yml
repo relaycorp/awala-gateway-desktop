@@ -56,7 +56,7 @@ jobs:
         working-directory: packages/ui
 
       - run: npm run build
-        timeout-minutes: 3
+        timeout-minutes: 5
       - run: npm run test:ci
       - run: npm run dist
         working-directory: packages/ui
