@@ -1,9 +1,5 @@
 import PrivateGatewayError from '../PrivateGatewayError';
 
-// Make fetch() work in the Node.js-based unit tests
-// tslint:disable-next-line:no-var-requires
-require('isomorphic-fetch');
-
 export class SettingError extends PrivateGatewayError {}
 
 /**
@@ -27,7 +23,7 @@ export async function getPublicGatewayAddress(token: string): Promise<string> {
 /**
  * Migrate to a new public gateway.
  *
- * @param newAddress
+ * @param _newAddress
  * @throws SettingError if the migration fails
  *
  * This function will simply resolve when the migration completes successfully.
