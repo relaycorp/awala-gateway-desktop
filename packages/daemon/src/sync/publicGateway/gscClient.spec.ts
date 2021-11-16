@@ -4,7 +4,8 @@ import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { getMockInstance, mockSpy } from '../../testUtils/jest';
 import { getPromiseRejection } from '../../testUtils/promises';
-import { makeGSCClient, NonExistingAddressError } from './gscClient';
+import { makeGSCClient } from './gscClient';
+import { NonExistingAddressError } from './errors';
 
 jest.mock('@relaycorp/relaynet-core', () => {
   const actualModule = jest.requireActual('@relaycorp/relaynet-core');

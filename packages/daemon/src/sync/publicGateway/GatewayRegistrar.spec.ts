@@ -4,6 +4,8 @@ import {
   GSCClient,
   PrivateNodeRegistration,
   PrivateNodeRegistrationRequest,
+  SessionKey,
+  SessionKeyPair,
   UnreachableResolverError,
 } from '@relaycorp/relaynet-core';
 import {
@@ -22,15 +24,18 @@ import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { arrayBufferFrom } from '../../testUtils/buffer';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { mockSpy } from '../../testUtils/jest';
-import { mockPrivateKeyStore } from '../../testUtils/keystores';
+import { mockPrivateKeyStore, mockPublicKeyStore } from '../../testUtils/keystores';
 import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
 import { mockSleepSeconds } from '../../testUtils/timing';
 import { GatewayRegistrar } from './GatewayRegistrar';
 import * as gscClient from './gscClient';
+import { NonExistingAddressError, PublicGatewayProtocolError } from './errors';
+import { getPromiseRejection } from '../../testUtils/promises';
 
 setUpTestDBConnection();
 
 const privateKeyStore = mockPrivateKeyStore();
+const publicKeyStore = mockPublicKeyStore();
 
 useTemporaryAppDirs();
 
@@ -52,11 +57,14 @@ const mockFileStoreGetObject = mockSpy(jest.spyOn(FileStore.prototype, 'getObjec
 const mockFileStorePutObject = mockSpy(jest.spyOn(FileStore.prototype, 'putObject'));
 
 let publicGatewayIdCertificate: Certificate;
+let publicGatewaySessionKey: SessionKey;
 let idCertificate: Certificate;
 beforeAll(async () => {
   const certPath = await generatePDACertificationPath(await generateIdentityKeyPairSet());
   publicGatewayIdCertificate = certPath.publicGateway;
   idCertificate = certPath.privateGateway;
+
+  publicGatewaySessionKey = (await SessionKeyPair.generate()).sessionKey;
 });
 
 describe('register', () => {
@@ -67,7 +75,11 @@ describe('register', () => {
   beforeEach(() => {
     preRegisterCall = new PreRegisterNodeCall(registrationAuth);
 
-    registration = new PrivateNodeRegistration(idCertificate, publicGatewayIdCertificate);
+    registration = new PrivateNodeRegistration(
+      idCertificate,
+      publicGatewayIdCertificate,
+      publicGatewaySessionKey,
+    );
     registerCall = new RegisterNodeCall(registration);
 
     mockGSCClient = new MockGSCClient([preRegisterCall, registerCall]);
@@ -83,7 +95,7 @@ describe('register', () => {
     expect(preRegisterCall.wasCalled).toBeFalsy();
   });
 
-  test('PoWeb client should complete registration with resolved endpoint', async () => {
+  test('PoWeb client should complete registration with resolved address', async () => {
     await registrar.register(DEFAULT_PUBLIC_GATEWAY);
 
     expect(mockMakeGSCClient).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
@@ -140,6 +152,44 @@ describe('register', () => {
     await expect(config.get(ConfigKey.NODE_KEY_SERIAL_NUMBER)).resolves.toEqual(
       idCertificate.getSerialNumberHex(),
     );
+  });
+
+  test('Public gateway session key should be stored', async () => {
+    await registrar.register(DEFAULT_PUBLIC_GATEWAY);
+
+    const storedPublicGatewaySessionKey = await publicKeyStore.fetchLastSessionKey(
+      await publicGatewayIdCertificate.calculateSubjectPrivateAddress(),
+    );
+    expect(storedPublicGatewaySessionKey).toEqual(publicGatewaySessionKey);
+  });
+
+  test('Error should be thrown if registration fails', async () => {
+    const originalError = new Error('oh noes');
+    registerCall = new RegisterNodeCall(originalError);
+    mockGSCClient = new MockGSCClient([preRegisterCall, registerCall]);
+
+    const error = await getPromiseRejection(
+      registrar.register(DEFAULT_PUBLIC_GATEWAY),
+      PublicGatewayProtocolError,
+    );
+    expect(error.message).toMatch(/^Failed to register with the public gateway:/);
+    expect(error.cause()).toBe(originalError);
+  });
+
+  test('Error should be thrown if the public gateway session key is missing', async () => {
+    registration = new PrivateNodeRegistration(idCertificate, publicGatewayIdCertificate);
+    registerCall = new RegisterNodeCall(registration);
+    mockGSCClient = new MockGSCClient([preRegisterCall, registerCall]);
+
+    await expect(registrar.register(DEFAULT_PUBLIC_GATEWAY)).rejects.toThrowWithMessage(
+      PublicGatewayProtocolError,
+      'Registration is missing public gateway session key',
+    );
+    expect(Object.values(privateKeyStore.keys)).toHaveLength(0);
+    expect(mockFileStorePutObject).not.toBeCalled();
+    const config = Container.get(Config);
+    await expect(config.get(ConfigKey.NODE_KEY_SERIAL_NUMBER)).resolves.toBeNull();
+    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS)).resolves.toBeNull();
   });
 });
 
@@ -208,7 +258,7 @@ describe('waitForRegistration', () => {
     mockIsRegistered.mockResolvedValueOnce(false);
     mockIsRegistered.mockResolvedValueOnce(false);
     mockIsRegistered.mockResolvedValueOnce(true);
-    mockRegister.mockRejectedValueOnce(new gscClient.NonExistingAddressError());
+    mockRegister.mockRejectedValueOnce(new NonExistingAddressError());
     mockRegister.mockResolvedValueOnce(undefined);
 
     await registrar.waitForRegistration();
@@ -218,7 +268,7 @@ describe('waitForRegistration', () => {
     expect(sleepSeconds).toBeCalledWith(60);
     expect(logs).toContainEqual(
       partialPinoLog('error', 'Failed to register with public gateway', {
-        err: expect.objectContaining({ type: gscClient.NonExistingAddressError.name }),
+        err: expect.objectContaining({ type: NonExistingAddressError.name }),
       }),
     );
   });

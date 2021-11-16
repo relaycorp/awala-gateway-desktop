@@ -4,6 +4,7 @@ import {
   PrivateKeyStore,
   PrivateNodeRegistration,
   PrivateNodeRegistrationRequest,
+  PublicKeyStore,
   UnreachableResolverError,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
@@ -13,10 +14,12 @@ import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { FileStore } from '../../fileStore';
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
+import { DBPublicKeyStore } from '../../keystores/DBPublicKeyStore';
 import { LOGGER } from '../../tokens';
 import { sleepSeconds } from '../../utils/timing';
 import { makeGSCClient } from './gscClient';
 import { PublicGateway } from './PublicGateway';
+import { PublicGatewayProtocolError } from './errors';
 
 export const PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY = 'public-gateway-id-certificate.der';
 
@@ -24,6 +27,7 @@ export const PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY = 'public-gateway-id-certi
 export class GatewayRegistrar {
   constructor(
     @Inject(() => DBPrivateKeyStore) private privateKeyStore: PrivateKeyStore,
+    @Inject(() => DBPublicKeyStore) private publicKeyStore: PublicKeyStore,
     private config: Config,
     @Inject() private fileStore: FileStore,
   ) {}
@@ -35,6 +39,7 @@ export class GatewayRegistrar {
    * @throws UnreachableResolverError if DNS resolver is unreachable
    * @throws PublicAddressingError if the DNS lookup or DNSSEC verification failed
    * @throws NonExistingAddressError if the DNS+DNSSEC lookup succeeded but the address doesn't exist
+   * @throws PublicGatewayProtocolError if the public gateways violates the protocol
    */
   public async register(publicGatewayAddress: string): Promise<void> {
     const currentPublicGatewayAddress = await this.getPublicGatewayAddress();
@@ -51,9 +56,15 @@ export class GatewayRegistrar {
       identityKeyPair.publicKey,
       registrationAuth,
     );
-    const registration = await client.registerNode(
-      await registrationRequest.serialize(identityKeyPair.privateKey),
-    );
+
+    let registration: PrivateNodeRegistration;
+    try {
+      registration = await client.registerNode(
+        await registrationRequest.serialize(identityKeyPair.privateKey),
+      );
+    } catch (err) {
+      throw new PublicGatewayProtocolError(err, 'Failed to register with the public gateway');
+    }
 
     await this.saveRegistration(registration, identityKeyPair, publicGatewayAddress);
   }
@@ -106,11 +117,22 @@ export class GatewayRegistrar {
     identityKeyPair: CryptoKeyPair,
     publicGatewayAddress: string,
   ): Promise<void> {
+    const sessionKey = registration.sessionKey;
+    if (!sessionKey) {
+      throw new PublicGatewayProtocolError('Registration is missing public gateway session key');
+    }
+
     const identityCertificate = registration.privateNodeCertificate;
     await this.privateKeyStore.saveNodeKey(identityKeyPair.privateKey, identityCertificate);
     await this.config.set(
       ConfigKey.NODE_KEY_SERIAL_NUMBER,
       identityCertificate.getSerialNumberHex(),
+    );
+
+    await this.publicKeyStore.saveSessionKey(
+      sessionKey,
+      await registration.gatewayCertificate.calculateSubjectPrivateAddress(),
+      new Date(),
     );
 
     await this.config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, publicGatewayAddress);
