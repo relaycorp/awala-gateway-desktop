@@ -41,7 +41,7 @@ let privateGatewayCertificate: Certificate;
 const retrievePKIFixture = generatePKIFixture((_keyPairSet, certPath) => {
   privateGatewayCertificate = certPath.privateGateway;
 });
-const undoGatewayRegistration = mockGatewayRegistration(retrievePKIFixture);
+const { undoGatewayRegistration } = mockGatewayRegistration(retrievePKIFixture);
 
 let parentStream: PassThrough;
 beforeEach(() => {
