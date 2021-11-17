@@ -35,7 +35,7 @@ const pkiFixtureRetriever = generatePKIFixture(async (pairSet, certPath) => {
 
   endpointKeyPair = pairSet.privateEndpoint;
 });
-const undoGatewayRegistration = mockGatewayRegistration(pkiFixtureRetriever);
+const { undoGatewayRegistration } = mockGatewayRegistration(pkiFixtureRetriever);
 
 describe('EndpointRegistration', () => {
   describe('preRegister', () => {
