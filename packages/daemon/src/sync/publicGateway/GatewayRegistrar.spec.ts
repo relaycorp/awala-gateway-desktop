@@ -93,12 +93,22 @@ describe('register', () => {
 
     expect(mockMakeGSCClient).not.toBeCalled();
     expect(preRegisterCall.wasCalled).toBeFalsy();
+    expect(logs).toContainEqual(
+      partialPinoLog('debug', 'Skipping registration with public gateway'),
+    );
   });
 
   test('PoWeb client should complete registration with resolved address', async () => {
     await registrar.register(DEFAULT_PUBLIC_GATEWAY);
 
     expect(mockMakeGSCClient).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
+    expect(logs).toContainEqual(
+      partialPinoLog('info', 'Successfully registered with public gateway', {
+        publicGatewayPublicAddress: DEFAULT_PUBLIC_GATEWAY,
+        publicGatewayPrivateAddress:
+          await publicGatewayIdCertificate.calculateSubjectPrivateAddress(),
+      }),
+    );
   });
 
   test('PoWeb client should do pre-registration', async () => {

@@ -42,8 +42,11 @@ export class GatewayRegistrar {
    * @throws PublicGatewayProtocolError if the public gateways violates the protocol
    */
   public async register(publicGatewayAddress: string): Promise<void> {
+    const logger = Container.get(LOGGER);
+
     const currentPublicGatewayAddress = await this.getPublicGatewayAddress();
     if (currentPublicGatewayAddress === publicGatewayAddress) {
+      logger.debug('Skipping registration with public gateway');
       return;
     }
 
@@ -67,6 +70,14 @@ export class GatewayRegistrar {
     }
 
     await this.saveRegistration(registration, identityKeyPair, publicGatewayAddress);
+    logger.info(
+      {
+        publicGatewayPublicAddress: publicGatewayAddress,
+        publicGatewayPrivateAddress:
+          await registration.gatewayCertificate.calculateSubjectPrivateAddress(),
+      },
+      'Successfully registered with public gateway',
+    );
   }
 
   public async waitForRegistration(): Promise<void> {
