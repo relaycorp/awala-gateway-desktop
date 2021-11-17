@@ -7,12 +7,10 @@ import {
   CargoMessageSet,
   CargoMessageStream,
   Certificate,
-  GatewayManager,
   issueGatewayCertificate,
   Parcel,
   ParcelCollectionAck,
   RecipientAddressType,
-  SessionlessEnvelopedData,
   UnboundKeyPair,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
@@ -28,7 +26,6 @@ import uuid from 'uuid-random';
 import { COURIER_PORT, CourierSyncExitCode, CourierSyncStage } from '.';
 import { ParcelCollection } from '../../entity/ParcelCollection';
 import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
-import { DBPublicKeyStore } from '../../keystores/DBPublicKeyStore';
 import { ParcelStore } from '../../parcelStore';
 import { LOGGER } from '../../tokens';
 import { MessageDirection } from '../../utils/MessageDirection';
@@ -36,6 +33,7 @@ import { sleepSeconds } from '../../utils/timing';
 import { GatewayRegistrar } from '../publicGateway/GatewayRegistrar';
 import { PublicGateway } from '../publicGateway/PublicGateway';
 import { CourierSyncStageNotification, ParcelCollectionNotification } from './messaging';
+import { PrivateGatewayManager } from '../../PrivateGatewayManager';
 
 const DELAY_BETWEEN_COLLECTION_AND_DELIVERY_SECONDS = 5;
 
@@ -63,8 +61,7 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
 
   const parcelStore = Container.get(ParcelStore);
   const privateKeyStore = Container.get(DBPrivateKeyStore);
-  const publicKeyStore = Container.get(DBPublicKeyStore);
-  const gateway = new GatewayManager(privateKeyStore, publicKeyStore);
+  const gatewayManager = Container.get(PrivateGatewayManager);
   const currentKey = (await privateKeyStore.getCurrentKey())!;
   let client: CogRPCClient | null = null;
   try {
@@ -72,7 +69,7 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
 
     await collectCargo(
       publicGateway,
-      gateway,
+      gatewayManager,
       client,
       currentKey,
       parcelStore,
@@ -83,7 +80,7 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
     await waitBeforeDelivery(parentStream, logger);
     await deliverCargo(
       publicGateway,
-      gateway,
+      gatewayManager,
       client,
       currentKey,
       parcelStore,
@@ -103,7 +100,7 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
 
 async function collectCargo(
   publicGateway: PublicGateway,
-  privateGateway: GatewayManager,
+  gatewayManager: PrivateGatewayManager,
   client: CogRPCClient,
   currentKey: UnboundKeyPair,
   parcelStore: ParcelStore,
@@ -114,7 +111,12 @@ async function collectCargo(
   logger.debug('Starting cargo collection');
   sendStageNotificationToParent(parentStream, CourierSyncStage.COLLECTION);
 
-  const ccaSerialized = await generateCCA(publicGateway, currentKey, privateKeyStore);
+  const ccaSerialized = await generateCCA(
+    publicGateway,
+    gatewayManager,
+    currentKey,
+    privateKeyStore,
+  );
   await pipe(
     client.collectCargo(ccaSerialized),
     async (cargoesSerialized: AsyncIterable<Buffer>) => {
@@ -145,7 +147,7 @@ async function collectCargo(
 
         let cargoMessageSet: CargoMessageSet;
         try {
-          cargoMessageSet = await privateGateway.unwrapMessagePayload(cargo);
+          cargoMessageSet = await gatewayManager.unwrapMessagePayload(cargo);
         } catch (err) {
           cargoAwareLogger.warn({ err }, 'Ignored invalid message in cargo');
           continue;
@@ -182,7 +184,8 @@ async function collectCargo(
 
 async function generateCCA(
   publicGateway: PublicGateway,
-  currentKey: UnboundKeyPair,
+  gatewayManager: PrivateGatewayManager,
+  identityKeyPair: UnboundKeyPair,
   privateKeyStore: DBPrivateKeyStore,
 ): Promise<Buffer> {
   const now = new Date();
@@ -193,22 +196,22 @@ async function generateCCA(
   const ccaIssuer = await privateKeyStore.getOrCreateCCAIssuer();
   const cargoDeliveryAuthorization = await issueGatewayCertificate({
     issuerCertificate: ccaIssuer,
-    issuerPrivateKey: currentKey.privateKey,
+    issuerPrivateKey: identityKeyPair.privateKey,
     subjectPublicKey: await publicGateway.identityCertificate.getPublicKey(),
     validityEndDate: endDate,
   });
   const ccr = new CargoCollectionRequest(cargoDeliveryAuthorization);
-  const ccaPayload = await SessionlessEnvelopedData.encrypt(
-    await ccr.serialize(),
-    publicGateway.identityCertificate,
+  const ccaPayload = await gatewayManager.wrapMessagePayload(
+    ccr,
+    await publicGateway.identityCertificate.calculateSubjectPrivateAddress(),
   );
   const cca = new CargoCollectionAuthorization(
     recipientAddress,
-    currentKey.certificate,
-    Buffer.from(ccaPayload.serialize()),
+    identityKeyPair.certificate,
+    Buffer.from(ccaPayload),
     { creationDate: startDate, ttl: differenceInSeconds(endDate, startDate) },
   );
-  const ccaSerialized = await cca.serialize(currentKey.privateKey);
+  const ccaSerialized = await cca.serialize(identityKeyPair.privateKey);
   return Buffer.from(ccaSerialized);
 }
 
@@ -278,7 +281,7 @@ async function waitBeforeDelivery(parentStream: Duplex, logger: Logger): Promise
 
 async function deliverCargo(
   publicGateway: PublicGateway,
-  privateGateway: GatewayManager,
+  gatewayManager: PrivateGatewayManager,
   client: CogRPCClient,
   currentKey: UnboundKeyPair,
   parcelStore: ParcelStore,
@@ -290,7 +293,7 @@ async function deliverCargo(
 
   const cargoDeliveryStream = makeCargoDeliveryStream(
     publicGateway,
-    privateGateway,
+    gatewayManager,
     currentKey,
     parcelStore,
     logger,
@@ -310,12 +313,12 @@ async function deliverCargo(
 
 async function* makeCargoDeliveryStream(
   publicGateway: PublicGateway,
-  privateGateway: GatewayManager,
+  gatewayManager: PrivateGatewayManager,
   currentKey: UnboundKeyPair,
   parcelStore: ParcelStore,
   logger: Logger,
 ): AsyncIterable<CargoDeliveryRequest> {
-  const cargoStream = privateGateway.generateCargoes(
+  const cargoStream = gatewayManager.generateCargoes(
     makeCargoMessageStream(parcelStore, logger),
     publicGateway.identityCertificate,
     currentKey.privateKey,
