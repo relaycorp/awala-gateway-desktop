@@ -71,7 +71,7 @@ export class EndpointRegistrar {
       validityStartDate: now,
     });
     const registration = new PrivateNodeRegistration(endpointCertificate, currentKey.certificate);
-    return Buffer.from(registration.serialize());
+    return Buffer.from(await registration.serialize());
   }
 
   private async getCurrentKey(): Promise<UnboundKeyPair> {

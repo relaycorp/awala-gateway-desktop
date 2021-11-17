@@ -41,7 +41,7 @@ let gatewayCertificate: Certificate;
 const pkiFixtureRetriever = generatePKIFixture((_keyPairSet, certPath) => {
   gatewayCertificate = certPath.privateGateway;
 });
-const undoGatewayRegistration = mockGatewayRegistration(pkiFixtureRetriever);
+const { undoGatewayRegistration } = mockGatewayRegistration(pkiFixtureRetriever);
 
 test('Subprocess should abort if the gateway is unregistered', async () => {
   await undoGatewayRegistration();

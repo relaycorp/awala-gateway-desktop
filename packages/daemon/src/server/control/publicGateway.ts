@@ -6,10 +6,10 @@ import { Container } from 'typedi';
 import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { GatewayRegistrar } from '../../sync/publicGateway/GatewayRegistrar';
-import { NonExistingAddressError } from '../../sync/publicGateway/gscClient';
 import { ParcelCollectorManager } from '../../sync/publicGateway/parcelCollection/ParcelCollectorManager';
 import { getBearerTokenFromAuthHeader } from '../../utils/auth';
 import RouteOptions from '../RouteOptions';
+import { NonExistingAddressError } from '../../sync/publicGateway/errors';
 
 enum ErrorCode {
   ADDRESS_RESOLUTION_FAILURE = 'ADDRESS_RESOLUTION_FAILURE',

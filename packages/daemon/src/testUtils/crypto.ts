@@ -1,8 +1,9 @@
 import { PrivateKey } from '@relaycorp/keystore-db';
+import { SessionKeyPair } from '@relaycorp/relaynet-core';
 import {
   CDACertPath,
   generateCDACertificationPath,
-  generateNodeKeyPairSet,
+  generateIdentityKeyPairSet,
   generatePDACertificationPath,
   NodeKeyPairSet,
   PDACertPath,
@@ -15,6 +16,7 @@ import { Config, ConfigKey } from '../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../constants';
 import { ConfigItem } from '../entity/ConfigItem';
 import { FileStore } from '../fileStore';
+import { DBPublicKeyStore } from '../keystores/DBPublicKeyStore';
 import { DBPrivateKeyStore } from '../keystores/DBPrivateKeyStore';
 import { PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY } from '../sync/publicGateway/GatewayRegistrar';
 
@@ -40,7 +42,7 @@ export function generatePKIFixture(
   let cdaCertPath: CDACertPath;
 
   beforeAll(async () => {
-    keyPairSet = await generateNodeKeyPairSet();
+    keyPairSet = await generateIdentityKeyPairSet();
     pdaCertPath = await generatePDACertificationPath(keyPairSet);
     cdaCertPath = await generateCDACertificationPath(keyPairSet);
 
@@ -54,13 +56,21 @@ export function generatePKIFixture(
   });
 }
 
+export interface MockGatewayRegistration {
+  readonly undoGatewayRegistration: () => Promise<void>;
+  readonly getPublicGatewaySessionPrivateKey: () => CryptoKey;
+}
+
 export function mockGatewayRegistration(
   pkiFixtureRetriever: PKIFixtureRetriever,
-): () => Promise<void> {
+): MockGatewayRegistration {
+  let publicGatewaySessionPrivateKey: CryptoKey;
+
   beforeEach(async () => {
     const { cdaCertPath, pdaCertPath, keyPairSet } = pkiFixtureRetriever();
 
     const privateKeyStore = Container.get(DBPrivateKeyStore);
+    const publicKeyStore = Container.get(DBPublicKeyStore);
     const config = Container.get(Config);
     const fileStore = Container.get(FileStore);
 
@@ -87,9 +97,17 @@ export function mockGatewayRegistration(
       ConfigKey.NODE_CCA_ISSUER_KEY_SERIAL_NUMBER,
       cdaCertPath.privateGateway.getSerialNumberHex(),
     );
+
+    const publicGatewaySessionKeyPair = await SessionKeyPair.generate();
+    await publicKeyStore.saveSessionKey(
+      publicGatewaySessionKeyPair.sessionKey,
+      await pdaCertPath.publicGateway.calculateSubjectPrivateAddress(),
+      new Date(),
+    );
+    publicGatewaySessionPrivateKey = publicGatewaySessionKeyPair.privateKey;
   });
 
-  return async () => {
+  const undoGatewayRegistration = async () => {
     const configItemRepo = getRepository(ConfigItem);
     await configItemRepo.clear();
 
@@ -98,5 +116,10 @@ export function mockGatewayRegistration(
 
     const fileStore = Container.get(FileStore);
     await fileStore.deleteObject(PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY);
+  };
+
+  return {
+    undoGatewayRegistration,
+    getPublicGatewaySessionPrivateKey: () => publicGatewaySessionPrivateKey,
   };
 }

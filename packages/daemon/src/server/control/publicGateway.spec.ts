@@ -5,7 +5,6 @@ import { Container } from 'typedi';
 import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { GatewayRegistrar } from '../../sync/publicGateway/GatewayRegistrar';
-import { NonExistingAddressError } from '../../sync/publicGateway/gscClient';
 import { ParcelCollectorManager } from '../../sync/publicGateway/parcelCollection/ParcelCollectorManager';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { setUpTestDBConnection } from '../../testUtils/db';
@@ -13,6 +12,7 @@ import { getMockInstance, mockSpy } from '../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
 import { makeServer } from '../index';
 import { CONTROL_API_PREFIX } from './index';
+import { NonExistingAddressError } from '../../sync/publicGateway/errors';
 
 setUpTestDBConnection();
 useTemporaryAppDirs();

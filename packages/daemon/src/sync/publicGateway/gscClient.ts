@@ -1,9 +1,7 @@
 import { BindingType, GSCClient, resolvePublicAddress } from '@relaycorp/relaynet-core';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
 
-import { PrivateGatewayError } from '../../errors';
-
-export class NonExistingAddressError extends PrivateGatewayError {}
+import { NonExistingAddressError } from './errors';
 
 /**
  * Resolve the PoWeb address and return a client bound to it.

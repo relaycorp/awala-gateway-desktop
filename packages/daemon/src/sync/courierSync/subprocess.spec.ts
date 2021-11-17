@@ -10,7 +10,7 @@ import {
   InvalidMessageError,
   ParcelCollectionAck,
   RAMFSyntaxError,
-  SessionlessEnvelopedData,
+  SessionEnvelopedData,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays, addSeconds, subMinutes } from 'date-fns';
@@ -36,6 +36,7 @@ import { MessageDirection } from '../../utils/MessageDirection';
 import { sleepSeconds } from '../../utils/timing';
 import { CourierSyncStageNotification, ParcelCollectionNotification } from './messaging';
 import runCourierSync from './subprocess';
+import { PrivateGatewayManager } from '../../PrivateGatewayManager';
 
 jest.mock('default-gateway', () => ({ v4: jest.fn() }));
 const mockGatewayIPAddress = '192.168.0.12';
@@ -62,7 +63,8 @@ const pkiFixtureRetriever = generatePKIFixture(async (keyPairSet, pdaCertPath, c
   publicGatewayPrivateKey = keyPairSet.publicGateway.privateKey;
   publicGatewayPDACertificate = pdaCertPath.publicGateway;
 });
-const undoGatewayRegistration = mockGatewayRegistration(pkiFixtureRetriever);
+const { undoGatewayRegistration, getPublicGatewaySessionPrivateKey } =
+  mockGatewayRegistration(pkiFixtureRetriever);
 
 const mockCollectCargo = mockSpy(jest.fn(), () => arrayToAsyncIterable([]));
 const mockDeliverCargo = mockSpy(jest.fn(), () => arrayToAsyncIterable([]));
@@ -207,7 +209,7 @@ describe('Cargo collection', () => {
         await runCourierSync(getParentStream());
 
         const cca = await retrieveCCA();
-        const cargoDeliveryAuthorization = await retrieveCDA(cca);
+        const cargoDeliveryAuthorization = await extractCDA(cca);
         expect(cargoDeliveryAuthorization.isEqual(publicGatewayPDACertificate)).toBeFalse();
         await expect(
           derSerializePublicKey(await cargoDeliveryAuthorization.getPublicKey()),
@@ -220,7 +222,7 @@ describe('Cargo collection', () => {
         await runCourierSync(getParentStream());
 
         const cca = await retrieveCCA();
-        const cargoDeliveryAuthorization = await retrieveCDA(cca);
+        const cargoDeliveryAuthorization = await extractCDA(cca);
         expect(cargoDeliveryAuthorization.expiryDate).toBeAfter(addDays(new Date(), 13));
         expect(cargoDeliveryAuthorization.expiryDate).toBeBefore(addDays(new Date(), 14));
       });
@@ -229,14 +231,15 @@ describe('Cargo collection', () => {
         await runCourierSync(getParentStream());
 
         const cca = await retrieveCCA();
-        const cargoDeliveryAuthorization = await retrieveCDA(cca);
+        const cargoDeliveryAuthorization = await extractCDA(cca);
         await expect(
           cargoDeliveryAuthorization.getCertificationPath([], [privateGatewayCDACertificate]),
         ).toResolve();
       });
 
-      async function retrieveCDA(cca: CargoCollectionAuthorization): Promise<Certificate> {
-        const { payload: ccr } = await cca.unwrapPayload(publicGatewayPrivateKey);
+      async function extractCDA(cca: CargoCollectionAuthorization): Promise<Certificate> {
+        const publicGatewaySessionPrivateKey = getPublicGatewaySessionPrivateKey();
+        const { payload: ccr } = await cca.unwrapPayload(publicGatewaySessionPrivateKey);
         return ccr.cargoDeliveryAuthorization;
       }
     });
@@ -516,13 +519,16 @@ describe('Cargo collection', () => {
   async function makeCargoPayloadFromMessages(
     messagesSerialized: readonly Buffer[],
   ): Promise<Buffer> {
-    const { cdaCertPath } = pkiFixtureRetriever();
     const cargoMessageSet = new CargoMessageSet(messagesSerialized.map(bufferToArray));
-    const payloadEncrypted = await SessionlessEnvelopedData.encrypt(
-      await cargoMessageSet.serialize(),
-      cdaCertPath.privateGateway,
+    const privateGatewayManager = Container.get(PrivateGatewayManager);
+    const privateGatewaySessionKey = await privateGatewayManager.generateSessionKey(
+      await publicGatewayPDACertificate.calculateSubjectPrivateAddress(),
     );
-    return Buffer.from(payloadEncrypted.serialize());
+    const { envelopedData } = await SessionEnvelopedData.encrypt(
+      await cargoMessageSet.serialize(),
+      privateGatewaySessionKey,
+    );
+    return Buffer.from(envelopedData.serialize());
   }
 
   async function getStoredParcelKeys(): Promise<readonly string[]> {
@@ -840,7 +846,8 @@ describe('Cargo delivery', () => {
 
   async function unwrapCargoMessages(cargoSerialized: Buffer): Promise<readonly Buffer[]> {
     const cargo = await Cargo.deserialize(bufferToArray(cargoSerialized));
-    const { payload: cargoMessageSet } = await cargo.unwrapPayload(publicGatewayPrivateKey);
+    const publicGatewaySessionPrivateKey = getPublicGatewaySessionPrivateKey();
+    const { payload: cargoMessageSet } = await cargo.unwrapPayload(publicGatewaySessionPrivateKey);
     return cargoMessageSet.messages.map((m) => Buffer.from(m));
   }
 });

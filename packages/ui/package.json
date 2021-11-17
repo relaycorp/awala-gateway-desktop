@@ -12,7 +12,7 @@
     "build": "run-s --print-name report-dependencies tsc webpack",
     "webpack": "webpack --config ./webpack.config.js",
     "tsc": "tsc -p tsconfig.json",
-    "start": "npm run build && electron ./app/main.js",
+    "start": "electron ./app/main.js",
     "clean": "rimraf build test coverage dist app",
     "cov": "run-s build test:unit && opn coverage/lcov-report/index.html",
     "dist": "electron-builder --config electron-builder.yml --publish=never",

@@ -716,7 +716,7 @@ async function computeInternetBoundParcelPath(parcel: Parcel): Promise<string> {
 async function computeInternetBoundParcelKey(parcel: Parcel): Promise<string> {
   return join(
     await parcel.senderCertificate.calculateSubjectPrivateAddress(),
-    await sha256Hex(parcel.recipientAddress + parcel.id),
+    sha256Hex(parcel.recipientAddress + parcel.id),
   );
 }
 
@@ -731,7 +731,7 @@ async function computeEndpointBoundParcelPath(parcel: Parcel): Promise<string> {
 
 async function computeEndpointBoundParcelKey(parcel: Parcel): Promise<string> {
   const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectPrivateAddress();
-  return join(parcel.recipientAddress, await sha256Hex(senderPrivateAddress + parcel.id));
+  return join(parcel.recipientAddress, sha256Hex(senderPrivateAddress + parcel.id));
 }
 
 async function overrideMetadataFile(
