@@ -43,7 +43,7 @@
     "@types/verror": "^1.10.5",
     "@types/ws": "^7.4.6",
     "abort-controller": "^3.0.0",
-    "copy-webpack-plugin": "^9.1.0",
+    "copy-webpack-plugin": "^10.0.0",
     "cross-env": "^7.0.3",
     "css-loader": "^6.5.1",
     "electron": "^15.3.0",
