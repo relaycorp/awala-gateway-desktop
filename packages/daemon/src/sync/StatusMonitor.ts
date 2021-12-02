@@ -49,6 +49,10 @@ export class StatusMonitor {
     // tslint:disable-next-line:no-object-mutation
     this.started = true;
 
+    if (!(await this.registrar.isRegistered())) {
+      this.setLastStatus(ConnectionStatus.UNREGISTERED);
+    }
+
     let isConnectedToPublicGateway = false;
     let isConnectedToCourier = false;
 
@@ -70,8 +74,6 @@ export class StatusMonitor {
       }
       monitor.setLastStatus(newStatus);
     }
-
-    await updateStatus();
 
     async function reflectCourierConnectionStatus(
       statuses: AsyncIterable<CourierConnectionStatus>,
