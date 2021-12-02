@@ -4,6 +4,10 @@ import { ConnectionStatus } from '../../ipc/connectionStatus';
 import Status from './status';
 
 describe('Status', () => {
+  test('renders connecting', async () => {
+    render(<Status status={ConnectionStatus.CONNECTING_TO_PUBLIC_GATEWAY}/>);
+    expect(screen.getByText("Connecting to Awala...")).toBeInTheDocument();
+  });
   test('renders disconnected', async () => {
     render(<Status status={ConnectionStatus.DISCONNECTED}/>);
     expect(screen.getByText("You're disconnected from Awala")).toBeInTheDocument();
