@@ -70,7 +70,10 @@ button.yellow {
   color: #27302B;
   border-color: transparent;
 }
-button.yellow:hover {
+button.yellow:disabled {
+  background: darkgrey;
+}
+button.yellow:enabled:hover {
   background: #FFE081;
 }
 
