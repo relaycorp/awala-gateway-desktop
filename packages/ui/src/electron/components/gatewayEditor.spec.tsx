@@ -6,7 +6,7 @@ describe('GatewayEditor', () => {
   test('edits the gateway', async () => {
     const onMigrate = jest.fn();
     render(<GatewayEditor gateway="my.gateway.com" onMigrate={onMigrate} gatewayError={false}/>);
-    expect(screen.getByText("New Public Gateway")).toBeInTheDocument();
+    expect(screen.getByText("Public gateway")).toBeInTheDocument();
 
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'a.relaycorp.net' } })
     expect(screen.getByDisplayValue("a.relaycorp.net")).toBeInTheDocument();
