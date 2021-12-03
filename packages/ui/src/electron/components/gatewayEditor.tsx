@@ -24,6 +24,7 @@ class GatewayEditor extends Component<Props, State> {
   public render() : JSX.Element {
     const gatewayAddress =
       this.state.newGateway.length === 0 ? this.props.gateway : this.state.newGateway;
+    const canMigrate = this.state.valid && this.state.confirmed;
     return (
       <div className='gatewayEditor'>
         <h3>Public gateway</h3>
@@ -55,7 +56,7 @@ class GatewayEditor extends Component<Props, State> {
           <input name='confirm' type='checkbox' onChange={this.onCheckbox.bind(this)}/>
           I understand the consequences of this change.
         </label>
-        <button className='yellow submit' onClick={this.submit.bind(this)}>
+        <button className='yellow submit' disabled={!canMigrate} onClick={this.submit.bind(this)}>
           Migrate
         </button>
       </div>
@@ -84,9 +85,10 @@ class GatewayEditor extends Component<Props, State> {
   }
 
   private onChange(event: ChangeEvent<HTMLInputElement>) : void {
+    const newAddress = event.target.value;
     this.setState({
-      newGateway: event.target.value,
-      valid: isValidDomain(event.target.value)
+      newGateway: newAddress,
+      valid: isValidDomain(newAddress) && newAddress !== this.props.gateway,
     });
   }
 
