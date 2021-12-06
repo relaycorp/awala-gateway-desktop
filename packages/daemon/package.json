@@ -57,7 +57,7 @@
     "@types/split2": "^3.2.1",
     "@types/tcp-port-used": "^1.0.0",
     "@types/verror": "^1.10.5",
-    "@types/ws": "^7.4.7",
+    "@types/ws": "^8.2.1",
     "fastify-plugin": "^3.0.0",
     "jest": "^27.3.1",
     "jest-extended": "^1.1.0",
