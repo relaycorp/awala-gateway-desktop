@@ -31,7 +31,7 @@
     "it-pipe": "^1.1.0",
     "make-promises-safe": "^5.1.0",
     "pino": "^7.5.1",
-    "pino-pretty": "^5.1.1",
+    "pino-pretty": "^7.3.0",
     "reflect-metadata": "^0.1.13",
     "split2": "^3.2.2",
     "sqlite3": "^5.0.2",
