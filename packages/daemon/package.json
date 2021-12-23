@@ -20,7 +20,7 @@
     "abortable-iterator": "^3.0.0",
     "bson": "^4.4.1",
     "buffer-to-arraybuffer": "0.0.6",
-    "bufferutil": "^4.0.3",
+    "bufferutil": "^4.0.5",
     "date-fns": "^2.22.1",
     "date-fns-tz": "^1.2.2",
     "default-gateway": "^6.0.3",
