@@ -33,7 +33,7 @@
     "pino": "^7.6.0",
     "pino-pretty": "^7.3.0",
     "reflect-metadata": "^0.1.13",
-    "split2": "^3.2.2",
+    "split2": "^4.1.0",
     "sqlite3": "^5.0.2",
     "stream-to-it": "^0.2.4",
     "streaming-iterables": "^6.0.0",
