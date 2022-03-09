@@ -1,6 +1,8 @@
 import {
   generateRSAKeyPair,
   getPrivateAddressFromIdentityKey,
+  ParcelCollectionHandshakeVerifier,
+  ParcelDeliveryVerifier,
   PrivateGateway,
   PrivateGatewayManager as BasePrivateGatewayManager,
 } from '@relaycorp/relaynet-core';
@@ -11,6 +13,8 @@ import { DBPublicKeyStore } from './keystores/DBPublicKeyStore';
 import { DBCertificateStore } from './keystores/DBCertificateStore';
 import { Config, ConfigKey } from './Config';
 import { MissingGatewayError } from './errors';
+
+type Verifier = ParcelDeliveryVerifier | ParcelCollectionHandshakeVerifier;
 
 @Service()
 export class PrivateGatewayManager extends BasePrivateGatewayManager {
@@ -51,5 +55,19 @@ export class PrivateGatewayManager extends BasePrivateGatewayManager {
     await this.keyStores.privateKeyStore.saveIdentityKey(keyPair.privateKey!);
     const privateAddress = await getPrivateAddressFromIdentityKey(keyPair.publicKey!);
     await this.config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
+  }
+
+  public async getVerifier<V extends Verifier>(
+    verifierClass: new (...args: readonly any[]) => V,
+  ): Promise<V | null> {
+    const publicGatewayPrivateAddress = await this.config.get(
+      ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS,
+    );
+    if (!publicGatewayPrivateAddress) {
+      return null;
+    }
+
+    const privateGateway = await this.getCurrent();
+    return privateGateway.getGCSVerifier(publicGatewayPrivateAddress, verifierClass);
   }
 }
