@@ -13,6 +13,9 @@ import {
 import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 import { addDays } from 'date-fns';
 import { DBCertificateStore } from './keystores/DBCertificateStore';
+import { generatePKIFixture, mockGatewayRegistration } from './testUtils/crypto';
+import { DEFAULT_PUBLIC_GATEWAY } from './constants';
+import { useTemporaryAppDirs } from './testUtils/appDirs';
 
 setUpTestDBConnection();
 
@@ -85,6 +88,31 @@ describe('getCurrent', () => {
     await expect(Container.get(Config).get(ConfigKey.CURRENT_PRIVATE_ADDRESS)).resolves.toEqual(
       gateway.privateAddress,
     );
+  });
+});
+
+describe('getCurrentChannel', () => {
+  useTemporaryAppDirs();
+  const pkiFixtureRetriever = generatePKIFixture();
+  const { undoGatewayRegistration } = mockGatewayRegistration(pkiFixtureRetriever);
+
+  test('Error should be thrown if private gateway is not initialised', async () => {
+    await undoGatewayRegistration();
+
+    await expect(gatewayManager.getCurrentChannel()).rejects.toBeInstanceOf(MissingGatewayError);
+  });
+
+  test('Null should be returned if gateway is not registered', async () => {
+    await undoGatewayRegistration();
+    await gatewayManager.createCurrentIfMissing();
+
+    await expect(gatewayManager.getCurrentChannel()).resolves.toBeNull();
+  });
+
+  test('Channel should be returned if gateway is registered', async () => {
+    const channel = await gatewayManager.getCurrentChannel();
+
+    expect(channel!.publicGatewayPublicAddress).toEqual(DEFAULT_PUBLIC_GATEWAY);
   });
 });
 

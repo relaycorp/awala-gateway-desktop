@@ -5,6 +5,7 @@ import {
   ParcelDeliveryVerifier,
   PrivateGateway,
   PrivateGatewayManager as BasePrivateGatewayManager,
+  PrivatePublicGatewayChannel,
 } from '@relaycorp/relaynet-core';
 import { Inject, Service } from 'typedi';
 
@@ -57,6 +58,23 @@ export class PrivateGatewayManager extends BasePrivateGatewayManager {
     await this.config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
   }
 
+  public async getCurrentChannel(): Promise<PrivatePublicGatewayChannel | null> {
+    const privateGateway = await this.getCurrent();
+
+    const publicGatewayPrivateAddress = await this.config.get(
+      ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS,
+    );
+    if (!publicGatewayPrivateAddress) {
+      return null;
+    }
+
+    const publicGatewayPublicAddress = await this.config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS);
+    return privateGateway.retrievePublicGatewayChannel(
+      publicGatewayPrivateAddress,
+      publicGatewayPublicAddress!,
+    );
+  }
+
   public async getVerifier<V extends Verifier>(
     verifierClass: new (...args: readonly any[]) => V,
   ): Promise<V | null> {
@@ -68,6 +86,6 @@ export class PrivateGatewayManager extends BasePrivateGatewayManager {
     }
 
     const privateGateway = await this.getCurrent();
-    return privateGateway.getGCSVerifier(publicGatewayPrivateAddress, verifierClass);
+    return privateGateway.getGSCVerifier(publicGatewayPrivateAddress, verifierClass);
   }
 }
