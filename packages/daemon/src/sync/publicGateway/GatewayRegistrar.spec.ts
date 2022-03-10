@@ -85,7 +85,7 @@ describe('register', () => {
 
   test('Registration should be skipped if already registered with new gateway', async () => {
     const config = Container.get(Config);
-    await config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
+    await config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
 
     await registrar.register(DEFAULT_PUBLIC_GATEWAY);
 
@@ -153,7 +153,7 @@ describe('register', () => {
     await registrar.register(DEFAULT_PUBLIC_GATEWAY);
 
     const config = Container.get(Config);
-    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS)).resolves.toEqual(
+    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS)).resolves.toEqual(
       DEFAULT_PUBLIC_GATEWAY,
     );
   });
@@ -184,7 +184,7 @@ describe('register', () => {
 
     expect(saveChannelSpy).not.toBeCalled();
     const config = Container.get(Config);
-    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS)).resolves.toBeNull();
+    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS)).resolves.toBeNull();
     await expect(config.get(ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS)).resolves.toBeNull();
   });
 
@@ -203,7 +203,7 @@ describe('register', () => {
     );
 
     const config = Container.get(Config);
-    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS)).resolves.toBeNull();
+    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS)).resolves.toBeNull();
     await expect(config.get(ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS)).resolves.toBeNull();
   });
 });
@@ -311,7 +311,7 @@ describe('waitForRegistration', () => {
 describe('isRegistered', () => {
   test('True should be returned if gateway is registered', async () => {
     const config = Container.get(Config);
-    await config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
+    await config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
 
     await expect(registrar.isRegistered()).resolves.toBeTrue();
   });

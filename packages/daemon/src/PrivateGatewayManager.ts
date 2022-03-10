@@ -79,7 +79,9 @@ export class PrivateGatewayManager extends BasePrivateGatewayManager {
       throw new UnregisteredGatewayError('Private gateway is unregistered');
     }
 
-    const publicGatewayPublicAddress = await this.config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS);
+    const publicGatewayPublicAddress = await this.config.get(
+      ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS,
+    );
     const channel = await privateGateway.retrievePublicGatewayChannel(
       publicGatewayPrivateAddress,
       publicGatewayPublicAddress!,

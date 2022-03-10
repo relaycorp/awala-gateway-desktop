@@ -93,7 +93,7 @@ export class GatewayRegistrar {
   }
 
   private getPublicGatewayAddress(): Promise<string | null> {
-    return this.config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS);
+    return this.config.get(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS);
   }
 
   private async saveRegistration(
@@ -122,6 +122,6 @@ export class GatewayRegistrar {
       ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS,
       await registration.gatewayCertificate.calculateSubjectPrivateAddress(),
     );
-    await this.config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, publicGatewayAddress);
+    await this.config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, publicGatewayAddress);
   }
 }
