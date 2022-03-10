@@ -2,6 +2,7 @@ import {
   Certificate,
   derSerializePublicKey,
   GSCClient,
+  PrivateGateway,
   PrivateNodeRegistration,
   PrivateNodeRegistrationRequest,
   SessionKey,
@@ -19,23 +20,19 @@ import { Container } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
-import { FileStore } from '../../fileStore';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { arrayBufferFrom } from '../../testUtils/buffer';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { mockSpy } from '../../testUtils/jest';
-import { mockPrivateKeyStore, mockPublicKeyStore } from '../../testUtils/keystores';
 import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
 import { mockSleepSeconds } from '../../testUtils/timing';
 import { GatewayRegistrar } from './GatewayRegistrar';
 import * as gscClient from './gscClient';
 import { NonExistingAddressError, PublicGatewayProtocolError } from './errors';
 import { getPromiseRejection } from '../../testUtils/promises';
+import { PrivateGatewayManager } from '../../PrivateGatewayManager';
 
 setUpTestDBConnection();
-
-const privateKeyStore = mockPrivateKeyStore();
-const publicKeyStore = mockPublicKeyStore();
 
 useTemporaryAppDirs();
 
@@ -52,9 +49,6 @@ beforeEach(() => {
 });
 
 const mockMakeGSCClient = mockSpy(jest.spyOn(gscClient, 'makeGSCClient'), () => mockGSCClient);
-
-const mockFileStoreGetObject = mockSpy(jest.spyOn(FileStore.prototype, 'getObject'));
-const mockFileStorePutObject = mockSpy(jest.spyOn(FileStore.prototype, 'putObject'));
 
 let publicGatewayIdCertificate: Certificate;
 let publicGatewaySessionKey: SessionKey;
@@ -83,6 +77,10 @@ describe('register', () => {
     registerCall = new RegisterNodeCall(registration);
 
     mockGSCClient = new MockGSCClient([preRegisterCall, registerCall]);
+  });
+
+  beforeEach(async () => {
+    await Container.get(PrivateGatewayManager).createCurrentIfMissing();
   });
 
   test('Registration should be skipped if already registered with new gateway', async () => {
@@ -130,47 +128,34 @@ describe('register', () => {
     expect(registrationRequest.pnraSerialized).toEqual(registrationAuth);
   });
 
-  test('Private gateway certificate should be stored along with private key', async () => {
+  test('Channel with public gateway should be stored', async () => {
+    const saveChannelSpy = jest.spyOn(PrivateGateway.prototype, 'savePublicGatewayChannel');
+
     await registrar.register(DEFAULT_PUBLIC_GATEWAY);
 
-    const key = await privateKeyStore.fetchNodeKey(idCertificate.getSerialNumber());
-    expect(key.certificate.isEqual(idCertificate)).toBeTruthy();
-  });
-
-  test('Public gateway certificate should be stored', async () => {
-    await registrar.register(DEFAULT_PUBLIC_GATEWAY);
-
-    expect(mockFileStorePutObject).toBeCalledWith(
-      Buffer.from(publicGatewayIdCertificate.serialize()),
-      'public-gateway-id-certificate.der',
+    expect(saveChannelSpy).toBeCalledWith(
+      idCertificate,
+      publicGatewayIdCertificate,
+      publicGatewaySessionKey,
     );
   });
 
-  test('Public gateway address should be stored in config', async () => {
+  test('Private address of public gateway should be stored in config', async () => {
+    await registrar.register(DEFAULT_PUBLIC_GATEWAY);
+
+    const config = Container.get(Config);
+    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS)).resolves.toEqual(
+      await publicGatewayIdCertificate.calculateSubjectPrivateAddress(),
+    );
+  });
+
+  test('Public address of public gateway should be stored in config', async () => {
     await registrar.register(DEFAULT_PUBLIC_GATEWAY);
 
     const config = Container.get(Config);
     await expect(config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS)).resolves.toEqual(
       DEFAULT_PUBLIC_GATEWAY,
     );
-  });
-
-  test('Node key serial number should be stored in config as hex', async () => {
-    await registrar.register(DEFAULT_PUBLIC_GATEWAY);
-
-    const config = Container.get(Config);
-    await expect(config.get(ConfigKey.NODE_KEY_SERIAL_NUMBER)).resolves.toEqual(
-      idCertificate.getSerialNumberHex(),
-    );
-  });
-
-  test('Public gateway session key should be stored', async () => {
-    await registrar.register(DEFAULT_PUBLIC_GATEWAY);
-
-    const storedPublicGatewaySessionKey = await publicKeyStore.fetchLastSessionKey(
-      await publicGatewayIdCertificate.calculateSubjectPrivateAddress(),
-    );
-    expect(storedPublicGatewaySessionKey).toEqual(publicGatewaySessionKey);
   });
 
   test('Error should be thrown if registration fails', async () => {
@@ -190,16 +175,36 @@ describe('register', () => {
     registration = new PrivateNodeRegistration(idCertificate, publicGatewayIdCertificate);
     registerCall = new RegisterNodeCall(registration);
     mockGSCClient = new MockGSCClient([preRegisterCall, registerCall]);
+    const saveChannelSpy = jest.spyOn(PrivateGateway.prototype, 'savePublicGatewayChannel');
 
     await expect(registrar.register(DEFAULT_PUBLIC_GATEWAY)).rejects.toThrowWithMessage(
       PublicGatewayProtocolError,
       'Registration is missing public gateway session key',
     );
-    expect(Object.values(privateKeyStore.keys)).toHaveLength(0);
-    expect(mockFileStorePutObject).not.toBeCalled();
+
+    expect(saveChannelSpy).not.toBeCalled();
     const config = Container.get(Config);
-    await expect(config.get(ConfigKey.NODE_KEY_SERIAL_NUMBER)).resolves.toBeNull();
     await expect(config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS)).resolves.toBeNull();
+    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS)).resolves.toBeNull();
+  });
+
+  test('Error should be thrown if the channel creation is rejected', async () => {
+    registration = new PrivateNodeRegistration(
+      idCertificate,
+      idCertificate, // Invalid public gateway certificate
+      publicGatewaySessionKey,
+    );
+    registerCall = new RegisterNodeCall(registration);
+    mockGSCClient = new MockGSCClient([preRegisterCall, registerCall]);
+
+    await expect(registrar.register(DEFAULT_PUBLIC_GATEWAY)).rejects.toThrowWithMessage(
+      PublicGatewayProtocolError,
+      /^Failed to save channel with public gateway:/,
+    );
+
+    const config = Container.get(Config);
+    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS)).resolves.toBeNull();
+    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS)).resolves.toBeNull();
   });
 });
 
@@ -313,31 +318,5 @@ describe('isRegistered', () => {
 
   test('False should be returned if gateway is unregistered', async () => {
     await expect(registrar.isRegistered()).resolves.toBeFalse();
-  });
-});
-
-describe('getPublicGateway', () => {
-  test('Null should be returned if public gateway address cannot be found', async () => {
-    mockFileStoreGetObject.mockResolvedValue(Buffer.from(publicGatewayIdCertificate.serialize()));
-
-    await expect(registrar.getPublicGateway()).resolves.toBeNull();
-  });
-
-  test('Null should be returned if public gateway id certificate cannot be found', async () => {
-    const config = Container.get(Config);
-    await config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
-
-    await expect(registrar.getPublicGateway()).resolves.toBeNull();
-  });
-
-  test('Public gateway data should be returned if registered', async () => {
-    const config = Container.get(Config);
-    await config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
-    mockFileStoreGetObject.mockResolvedValue(Buffer.from(publicGatewayIdCertificate.serialize()));
-
-    const publicGateway = await registrar.getPublicGateway();
-
-    expect(publicGateway!.publicAddress).toEqual(DEFAULT_PUBLIC_GATEWAY);
-    expect(publicGateway!.identityCertificate.isEqual(publicGatewayIdCertificate)).toBeTrue();
   });
 });

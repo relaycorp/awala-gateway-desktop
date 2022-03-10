@@ -1,36 +1,21 @@
 import {
-  Certificate,
-  generateRSAKeyPair,
-  PrivateKeyStore,
+  PrivateGateway,
   PrivateNodeRegistration,
-  PrivateNodeRegistrationRequest,
-  PublicKeyStore,
   UnreachableResolverError,
 } from '@relaycorp/relaynet-core';
-import bufferToArray from 'buffer-to-arraybuffer';
 import { Container, Inject, Service } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
-import { FileStore } from '../../fileStore';
-import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
-import { DBPublicKeyStore } from '../../keystores/DBPublicKeyStore';
 import { LOGGER } from '../../tokens';
 import { sleepSeconds } from '../../utils/timing';
 import { makeGSCClient } from './gscClient';
-import { PublicGateway } from './PublicGateway';
 import { PublicGatewayProtocolError } from './errors';
-
-export const PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY = 'public-gateway-id-certificate.der';
+import { PrivateGatewayManager } from '../../PrivateGatewayManager';
 
 @Service()
 export class GatewayRegistrar {
-  constructor(
-    @Inject(() => DBPrivateKeyStore) private privateKeyStore: PrivateKeyStore,
-    @Inject(() => DBPublicKeyStore) private publicKeyStore: PublicKeyStore,
-    private config: Config,
-    @Inject() private fileStore: FileStore,
-  ) {}
+  constructor(private config: Config, @Inject() private gatewayManager: PrivateGatewayManager) {}
 
   /**
    * Register with the `publicGatewayAddress`.
@@ -52,24 +37,26 @@ export class GatewayRegistrar {
 
     const client = await makeGSCClient(publicGatewayAddress);
 
-    const identityKeyPair = await generateRSAKeyPair();
+    const privateGateway = await this.gatewayManager.getCurrent();
 
-    const registrationAuth = await client.preRegisterNode(identityKeyPair.publicKey);
-    const registrationRequest = new PrivateNodeRegistrationRequest(
-      identityKeyPair.publicKey,
+    const registrationAuth = await client.preRegisterNode(
+      await privateGateway.getIdentityPublicKey(),
+    );
+    const registrationRequest = await privateGateway.requestPublicGatewayRegistration(
       registrationAuth,
     );
 
     let registration: PrivateNodeRegistration;
     try {
-      registration = await client.registerNode(
-        await registrationRequest.serialize(identityKeyPair.privateKey),
-      );
+      registration = await client.registerNode(registrationRequest);
     } catch (err) {
-      throw new PublicGatewayProtocolError(err, 'Failed to register with the public gateway');
+      throw new PublicGatewayProtocolError(
+        err as Error,
+        'Failed to register with the public gateway',
+      );
     }
 
-    await this.saveRegistration(registration, identityKeyPair, publicGatewayAddress);
+    await this.saveRegistration(registration, publicGatewayAddress, privateGateway);
     logger.info(
       {
         publicGatewayPublicAddress: publicGatewayAddress,
@@ -105,51 +92,36 @@ export class GatewayRegistrar {
     return publicGatewayAddress !== null;
   }
 
-  public async getPublicGateway(): Promise<PublicGateway | null> {
-    const publicAddress = await this.getPublicGatewayAddress();
-    const identityCertificateSerialized = await this.fileStore.getObject(
-      PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY,
-    );
-    if (!publicAddress || !identityCertificateSerialized) {
-      return null;
-    }
-    const identityCertificate = Certificate.deserialize(
-      bufferToArray(identityCertificateSerialized),
-    );
-    return { publicAddress, identityCertificate };
-  }
-
   private getPublicGatewayAddress(): Promise<string | null> {
     return this.config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS);
   }
 
   private async saveRegistration(
     registration: PrivateNodeRegistration,
-    identityKeyPair: CryptoKeyPair,
     publicGatewayAddress: string,
+    privateGateway: PrivateGateway,
   ): Promise<void> {
     const sessionKey = registration.sessionKey;
     if (!sessionKey) {
       throw new PublicGatewayProtocolError('Registration is missing public gateway session key');
     }
 
-    const identityCertificate = registration.privateNodeCertificate;
-    await this.privateKeyStore.saveNodeKey(identityKeyPair.privateKey, identityCertificate);
+    try {
+      await privateGateway.savePublicGatewayChannel(
+        registration.privateNodeCertificate,
+        registration.gatewayCertificate,
+        sessionKey,
+      );
+    } catch (err) {
+      throw new PublicGatewayProtocolError(
+        err as Error,
+        'Failed to save channel with public gateway',
+      );
+    }
     await this.config.set(
-      ConfigKey.NODE_KEY_SERIAL_NUMBER,
-      identityCertificate.getSerialNumberHex(),
-    );
-
-    await this.publicKeyStore.saveSessionKey(
-      sessionKey,
+      ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS,
       await registration.gatewayCertificate.calculateSubjectPrivateAddress(),
-      new Date(),
     );
-
     await this.config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, publicGatewayAddress);
-    await this.fileStore.putObject(
-      Buffer.from(registration.gatewayCertificate.serialize()),
-      PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY,
-    );
   }
 }
