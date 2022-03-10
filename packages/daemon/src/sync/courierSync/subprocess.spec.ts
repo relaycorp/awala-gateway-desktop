@@ -5,6 +5,7 @@ import {
   CargoDeliveryRequest,
   CargoMessageSet,
   Certificate,
+  CertificateRotation,
   CMSError,
   derSerializePublicKey,
   InvalidMessageError,
@@ -60,7 +61,7 @@ const pkiFixtureRetriever = generatePKIFixture(async (keyPairSet, pdaCertPath, c
   privateGatewayPDACertificate = pdaCertPath.privateGateway;
   privateGatewayCDACertificate = cdaCertPath.privateGateway;
 
-  publicGatewayPrivateKey = keyPairSet.publicGateway.privateKey;
+  publicGatewayPrivateKey = keyPairSet.publicGateway.privateKey!!;
   publicGatewayPDACertificate = pdaCertPath.publicGateway;
 });
 const { undoGatewayRegistration, getPublicGatewaySessionPrivateKey } =
@@ -472,6 +473,24 @@ describe('Cargo collection', () => {
       );
       return Buffer.from(ack.serialize());
     }
+  });
+
+  describe.skip('Encapsulated certificate rotation', () => {
+    test('Certificate rotation should be ignored for now', async () => {
+      const certificateRotation = new CertificateRotation(privateGatewayPDACertificate, [
+        publicGatewayPDACertificate,
+      ]);
+      const { cargoSerialized } = await makeDummyCargoFromMessages(
+        Buffer.from(certificateRotation.serialize()),
+      );
+      mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
+
+      await runCourierSync(getParentStream());
+
+      expect(mockLogs).toContainEqual(
+        partialPinoLog('info', 'Certificate rotations are not yet supported'),
+      );
+    });
   });
 
   test('Multiple cargoes should be processed', async () => {

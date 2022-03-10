@@ -81,7 +81,7 @@ export function mockGatewayRegistration(
       await pdaCertPath.publicGateway.calculateSubjectPrivateAddress();
 
     await privateKeyStore.saveIdentityKey(keyPairSet.privateGateway.privateKey!!);
-    await certificateStore.save(pdaCertPath.privateGateway, privateGatewayPrivateAddress);
+    await certificateStore.save(pdaCertPath.privateGateway, publicGatewayPrivateAddress);
 
     await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateGatewayPrivateAddress);
 
