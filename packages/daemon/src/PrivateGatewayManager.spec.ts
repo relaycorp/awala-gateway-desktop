@@ -3,7 +3,7 @@ import { Container } from 'typedi';
 import { PrivateGatewayManager } from './PrivateGatewayManager';
 import { setUpTestDBConnection } from './testUtils/db';
 import { Config, ConfigKey } from './Config';
-import { MissingGatewayError } from './errors';
+import { MissingGatewayError, UnregisteredGatewayError } from './errors';
 import {
   Certificate,
   getRSAPublicKeyFromPrivate,
@@ -16,6 +16,8 @@ import { DBCertificateStore } from './keystores/DBCertificateStore';
 import { generatePKIFixture, mockGatewayRegistration } from './testUtils/crypto';
 import { DEFAULT_PUBLIC_GATEWAY } from './constants';
 import { useTemporaryAppDirs } from './testUtils/appDirs';
+import { getRepository } from 'typeorm';
+import { IdentityPublicKey } from '@relaycorp/keystore-db';
 
 setUpTestDBConnection();
 
@@ -102,17 +104,30 @@ describe('getCurrentChannel', () => {
     await expect(gatewayManager.getCurrentChannel()).rejects.toBeInstanceOf(MissingGatewayError);
   });
 
-  test('Null should be returned if gateway is not registered', async () => {
+  test('Error should be thrown if gateway is not registered', async () => {
     await undoGatewayRegistration();
     await gatewayManager.createCurrentIfMissing();
 
-    await expect(gatewayManager.getCurrentChannel()).resolves.toBeNull();
+    await expect(gatewayManager.getCurrentChannel()).rejects.toThrowWithMessage(
+      UnregisteredGatewayError,
+      'Private gateway is unregistered',
+    );
+  });
+
+  test('Error should be thrown if channel could not be retrieved', async () => {
+    await getRepository(IdentityPublicKey).clear();
+    await gatewayManager.createCurrentIfMissing();
+
+    await expect(gatewayManager.getCurrentChannel()).rejects.toThrowWithMessage(
+      UnregisteredGatewayError,
+      'Failed to retrieve channel; some keys may be missing',
+    );
   });
 
   test('Channel should be returned if gateway is registered', async () => {
     const channel = await gatewayManager.getCurrentChannel();
 
-    expect(channel!.publicGatewayPublicAddress).toEqual(DEFAULT_PUBLIC_GATEWAY);
+    expect(channel.publicGatewayPublicAddress).toEqual(DEFAULT_PUBLIC_GATEWAY);
   });
 });
 

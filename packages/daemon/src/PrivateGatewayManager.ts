@@ -13,7 +13,7 @@ import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 import { DBPublicKeyStore } from './keystores/DBPublicKeyStore';
 import { DBCertificateStore } from './keystores/DBCertificateStore';
 import { Config, ConfigKey } from './Config';
-import { MissingGatewayError } from './errors';
+import { MissingGatewayError, UnregisteredGatewayError } from './errors';
 
 type Verifier = ParcelDeliveryVerifier | ParcelCollectionHandshakeVerifier;
 
@@ -28,6 +28,11 @@ export class PrivateGatewayManager extends BasePrivateGatewayManager {
     super({ certificateStore, privateKeyStore, publicKeyStore });
   }
 
+  /**
+   * Return an instance of the current `PrivateGateway`.
+   *
+   * @throws {MissingGatewayError}
+   */
   public async getCurrent(): Promise<PrivateGateway> {
     const privateAddress = await this.config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
     if (!privateAddress) {
@@ -58,21 +63,32 @@ export class PrivateGatewayManager extends BasePrivateGatewayManager {
     await this.config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
   }
 
-  public async getCurrentChannel(): Promise<PrivatePublicGatewayChannel | null> {
+  /**
+   * Return the channel with the public gateway.
+   *
+   * @throws {MissingGatewayError} if the private gateway isn't initialised
+   * @throws {UnregisteredGatewayError} if the private gateway isn't registered with public gateway
+   */
+  public async getCurrentChannel(): Promise<PrivatePublicGatewayChannel> {
     const privateGateway = await this.getCurrent();
 
     const publicGatewayPrivateAddress = await this.config.get(
       ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS,
     );
     if (!publicGatewayPrivateAddress) {
-      return null;
+      throw new UnregisteredGatewayError('Private gateway is unregistered');
     }
 
     const publicGatewayPublicAddress = await this.config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS);
-    return privateGateway.retrievePublicGatewayChannel(
+    const channel = await privateGateway.retrievePublicGatewayChannel(
       publicGatewayPrivateAddress,
       publicGatewayPublicAddress!,
     );
+    if (!channel) {
+      throw new UnregisteredGatewayError('Failed to retrieve channel; some keys may be missing');
+    }
+
+    return channel;
   }
 
   public async getVerifier<V extends Verifier>(
