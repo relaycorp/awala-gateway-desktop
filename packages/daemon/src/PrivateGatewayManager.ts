@@ -90,6 +90,21 @@ export class PrivateGatewayManager extends BasePrivateGatewayManager {
 
     return channel;
   }
+  /**
+   * Return the channel with the public gateway or `null` if the private gateway is unregistered.
+   *
+   * @throws {MissingGatewayError} if the private gateway isn't initialised
+   */
+  public async getCurrentChannelIfRegistered(): Promise<PrivatePublicGatewayChannel | null> {
+    try {
+      return await this.getCurrentChannel();
+    } catch (err) {
+      if (err instanceof UnregisteredGatewayError) {
+        return null;
+      }
+      throw err;
+    }
+  }
 
   public async getVerifier<V extends Verifier>(
     verifierClass: new (...args: readonly any[]) => V,

@@ -1,25 +1,26 @@
-import { Container } from 'typedi';
-
-import { PrivateGatewayManager } from './PrivateGatewayManager';
-import { setUpTestDBConnection } from './testUtils/db';
-import { Config, ConfigKey } from './Config';
-import { MissingGatewayError, UnregisteredGatewayError } from './errors';
 import {
   Certificate,
   getRSAPublicKeyFromPrivate,
   issueGatewayCertificate,
   ParcelDeliveryVerifier,
 } from '@relaycorp/relaynet-core';
-import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
+import { IdentityPublicKey } from '@relaycorp/keystore-db';
 import { addDays } from 'date-fns';
+import { getRepository } from 'typeorm';
+import { Container } from 'typedi';
+
+import { PrivateGatewayManager } from './PrivateGatewayManager';
+import { setUpTestDBConnection } from './testUtils/db';
+import { Config, ConfigKey } from './Config';
+import { MissingGatewayError, UnregisteredGatewayError } from './errors';
+import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 import { DBCertificateStore } from './keystores/DBCertificateStore';
 import { generatePKIFixture, mockGatewayRegistration } from './testUtils/crypto';
 import { DEFAULT_PUBLIC_GATEWAY } from './constants';
 import { useTemporaryAppDirs } from './testUtils/appDirs';
-import { getRepository } from 'typeorm';
-import { IdentityPublicKey } from '@relaycorp/keystore-db';
 
 setUpTestDBConnection();
+useTemporaryAppDirs();
 
 let gatewayManager: PrivateGatewayManager;
 beforeEach(() => {
@@ -94,12 +95,12 @@ describe('getCurrent', () => {
 });
 
 describe('getCurrentChannel', () => {
-  useTemporaryAppDirs();
   const pkiFixtureRetriever = generatePKIFixture();
-  const { undoGatewayRegistration } = mockGatewayRegistration(pkiFixtureRetriever);
+  const { deletePrivateGateway, undoGatewayRegistration } =
+    mockGatewayRegistration(pkiFixtureRetriever);
 
   test('Error should be thrown if private gateway is not initialised', async () => {
-    await undoGatewayRegistration();
+    await deletePrivateGateway();
 
     await expect(gatewayManager.getCurrentChannel()).rejects.toBeInstanceOf(MissingGatewayError);
   });
@@ -128,6 +129,31 @@ describe('getCurrentChannel', () => {
     const channel = await gatewayManager.getCurrentChannel();
 
     expect(channel.publicGatewayPublicAddress).toEqual(DEFAULT_PUBLIC_GATEWAY);
+  });
+});
+
+describe('getCurrentChannelIfRegistered', () => {
+  const pkiFixtureRetriever = generatePKIFixture();
+  const { deletePrivateGateway, undoGatewayRegistration } =
+    mockGatewayRegistration(pkiFixtureRetriever);
+
+  test('Null should be returned if private gateway is unregistered', async () => {
+    await undoGatewayRegistration();
+
+    await expect(gatewayManager.getCurrentChannelIfRegistered()).resolves.toBeNull();
+  });
+
+  test('Channel should be returned if private gateway is registered', async () => {
+    await expect(gatewayManager.getCurrentChannelIfRegistered()).resolves.toHaveProperty(
+      'publicGatewayPublicAddress',
+      DEFAULT_PUBLIC_GATEWAY,
+    );
+  });
+
+  test('Non-registration-related errors should be propagated', async () => {
+    await deletePrivateGateway();
+
+    await expect(gatewayManager.getCurrentChannel()).rejects.toBeInstanceOf(MissingGatewayError);
   });
 });
 
