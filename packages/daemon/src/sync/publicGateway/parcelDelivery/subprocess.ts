@@ -1,4 +1,3 @@
-import { Signer } from '@relaycorp/relaynet-core';
 import { RefusedParcelError, ServerError } from '@relaycorp/relaynet-poweb';
 import bufferToArray from 'buffer-to-arraybuffer';
 import pipe from 'it-pipe';
@@ -7,30 +6,40 @@ import { Duplex } from 'stream';
 import { source } from 'stream-to-it';
 import { Container } from 'typedi';
 
-import { DBPrivateKeyStore } from '../../../keystores/DBPrivateKeyStore';
 import { ParcelStore, ParcelWithExpiryDate } from '../../../parcelStore';
 import { LOGGER } from '../../../tokens';
 import { MessageDirection } from '../../../utils/MessageDirection';
-import { GatewayRegistrar } from '../GatewayRegistrar';
 import { makeGSCClient } from '../gscClient';
+import { PrivateGatewayManager } from '../../../PrivateGatewayManager';
+import { ParcelDeliverySigner } from '@relaycorp/relaynet-core';
 
 export default async function runParcelDelivery(parentStream: Duplex): Promise<number> {
-  const gatewayRegistrar = Container.get(GatewayRegistrar);
-  const publicGateway = await gatewayRegistrar.getPublicGateway();
-  if (!publicGateway) {
-    // The gateway isn't registered.
-    return 1;
-  }
-
   const parcelStore = Container.get(ParcelStore);
   const logger = Container.get(LOGGER);
 
-  logger.info('Ready to deliver parcels');
-  await pipe(async function* (): AsyncIterable<string> {
+  const gatewayManager = Container.get(PrivateGatewayManager);
+  const channel = await gatewayManager.getCurrentChannelIfRegistered();
+  if (!channel) {
+    logger.fatal('Private gateway is not registered');
+    return 1;
+  }
+
+  async function* streamParcels(): AsyncIterable<string> {
     // Deliver the queued parcels before delivering parcels streamed by the parent process
     yield* await convertParcelsWithExpiryDateToParcelKeys(parcelStore.listInternetBound());
     yield* source(parentStream);
-  }, await deliverParcels(publicGateway.publicAddress, parcelStore, logger));
+  }
+
+  const privateGateway = await gatewayManager.getCurrent();
+  const signer = await privateGateway.getGSCSigner(
+    channel.peerPrivateAddress,
+    ParcelDeliverySigner,
+  );
+  logger.info('Ready to deliver parcels');
+  await pipe(
+    streamParcels,
+    await deliverParcels(channel.publicGatewayPublicAddress, signer!, parcelStore, logger),
+  );
 
   // This should never end, so ending "normally" should actually be an error
   return 2;
@@ -38,15 +47,11 @@ export default async function runParcelDelivery(parentStream: Duplex): Promise<n
 
 async function deliverParcels(
   publicGatewayAddress: string,
+  signer: ParcelDeliverySigner,
   parcelStore: ParcelStore,
   logger: Logger,
 ): Promise<(parcelKeys: AsyncIterable<string>) => Promise<void>> {
   const gcsClient = await makeGSCClient(publicGatewayAddress);
-
-  const privateKeyStore = Container.get(DBPrivateKeyStore);
-  const currentKey = await privateKeyStore.getCurrentKey();
-
-  const signer = new Signer(currentKey!.certificate, currentKey!.privateKey);
 
   return async (parcelKeys: AsyncIterable<string>) => {
     for await (const parcelKey of parcelKeys) {
