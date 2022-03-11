@@ -475,7 +475,7 @@ describe('Cargo collection', () => {
     }
   });
 
-  describe.skip('Encapsulated certificate rotation', () => {
+  describe('Encapsulated certificate rotation', () => {
     test('Certificate rotation should be ignored for now', async () => {
       const certificateRotation = new CertificateRotation(privateGatewayPDACertificate, [
         publicGatewayPDACertificate,

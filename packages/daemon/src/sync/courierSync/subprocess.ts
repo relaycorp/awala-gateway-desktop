@@ -147,6 +147,8 @@ async function collectCargo(
             );
           } else if (item instanceof ParcelCollectionAck) {
             await processParcelCollectionAck(item, parcelStore, cargoAwareLogger);
+          } else {
+            cargoAwareLogger.info('Certificate rotations are not yet supported');
           }
         }
       }
