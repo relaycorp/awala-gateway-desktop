@@ -92,6 +92,7 @@ export class PrivateGatewayManager extends BasePrivateGatewayManager {
 
     return channel;
   }
+
   /**
    * Return the channel with the public gateway or `null` if the private gateway is unregistered.
    *
