@@ -153,7 +153,9 @@ describe('getCurrentChannelIfRegistered', () => {
   test('Non-registration-related errors should be propagated', async () => {
     await deletePrivateGateway();
 
-    await expect(gatewayManager.getCurrentChannel()).rejects.toBeInstanceOf(MissingGatewayError);
+    await expect(gatewayManager.getCurrentChannelIfRegistered()).rejects.toBeInstanceOf(
+      MissingGatewayError,
+    );
   });
 });
 
