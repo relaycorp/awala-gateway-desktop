@@ -1,8 +1,6 @@
 import { Certificate, IdentityPublicKey, PrivateKey } from '@relaycorp/keystore-db';
 import { getPrivateAddressFromIdentityKey, SessionKeyPair } from '@relaycorp/relaynet-core';
 import {
-  CDACertPath,
-  generateCDACertificationPath,
   generateIdentityKeyPairSet,
   generatePDACertificationPath,
   NodeKeyPairSet,
@@ -30,26 +28,22 @@ export function sha256Hex(plaintext: string): string {
 export type PKIFixtureRetriever = () => {
   readonly keyPairSet: NodeKeyPairSet;
   readonly pdaCertPath: PDACertPath;
-  readonly cdaCertPath: CDACertPath;
 };
 
 export function generatePKIFixture(
-  cb?: (keyPairSet: NodeKeyPairSet, pdaCertPath: PDACertPath, cdaCertPath: CDACertPath) => void,
+  cb?: (keyPairSet: NodeKeyPairSet, pdaCertPath: PDACertPath) => void,
 ): PKIFixtureRetriever {
   let keyPairSet: NodeKeyPairSet;
   let pdaCertPath: PDACertPath;
-  let cdaCertPath: CDACertPath;
 
   beforeAll(async () => {
     keyPairSet = await generateIdentityKeyPairSet();
     pdaCertPath = await generatePDACertificationPath(keyPairSet);
-    cdaCertPath = await generateCDACertificationPath(keyPairSet);
 
-    cb?.(keyPairSet, pdaCertPath, cdaCertPath);
+    cb?.(keyPairSet, pdaCertPath);
   });
 
   return () => ({
-    cdaCertPath,
     keyPairSet,
     pdaCertPath,
   });
