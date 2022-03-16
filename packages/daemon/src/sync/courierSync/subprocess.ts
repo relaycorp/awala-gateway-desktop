@@ -93,10 +93,7 @@ async function collectCargo(
         privateGateway.privateAddress,
         channel.peerPrivateAddress,
       );
-      const ownCDACertificates = await certificateStore.retrieveAll(
-        privateGateway.privateAddress,
-        privateGateway.privateAddress,
-      );
+      const ownCDAIssuers = await channel.getCDAIssuers();
 
       const parcelCollectionRepo = getRepository(ParcelCollection);
 
@@ -111,7 +108,7 @@ async function collectCargo(
         const cargoAwareLogger = logger.child({ cargo: { id: cargo.id } });
 
         try {
-          await cargo.validate(RecipientAddressType.PRIVATE, ownCDACertificates);
+          await cargo.validate(RecipientAddressType.PRIVATE, ownCDAIssuers);
         } catch (err) {
           cargoAwareLogger.warn({ err }, 'Ignoring cargo by unauthorized sender');
           continue;

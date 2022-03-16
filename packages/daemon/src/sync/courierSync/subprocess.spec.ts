@@ -564,16 +564,14 @@ describe('Cargo collection', () => {
 
     let finalCDA = cda;
     if (!finalCDA) {
-      const certificateStore = Container.get(DBCertificateStore);
-      const cdaIssuer = await certificateStore.retrieveLatest(
-        privateGatewayPrivateAddress,
-        privateGatewayPrivateAddress,
-      );
+      const gatewayManager = Container.get(PrivateGatewayManager);
+      const channel = await gatewayManager.getCurrentChannel();
+      const cdaIssuer = await channel.getOrCreateCDAIssuer();
       finalCDA = await issueGatewayCertificate({
-        issuerCertificate: cdaIssuer!,
+        issuerCertificate: cdaIssuer,
         issuerPrivateKey: keyPairSet.privateGateway.privateKey!,
         subjectPublicKey: keyPairSet.publicGateway.publicKey!,
-        validityEndDate: cdaIssuer!.expiryDate,
+        validityEndDate: cdaIssuer.expiryDate,
       });
     }
     const cargo = new Cargo(
