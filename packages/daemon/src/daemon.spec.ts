@@ -8,6 +8,8 @@ import startup from './startup';
 import runSync from './sync';
 import { setUpTestDBConnection } from './testUtils/db';
 import { mockLoggerToken } from './testUtils/logging';
+import { Container } from 'typedi';
+import { PrivateGatewayManager } from './PrivateGatewayManager';
 
 jest.mock('./server');
 jest.mock('./sync');
@@ -20,6 +22,13 @@ test('Startup routine should be called', async () => {
   await daemon();
 
   expect(startup).toBeCalledWith('daemon');
+});
+
+test('Gateway should be created if it does not exist yet', async () => {
+  await daemon();
+
+  const gatewayManager = Container.get(PrivateGatewayManager);
+  await gatewayManager.getCurrent();
 });
 
 test('Server should be run', async () => {

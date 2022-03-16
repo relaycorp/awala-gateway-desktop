@@ -33,7 +33,7 @@ export default async function registerRoutes(
     onRequest: makeAuthEnforcementHook(options.controlAuthToken),
     url: ENDPOINT_PATH,
     async handler(_request, reply): Promise<FastifyReply<any>> {
-      const registeredAddress = await config.get(ConfigKey.PUBLIC_GATEWAY_ADDRESS);
+      const registeredAddress = await config.get(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS);
       const publicAddress = registeredAddress ?? DEFAULT_PUBLIC_GATEWAY;
       return reply.header('Content-Type', 'application/json').code(200).send({ publicAddress });
     },
@@ -61,7 +61,7 @@ export default async function registerRoutes(
       try {
         await registrar.register(publicAddress);
       } catch (err) {
-        return abortFailedMigration(err, request, publicAddress, reply);
+        return abortFailedMigration(err as Error, request, publicAddress, reply);
       }
 
       await parcelCollectorManager.restart();

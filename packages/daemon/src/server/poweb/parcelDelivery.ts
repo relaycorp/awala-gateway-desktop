@@ -1,19 +1,19 @@
 import {
   Certificate,
-  DETACHED_SIGNATURE_TYPES,
   Parcel,
+  ParcelDeliveryVerifier,
   RAMFSyntaxError,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyLoggerInstance, FastifyReply } from 'fastify';
 import { Container } from 'typedi';
 
-import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
 import { ParcelStore } from '../../parcelStore';
 import { ParcelDeliveryManager } from '../../sync/publicGateway/parcelDelivery/ParcelDeliveryManager';
 import { registerAllowedMethods } from '../http';
 import RouteOptions from '../RouteOptions';
 import { CONTENT_TYPES } from './contentTypes';
+import { PrivateGatewayManager } from '../../PrivateGatewayManager';
 
 const ENDPOINT_URL = '/parcels';
 
@@ -21,9 +21,9 @@ export default async function registerRoutes(
   fastify: FastifyInstance,
   _options: RouteOptions,
 ): Promise<void> {
-  const privateKeyStore = Container.get(DBPrivateKeyStore);
   const parcelStore = Container.get(ParcelStore);
   const parcelDeliveryManager = Container.get(ParcelDeliveryManager);
+  const gatewayManager = Container.get(PrivateGatewayManager);
 
   registerAllowedMethods(['POST'], ENDPOINT_URL, fastify);
 
@@ -41,11 +41,17 @@ export default async function registerRoutes(
         return reply.code(415).send();
       }
 
+      const verifier = await gatewayManager.getVerifier(ParcelDeliveryVerifier);
+      if (!verifier) {
+        request.log.info('Refusing parcel delivery because private gateway is unregistered');
+        return reply.code(500).send({ message: 'Private gateway is currently unregistered' });
+      }
+
       const countersignerCertificate = await verifyCountersignature(
         request.body,
         request.headers.authorization,
         request.log,
-        privateKeyStore,
+        verifier,
       );
       if (!countersignerCertificate) {
         return reply
@@ -58,7 +64,7 @@ export default async function registerRoutes(
       try {
         parcel = await parseAndValidateParcel(request.body);
       } catch (err) {
-        return replyWithParcelRejection(err, reply, request.log);
+        return replyWithParcelRejection(err as Error, reply, request.log);
       }
 
       let parcelKey: string;
@@ -107,7 +113,7 @@ async function verifyCountersignature(
   parcelSerialized: ArrayBuffer,
   authorizationHeader: string | undefined,
   logger: FastifyLoggerInstance,
-  privateKeyStore: DBPrivateKeyStore,
+  verifier: ParcelDeliveryVerifier,
 ): Promise<Certificate | null> {
   const [authorizationType, countersignatureBase64] = (authorizationHeader || '').split(' ', 2);
   if (authorizationType !== 'Relaynet-Countersignature') {
@@ -118,13 +124,8 @@ async function verifyCountersignature(
     // The base64-encoded countersignature was empty or malformed
     return null;
   }
-  const trustedCertificates = await privateKeyStore.fetchNodeCertificates();
   try {
-    return await DETACHED_SIGNATURE_TYPES.PARCEL_DELIVERY.verify(
-      bufferToArray(countersignature),
-      parcelSerialized,
-      trustedCertificates,
-    );
+    return await verifier.verify(bufferToArray(countersignature), parcelSerialized);
   } catch (err) {
     logger.debug({ err }, 'Invalid countersignature');
     return null;

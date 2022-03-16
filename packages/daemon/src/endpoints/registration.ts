@@ -1,33 +1,27 @@
 // tslint:disable:max-classes-per-file
 
 import {
-  Certificate,
   getPublicKeyDigest,
-  issueEndpointCertificate,
-  PrivateNodeRegistration,
-  PrivateNodeRegistrationAuthorization,
   PrivateNodeRegistrationRequest,
-  UnboundKeyPair,
+  PrivatePublicGatewayChannel,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { addMonths } from 'date-fns';
 import { Inject, Service } from 'typedi';
 
-import { PrivateGatewayError, UnregisteredGatewayError } from '../errors';
-import { DBPrivateKeyStore } from '../keystores/DBPrivateKeyStore';
-
-const ENDPOINT_CERT_VALIDITY_MONTHS = 12;
+import { PrivateGatewayError } from '../errors';
+import { PrivateGatewayManager } from '../PrivateGatewayManager';
+import { addSeconds } from 'date-fns';
 
 @Service()
 export class EndpointRegistrar {
-  constructor(@Inject() protected privateKeyStore: DBPrivateKeyStore) {}
+  constructor(@Inject() protected gatewayManager: PrivateGatewayManager) {}
 
   /**
    * Pre-register endpoint and return a registration authorization serialized.
    *
    * @param endpointPublicKeyDigest
-   * @throws MalformedEndpointKeyDigestError if `endpointPublicKeyDigest` is malformed
-   * @throws UnregisteredGatewayError if gateway is not yet registered with its public peer
+   * @throws {MalformedEndpointKeyDigestError} if `endpointPublicKeyDigest` is malformed
+   * @throws {UnregisteredGatewayError}
    */
   public async preRegister(endpointPublicKeyDigest: string): Promise<Buffer> {
     if (endpointPublicKeyDigest.length !== 64) {
@@ -36,16 +30,13 @@ export class EndpointRegistrar {
       );
     }
 
-    const currentKey = await this.getCurrentKey();
-
     const gatewayData = bufferToArray(Buffer.from(endpointPublicKeyDigest, 'hex'));
-    const tenSecondsInTheFuture = new Date();
-    tenSecondsInTheFuture.setSeconds(tenSecondsInTheFuture.getSeconds() + 10);
-    const authorization = new PrivateNodeRegistrationAuthorization(
-      tenSecondsInTheFuture,
+    const expiryDate = addSeconds(new Date(), 10);
+    const channel = await this.gatewayManager.getCurrentChannel();
+    const authorizationSerialized = await channel.authorizeEndpointRegistration(
       gatewayData,
+      expiryDate,
     );
-    const authorizationSerialized = await authorization.serialize(currentKey.privateKey);
     return Buffer.from(authorizationSerialized);
   }
 
@@ -53,39 +44,24 @@ export class EndpointRegistrar {
    * Process the registration request and return the registration data if successful.
    *
    * @param registrationRequestSerialized
-   * @throws InvalidRegistrationRequestError if `registrationRequestSerialized` is malformed/invalid
+   * @throws {InvalidRegistrationRequestError} if `registrationRequestSerialized` is malformed/invalid
+   * @throws {UnregisteredGatewayError}
    */
   public async completeRegistration(registrationRequestSerialized: Buffer): Promise<Buffer> {
-    const currentKey = await this.getCurrentKey();
+    const channel = await this.gatewayManager.getCurrentChannel();
+
     const endpointPublicKey = await validateRegistrationRequest(
       registrationRequestSerialized,
-      currentKey.certificate,
+      channel,
     );
-
-    const now = new Date();
-    const endpointCertificate = await issueEndpointCertificate({
-      issuerCertificate: currentKey.certificate,
-      issuerPrivateKey: currentKey.privateKey,
-      subjectPublicKey: endpointPublicKey,
-      validityEndDate: addMonths(now, ENDPOINT_CERT_VALIDITY_MONTHS),
-      validityStartDate: now,
-    });
-    const registration = new PrivateNodeRegistration(endpointCertificate, currentKey.certificate);
-    return Buffer.from(await registration.serialize());
-  }
-
-  private async getCurrentKey(): Promise<UnboundKeyPair> {
-    const currentKey = await this.privateKeyStore.getCurrentKey();
-    if (!currentKey) {
-      throw new UnregisteredGatewayError();
-    }
-    return currentKey;
+    const registrationSerialized = await channel.registerEndpoint(endpointPublicKey);
+    return Buffer.from(registrationSerialized);
   }
 }
 
 async function validateRegistrationRequest(
   registrationRequestSerialized: Buffer,
-  gatewayCertificate: Certificate,
+  channel: PrivatePublicGatewayChannel,
 ): Promise<CryptoKey> {
   let request: PrivateNodeRegistrationRequest;
   try {
@@ -93,26 +69,25 @@ async function validateRegistrationRequest(
       bufferToArray(registrationRequestSerialized),
     );
   } catch (err) {
-    throw new InvalidRegistrationRequestError(err, 'Registration request is invalid/malformed');
+    throw new InvalidRegistrationRequestError(
+      err as Error,
+      'Registration request is invalid/malformed',
+    );
   }
 
-  const currentPublicKey = await gatewayCertificate.getPublicKey();
-  let authorization: PrivateNodeRegistrationAuthorization;
+  let gatewayData: ArrayBuffer;
   try {
-    authorization = await PrivateNodeRegistrationAuthorization.deserialize(
-      request.pnraSerialized,
-      currentPublicKey,
-    );
+    gatewayData = await channel.verifyEndpointRegistrationAuthorization(request.pnraSerialized);
   } catch (err) {
     throw new InvalidRegistrationRequestError(
-      err,
+      err as Error,
       'Authorization in registration request is invalid/malformed',
     );
   }
 
   const endpointPublicKey = request.privateNodePublicKey;
   const endpointPublicKeyDigest = Buffer.from(await getPublicKeyDigest(endpointPublicKey));
-  if (!endpointPublicKeyDigest.equals(Buffer.from(authorization.gatewayData))) {
+  if (!endpointPublicKeyDigest.equals(Buffer.from(gatewayData))) {
     throw new InvalidRegistrationRequestError(
       'Subject key in request does not match that of authorization',
     );
