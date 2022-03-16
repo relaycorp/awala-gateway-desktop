@@ -47,7 +47,7 @@
     "ws": "^8.4.0"
   },
   "devDependencies": {
-    "@relaycorp/relaynet-testing": "^2.2.3",
+    "@relaycorp/relaynet-testing": "^2.2.4",
     "@relaycorp/shared-config": "^1.6.1",
     "@relaycorp/ws-mock": "^2.4.1",
     "@types/default-gateway": "^3.0.1",
