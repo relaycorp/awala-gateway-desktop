@@ -8,7 +8,6 @@ import {
   PrivateNodeRegistrationRequest,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { addYears } from 'date-fns';
 import { Container } from 'typedi';
 
 import { UnregisteredGatewayError } from '../errors';
@@ -74,7 +73,7 @@ describe('EndpointRegistration', () => {
 
       const authorization = await PrivateNodeRegistrationAuthorization.deserialize(
         bufferToArray(authorizationSerialized),
-        gatewayKeyPair.publicKey,
+        gatewayKeyPair.publicKey!,
       );
       const now = new Date();
       expect(authorization.expiryDate.getTime()).toBeGreaterThan(now.getTime() + 8_000);
@@ -101,10 +100,10 @@ describe('EndpointRegistration', () => {
     test('InvalidRegistrationRequestError should be thrown if the auth is invalid', async () => {
       const registrar = Container.get(EndpointRegistrar);
       const request = new PrivateNodeRegistrationRequest(
-        endpointKeyPair.publicKey,
+        endpointKeyPair.publicKey!,
         arrayBufferFrom('invalid'),
       );
-      const requestSerialized = await request.serialize(endpointKeyPair.privateKey);
+      const requestSerialized = await request.serialize(endpointKeyPair.privateKey!);
 
       const error = await getPromiseRejection(
         registrar.completeRegistration(Buffer.from(requestSerialized)),
@@ -120,13 +119,13 @@ describe('EndpointRegistration', () => {
     test('InvalidRegistrationRequestError should be thrown if the auth does not match key', async () => {
       const registrar = Container.get(EndpointRegistrar);
       const authorizationSerialized = await registrar.preRegister(
-        await getPublicKeyDigestHex(gatewayKeyPair.publicKey), // Wrong key
+        await getPublicKeyDigestHex(gatewayKeyPair.publicKey!), // Wrong key
       );
       const request = new PrivateNodeRegistrationRequest(
-        endpointKeyPair.publicKey,
+        endpointKeyPair.publicKey!,
         bufferToArray(authorizationSerialized),
       );
-      const requestSerialized = await request.serialize(endpointKeyPair.privateKey);
+      const requestSerialized = await request.serialize(endpointKeyPair.privateKey!);
 
       const error = await getPromiseRejection(
         registrar.completeRegistration(Buffer.from(requestSerialized)),
@@ -173,44 +172,6 @@ describe('EndpointRegistration', () => {
       await expect(endpointCertificate.getCertificationPath([], [gatewayCertificate]));
     });
 
-    test('Endpoint certificate should be valid starting now', async () => {
-      const registrar = Container.get(EndpointRegistrar);
-      const requestSerialized = await makeRegistrationRequest(registrar);
-
-      const registrationSerialized = await registrar.completeRegistration(
-        Buffer.from(requestSerialized),
-      );
-
-      const registration = await PrivateNodeRegistration.deserialize(
-        bufferToArray(registrationSerialized),
-      );
-      const endpointCertificate = registration.privateNodeCertificate;
-      const now = new Date();
-      expect(endpointCertificate.startDate.getTime()).toBeWithin(
-        now.getTime() - 2_000,
-        now.getTime(),
-      );
-    });
-
-    test('Endpoint certificate should be valid for 12 months', async () => {
-      const registrar = Container.get(EndpointRegistrar);
-      const requestSerialized = await makeRegistrationRequest(registrar);
-
-      const registrationSerialized = await registrar.completeRegistration(
-        Buffer.from(requestSerialized),
-      );
-
-      const registration = await PrivateNodeRegistration.deserialize(
-        bufferToArray(registrationSerialized),
-      );
-      const endpointCertificate = registration.privateNodeCertificate;
-      const expectedEndDate = addYears(new Date(), 1).getTime();
-      expect(endpointCertificate.expiryDate.getTime()).toBeWithin(
-        expectedEndDate - 2_000,
-        expectedEndDate,
-      );
-    });
-
     test('Endpoint certificate should honor subject public key', async () => {
       const registrar = Container.get(EndpointRegistrar);
       const requestSerialized = await makeRegistrationRequest(registrar);
@@ -225,7 +186,7 @@ describe('EndpointRegistration', () => {
       const endpointCertificate = registration.privateNodeCertificate;
       await expect(
         derSerializePublicKey(await endpointCertificate.getPublicKey()),
-      ).resolves.toEqual(await derSerializePublicKey(endpointKeyPair.publicKey));
+      ).resolves.toEqual(await derSerializePublicKey(endpointKeyPair.publicKey!));
     });
 
     test('Gateway certificate should be included in registration', async () => {
@@ -244,13 +205,13 @@ describe('EndpointRegistration', () => {
 
     async function makeRegistrationRequest(registrar: EndpointRegistrar): Promise<Buffer> {
       const authorizationSerialized = await registrar.preRegister(
-        await getPublicKeyDigestHex(endpointKeyPair.publicKey),
+        await getPublicKeyDigestHex(endpointKeyPair.publicKey!),
       );
       const request = new PrivateNodeRegistrationRequest(
-        endpointKeyPair.publicKey,
+        endpointKeyPair.publicKey!,
         bufferToArray(authorizationSerialized),
       );
-      const requestSerialized = await request.serialize(endpointKeyPair.privateKey);
+      const requestSerialized = await request.serialize(endpointKeyPair.privateKey!);
       return Buffer.from(requestSerialized);
     }
   });

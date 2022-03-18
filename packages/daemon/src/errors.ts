@@ -9,3 +9,5 @@ export abstract class PrivateGatewayError extends VError {
 }
 
 export class UnregisteredGatewayError extends PrivateGatewayError {}
+
+export class MissingGatewayError extends PrivateGatewayError {}
