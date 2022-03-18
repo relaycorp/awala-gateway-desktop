@@ -2,8 +2,8 @@ import {
   GSCClient,
   Parcel,
   ParcelCollection,
+  ParcelCollectionHandshakeSigner,
   PublicAddressingError,
-  Signer,
   StreamingMode,
   UnreachableResolverError,
 } from '@relaycorp/relaynet-core';
@@ -12,20 +12,19 @@ import { Logger } from 'pino';
 import { Duplex, Writable } from 'stream';
 import { Container } from 'typedi';
 
-import { DBPrivateKeyStore } from '../../../keystores/DBPrivateKeyStore';
 import { ParcelStore } from '../../../parcelStore';
 import { LOGGER } from '../../../tokens';
 import { sleepSeconds } from '../../../utils/timing';
-import { GatewayRegistrar } from '../GatewayRegistrar';
 import { makeGSCClient } from '../gscClient';
 import { ParcelCollectionNotification, ParcelCollectorStatus } from './messaging';
+import { PrivateGatewayManager } from '../../../PrivateGatewayManager';
 
 export default async function runParcelCollection(parentStream: Duplex): Promise<number> {
   const logger = Container.get(LOGGER);
 
-  const gatewayRegistrar = Container.get(GatewayRegistrar);
-  const publicGateway = await gatewayRegistrar.getPublicGateway();
-  if (!publicGateway) {
+  const gatewayManager = Container.get(PrivateGatewayManager);
+  const channel = await gatewayManager.getCurrentChannelIfRegistered();
+  if (!channel) {
     logger.fatal('Private gateway is not registered');
     return 1;
   }
@@ -34,8 +33,18 @@ export default async function runParcelCollection(parentStream: Duplex): Promise
 
   logger.info('Ready to collect parcels');
 
+  const privateGateway = await gatewayManager.getCurrent();
+  const signer = await privateGateway.getGSCSigner(
+    channel.peerPrivateAddress,
+    ParcelCollectionHandshakeSigner,
+  );
   await pipe(
-    await streamParcelCollections(publicGateway.publicAddress, parentStream, logger),
+    await streamParcelCollections(
+      channel.publicGatewayPublicAddress,
+      signer!,
+      parentStream,
+      logger,
+    ),
     processParcels(logger, parentStream),
   );
 
@@ -46,13 +55,10 @@ export default async function runParcelCollection(parentStream: Duplex): Promise
 
 async function streamParcelCollections(
   publicGatewayAddress: string,
+  signer: ParcelCollectionHandshakeSigner,
   parentStream: Duplex,
   logger: Logger,
 ): Promise<() => AsyncIterable<ParcelCollection>> {
-  const privateKeyStore = Container.get(DBPrivateKeyStore);
-  const currentKey = await privateKeyStore.getCurrentKey();
-  const signer = new Signer(currentKey!.certificate, currentKey!.privateKey);
-
   const handshakeCallback = () => {
     logger.debug('Handshake completed successfully');
   };

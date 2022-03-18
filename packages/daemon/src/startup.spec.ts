@@ -1,4 +1,4 @@
-import { PrivateKey, PublicKey } from '@relaycorp/keystore-db';
+import { ENTITIES } from '@relaycorp/keystore-db';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import pino from 'pino';
@@ -112,7 +112,7 @@ test('DB connection should be established', async () => {
   expect(connection.isConnected).toBeTrue();
   expect(connection.options).toMatchObject<Partial<ConnectionOptions>>({
     database: dbPath,
-    entities: [entitiesDir, PrivateKey, PublicKey],
+    entities: [entitiesDir, ...ENTITIES],
     logging: false,
     synchronize: true,
     type: 'sqlite',

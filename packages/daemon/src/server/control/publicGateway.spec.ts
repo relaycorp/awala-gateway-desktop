@@ -30,7 +30,7 @@ const BASE_HEADERS = { authorization: `Bearer ${AUTH_TOKEN}` };
 describe('Get public gateway', () => {
   test('The current gateway should be returned if registered', async () => {
     const config = Container.get(Config);
-    await config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, NEW_PUBLIC_ADDRESS);
+    await config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, NEW_PUBLIC_ADDRESS);
     const fastify = await makeServer(AUTH_TOKEN);
 
     const response = await fastify.inject({
