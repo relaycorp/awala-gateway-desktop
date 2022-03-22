@@ -29,10 +29,6 @@ export async function fork(subprocessName: string): Promise<Duplex> {
     },
   });
 
-  childProcess.once('error', (err) => {
-    duplex.destroy(err);
-  });
-
   childProcess.once('exit', (code) => {
     const error =
       code && 0 < code
@@ -45,6 +41,16 @@ export async function fork(subprocessName: string): Promise<Duplex> {
     duplex.push(message);
   });
 
-  // TODO: When we support Node.js >= 16, return the duplex once the 'spawn' event has been emitted
-  return duplex;
+  return new Promise((resolve, reject) => {
+    childProcess.once('error', reject);
+
+    childProcess.once('spawn', () => {
+      childProcess.removeListener('error', reject);
+      childProcess.once('error', (err) => {
+        duplex.destroy(err);
+      });
+
+      resolve(duplex);
+    });
+  });
 }

@@ -24,7 +24,36 @@ beforeEach(() => {
 const SUBPROCESS_NAME = 'foo';
 
 describe('fork', () => {
+  test('Error should be thrown if child process fails to spawn', async () => {
+    const originalError = new Error('Oh noes! Could not spawn');
+    setImmediate(() => {
+      mockChildProcess.emit('error', originalError);
+    });
+
+    const error = await getPromiseRejection(fork(SUBPROCESS_NAME), Error);
+
+    expect(error).toBe(originalError);
+  });
+
+  test('Promise should not resolve until child process has been spawn', async () => {
+    let promiseResolved = false;
+    const subprocessPromise = fork(SUBPROCESS_NAME).then((subprocess) => {
+      promiseResolved = true;
+      return subprocess;
+    });
+
+    await setImmediateAsync();
+
+    expect(promiseResolved).toBeFalse();
+
+    mockChildProcess.queueSpawnEvent();
+    await expect(subprocessPromise).toResolve();
+    expect(mockChildProcess.listeners('error')).toHaveLength(1);
+  });
+
   test('Subprocess script should be run', async () => {
+    mockChildProcess.queueSpawnEvent();
+
     await fork(SUBPROCESS_NAME);
 
     const isTypescript = __filename.endsWith('.ts');
@@ -43,6 +72,7 @@ describe('fork', () => {
 
   test('Subprocess name should be passed as argument', async () => {
     const subprocessName = SUBPROCESS_NAME;
+    mockChildProcess.queueSpawnEvent();
 
     await fork(subprocessName);
 
@@ -54,6 +84,8 @@ describe('fork', () => {
   });
 
   test('Subprocess should be run with LOG_FILES=true', async () => {
+    mockChildProcess.queueSpawnEvent();
+
     await fork(SUBPROCESS_NAME);
 
     expect(childProcess.fork).toBeCalledWith(
@@ -66,6 +98,8 @@ describe('fork', () => {
   });
 
   test('Stream should be returned as soon as the process is spawn', async () => {
+    mockChildProcess.queueSpawnEvent();
+
     const subprocess = await fork(SUBPROCESS_NAME);
 
     expect(subprocess).toBeInstanceOf(Duplex);
@@ -73,6 +107,7 @@ describe('fork', () => {
 
   test('Stream should be destroyed with an error when one is emitted', async () => {
     const originalError = new Error('denied.png');
+    mockChildProcess.queueSpawnEvent();
 
     const subprocess = await fork(SUBPROCESS_NAME);
 
@@ -81,6 +116,7 @@ describe('fork', () => {
 
   test('Stream should be destroyed with an error when the subprocess errors out', async () => {
     const exitCode = 12;
+    mockChildProcess.queueSpawnEvent();
     const subprocess = await fork(SUBPROCESS_NAME);
 
     const error = await getPromiseRejection(
@@ -96,6 +132,7 @@ describe('fork', () => {
 
   test('Stream should end normally when the subprocess is killed', async () => {
     const signal = 'SIGTERM';
+    mockChildProcess.queueSpawnEvent();
 
     const subprocess = await fork(SUBPROCESS_NAME);
 
@@ -103,12 +140,15 @@ describe('fork', () => {
   });
 
   test('Stream should end normally when subprocess ends normally', async () => {
+    mockChildProcess.queueSpawnEvent();
+
     const subprocess = await fork(SUBPROCESS_NAME);
 
     await mockChildExit(subprocess, 0, null);
   });
 
   test('Subprocess should be killed when stream is destroyed', async () => {
+    mockChildProcess.queueSpawnEvent();
     const subprocess = await fork(SUBPROCESS_NAME);
 
     subprocess.destroy();
@@ -120,6 +160,7 @@ describe('fork', () => {
 
   test('Messages sent to the writable stream should be passed to the subprocess', async () => {
     const messages: readonly string[] = ['one', 'dos', 'trois'];
+    mockChildProcess.queueSpawnEvent();
 
     const subprocess = await fork(SUBPROCESS_NAME);
 
@@ -130,6 +171,7 @@ describe('fork', () => {
 
   test('Messages sent by the subprocess should be passed to the readable stream', async () => {
     const messages: readonly string[] = [SUBPROCESS_NAME, 'bar', 'baz'];
+    mockChildProcess.queueSpawnEvent();
 
     const subprocess = await fork(SUBPROCESS_NAME);
 
@@ -161,6 +203,12 @@ class MockChildProcess extends EventEmitter {
     this.wasKilled = true;
     // tslint:disable-next-line:no-object-mutation
     this.killSignal = signal;
+  }
+
+  public queueSpawnEvent(): void {
+    setImmediate(() => {
+      this.emit('spawn');
+    });
   }
 }
 
