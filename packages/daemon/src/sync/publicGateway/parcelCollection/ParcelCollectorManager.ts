@@ -19,12 +19,12 @@ export class ParcelCollectorManager {
 
   constructor(@Inject(LOGGER) protected logger: Logger) {}
 
-  public start(): void {
+  public async start(): Promise<void> {
     if (this.subprocess?.destroyed === false) {
       this.logger.warn('Ignored attempt to start parcel collection subprocess a second time');
     } else {
       // tslint:disable-next-line:no-object-mutation
-      this.subprocess = fork('parcel-collection');
+      this.subprocess = await fork('parcel-collection');
 
       this.events.emit('started');
 

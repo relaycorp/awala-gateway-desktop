@@ -11,6 +11,7 @@ import { getMockInstance } from '../../testUtils/jest';
 import { setImmediateAsync } from '../../testUtils/timing';
 import { fork } from './child';
 import { SubprocessError } from './SubprocessError';
+import { getPromiseRejection } from '../../testUtils/promises';
 
 jest.mock('child_process');
 
@@ -24,7 +25,7 @@ const SUBPROCESS_NAME = 'foo';
 
 describe('fork', () => {
   test('Subprocess script should be run', async () => {
-    fork(SUBPROCESS_NAME);
+    await fork(SUBPROCESS_NAME);
 
     const isTypescript = __filename.endsWith('.ts');
     const expectedScriptPath = join(
@@ -40,10 +41,10 @@ describe('fork', () => {
     );
   });
 
-  test('Subprocess name should be passed as argument', () => {
+  test('Subprocess name should be passed as argument', async () => {
     const subprocessName = SUBPROCESS_NAME;
 
-    fork(subprocessName);
+    await fork(subprocessName);
 
     expect(childProcess.fork).toBeCalledWith(
       expect.anything(),
@@ -52,8 +53,8 @@ describe('fork', () => {
     );
   });
 
-  test('Subprocess should be run with LOG_FILES=true', () => {
-    fork(SUBPROCESS_NAME);
+  test('Subprocess should be run with LOG_FILES=true', async () => {
+    await fork(SUBPROCESS_NAME);
 
     expect(childProcess.fork).toBeCalledWith(
       expect.anything(),
@@ -64,60 +65,51 @@ describe('fork', () => {
     );
   });
 
-  test('Stream should be returned as soon as the process is spawn', () => {
-    const subprocess = fork(SUBPROCESS_NAME);
+  test('Stream should be returned as soon as the process is spawn', async () => {
+    const subprocess = await fork(SUBPROCESS_NAME);
 
     expect(subprocess).toBeInstanceOf(Duplex);
   });
 
-  test('Stream should be destroyed with an error when one is emitted', (cb) => {
+  test('Stream should be destroyed with an error when one is emitted', async () => {
     const originalError = new Error('denied.png');
 
-    const subprocess = fork(SUBPROCESS_NAME);
+    const subprocess = await fork(SUBPROCESS_NAME);
 
-    subprocess.on('error', (error) => {
-      expect(error).toBe(originalError);
-      cb();
-    });
-    mockChildProcess.emit('error', originalError);
+    await expect(mockChildError(subprocess, originalError)).resolves.toBe(originalError);
   });
 
-  test('Stream should be destroyed with an error when the subprocess errors out', (cb) => {
+  test('Stream should be destroyed with an error when the subprocess errors out', async () => {
     const exitCode = 12;
+    const subprocess = await fork(SUBPROCESS_NAME);
 
-    const subprocess = fork(SUBPROCESS_NAME);
+    const error = await getPromiseRejection(
+      mockChildExit(subprocess, exitCode, null),
+      SubprocessError,
+    );
 
-    subprocess.on('error', (error: SubprocessError) => {
-      expect(error).toBeInstanceOf(SubprocessError);
-      expect(error.message).toEqual(
-        `Subprocess "${SUBPROCESS_NAME}" errored out with code ${exitCode}`,
-      );
-      expect(error.exitCode).toEqual(exitCode);
-      cb();
-    });
-    mockChildProcess.emit('exit', exitCode, null);
+    expect(error.message).toEqual(
+      `Subprocess "${SUBPROCESS_NAME}" errored out with code ${exitCode}`,
+    );
+    expect(error.exitCode).toEqual(exitCode);
   });
 
-  test('Stream should end normally when the subprocess is killed', (cb) => {
+  test('Stream should end normally when the subprocess is killed', async () => {
     const signal = 'SIGTERM';
 
-    const subprocess = fork(SUBPROCESS_NAME);
+    const subprocess = await fork(SUBPROCESS_NAME);
 
-    subprocess.on('error', cb);
-    subprocess.on('close', cb);
-    mockChildProcess.emit('exit', null, signal);
+    await mockChildExit(subprocess, null, signal);
   });
 
-  test('Stream should end normally when subprocess ends normally', (cb) => {
-    const subprocess = fork(SUBPROCESS_NAME);
+  test('Stream should end normally when subprocess ends normally', async () => {
+    const subprocess = await fork(SUBPROCESS_NAME);
 
-    subprocess.on('error', cb);
-    subprocess.on('close', cb);
-    mockChildProcess.emit('exit', 0, null);
+    await mockChildExit(subprocess, 0, null);
   });
 
   test('Subprocess should be killed when stream is destroyed', async () => {
-    const subprocess = fork(SUBPROCESS_NAME);
+    const subprocess = await fork(SUBPROCESS_NAME);
 
     subprocess.destroy();
 
@@ -129,7 +121,7 @@ describe('fork', () => {
   test('Messages sent to the writable stream should be passed to the subprocess', async () => {
     const messages: readonly string[] = ['one', 'dos', 'trois'];
 
-    const subprocess = fork(SUBPROCESS_NAME);
+    const subprocess = await fork(SUBPROCESS_NAME);
 
     messages.forEach((message) => subprocess.write(message));
     await setImmediateAsync();
@@ -139,7 +131,7 @@ describe('fork', () => {
   test('Messages sent by the subprocess should be passed to the readable stream', async () => {
     const messages: readonly string[] = [SUBPROCESS_NAME, 'bar', 'baz'];
 
-    const subprocess = fork(SUBPROCESS_NAME);
+    const subprocess = await fork(SUBPROCESS_NAME);
 
     setImmediate(() => messages.forEach((message) => mockChildProcess.emit('message', message)));
     await expect(
@@ -170,4 +162,23 @@ class MockChildProcess extends EventEmitter {
     // tslint:disable-next-line:no-object-mutation
     this.killSignal = signal;
   }
+}
+
+function mockChildError<E extends Error>(subprocess: Duplex, childError?: E): Promise<E> {
+  return new Promise<E>((resolve) => {
+    subprocess.on('error', resolve);
+    mockChildProcess.emit('error', childError);
+  });
+}
+
+function mockChildExit(
+  subprocess: Duplex,
+  exitCode: number | null,
+  signal: string | null,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    subprocess.on('error', reject);
+    subprocess.on('close', resolve);
+    mockChildProcess.emit('exit', exitCode, signal);
+  });
 }

@@ -10,7 +10,7 @@ const SUBPROCESS_SCRIPT_NAME = IS_TYPESCRIPT ? 'subprocess.ts' : 'subprocess.js'
 const ROOT_DIR = dirname(dirname(__dirname));
 const SUBPROCESS_SCRIPT_PATH = join(ROOT_DIR, 'bin', SUBPROCESS_SCRIPT_NAME);
 
-export function fork(subprocessName: string): Duplex {
+export async function fork(subprocessName: string): Promise<Duplex> {
   const childProcess = forkChildProcess(SUBPROCESS_SCRIPT_PATH, [subprocessName], {
     env: { ...process.env, LOG_FILES: 'true' },
   });
