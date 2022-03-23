@@ -23,16 +23,16 @@ beforeEach(() => {
 const getSubprocess = mockFork();
 
 describe('start', () => {
-  test('Subprocess parcel-collection should be started', () => {
-    manager.start();
+  test('Subprocess parcel-collection should be started', async () => {
+    await manager.start();
 
     expect(fork).toBeCalledWith('parcel-collection');
     expect(mockLogs).toContainEqual(partialPinoLog('info', 'Started parcel collection subprocess'));
   });
 
-  test('Subprocess should not be started if it is already running', () => {
-    manager.start();
-    manager.start();
+  test('Subprocess should not be started if it is already running', async () => {
+    await manager.start();
+    await manager.start();
 
     expect(fork).toBeCalledTimes(1);
     expect(mockLogs).toContainEqual(
@@ -47,7 +47,7 @@ describe('restart', () => {
     getMockInstance(fork).mockReturnValueOnce(subprocess1);
     const subprocess2 = new PassThrough({ objectMode: true });
     getMockInstance(fork).mockReturnValueOnce(subprocess2);
-    manager.start();
+    await manager.start();
 
     await manager.restart();
 
@@ -65,7 +65,7 @@ describe('restart', () => {
   });
 
   test('Nothing should happen if subprocess is undergoing a restart', async () => {
-    manager.start();
+    await manager.start();
 
     // Mimic a restart
     getSubprocess().destroy();
@@ -80,7 +80,7 @@ describe('restart', () => {
 describe('streamStatus', () => {
   test('It should wait for subprocess to start if it is not already running', async () => {
     setImmediate(async () => {
-      manager.start();
+      await manager.start();
       emitValidSubprocessMessage({ type: 'status', status: 'disconnected' });
     });
 
@@ -90,7 +90,7 @@ describe('streamStatus', () => {
   });
 
   test('DISCONNECTED should be returned if subprocess reports disconnection', async () => {
-    manager.start();
+    await manager.start();
     setImmediate(() => {
       emitValidSubprocessMessage({ type: 'status', status: 'disconnected' });
     });
@@ -101,7 +101,7 @@ describe('streamStatus', () => {
   });
 
   test('CONNECTED should be returned if subprocess reports connection', async () => {
-    manager.start();
+    await manager.start();
     setImmediate(() => {
       emitValidSubprocessMessage({ type: 'status', status: 'connected' });
     });
@@ -112,7 +112,7 @@ describe('streamStatus', () => {
   });
 
   test('Subsequent connection changes should be reflected', async () => {
-    manager.start();
+    await manager.start();
     setImmediate(() => {
       emitValidSubprocessMessage({ type: 'status', status: 'connected' });
       emitValidSubprocessMessage({ type: 'status', status: 'disconnected' });
@@ -129,7 +129,7 @@ describe('streamStatus', () => {
   });
 
   test('Messages without types should be ignored', async () => {
-    manager.start();
+    await manager.start();
     setImmediate(() => {
       getSubprocess().write({ foo: 'bar' });
       emitValidSubprocessMessage({ type: 'status', status: 'connected' });
@@ -141,7 +141,7 @@ describe('streamStatus', () => {
   });
 
   test('Non-connection messages should be ignored', async () => {
-    manager.start();
+    await manager.start();
     setImmediate(() => {
       emitValidSubprocessMessage({
         parcelKey: 'key',
@@ -157,7 +157,7 @@ describe('streamStatus', () => {
   });
 
   test('Breaking the iterable should not destroy the underlying stream', async () => {
-    manager.start();
+    await manager.start();
     setImmediate(() => {
       emitValidSubprocessMessage({ type: 'status', status: 'connected' });
     });
@@ -174,7 +174,7 @@ describe('streamStatus', () => {
     getMockInstance(fork).mockReturnValueOnce(subprocess1);
     const subprocess2 = new PassThrough({ objectMode: true });
     getMockInstance(fork).mockReturnValueOnce(subprocess2);
-    manager.start();
+    await manager.start();
 
     setImmediate(async () => {
       subprocess1.write({ type: 'status', status: 'disconnected' });
@@ -197,7 +197,7 @@ describe('watchCollectionsForRecipients', () => {
 
   test('It should wait for subprocess to start if it is not already running', async () => {
     setImmediate(async () => {
-      manager.start();
+      await manager.start();
       const status: ParcelCollectionNotification = {
         parcelKey: PARCEL_KEY,
         recipientAddress: RECIPIENT_ADDRESS,
@@ -216,7 +216,7 @@ describe('watchCollectionsForRecipients', () => {
   });
 
   test('Parcel bound for specified recipient should be output', async () => {
-    manager.start();
+    await manager.start();
     setImmediate(async () => {
       emitValidSubprocessMessage({
         parcelKey: PARCEL_KEY,
@@ -235,7 +235,7 @@ describe('watchCollectionsForRecipients', () => {
   });
 
   test('Multiple recipients can be specified', async () => {
-    manager.start();
+    await manager.start();
     const recipient2Address = '0deadc0de';
     const parcel2Key = 'another parcel';
     setImmediate(async () => {
@@ -261,7 +261,7 @@ describe('watchCollectionsForRecipients', () => {
   });
 
   test('Parcel bound for unspecified recipient should be ignored', async () => {
-    manager.start();
+    await manager.start();
     setImmediate(async () => {
       emitValidSubprocessMessage({
         parcelKey: 'the parcel key',
@@ -285,7 +285,7 @@ describe('watchCollectionsForRecipients', () => {
   });
 
   test('Messages without types should be ignored', async () => {
-    manager.start();
+    await manager.start();
     setImmediate(async () => {
       getSubprocess().write({ foo: 'bar' });
       emitValidSubprocessMessage({
@@ -305,7 +305,7 @@ describe('watchCollectionsForRecipients', () => {
   });
 
   test('Non-collection messages should be ignored', async () => {
-    manager.start();
+    await manager.start();
     setImmediate(async () => {
       emitValidSubprocessMessage({ type: 'status', status: 'connected' });
       emitValidSubprocessMessage({
@@ -325,7 +325,7 @@ describe('watchCollectionsForRecipients', () => {
   });
 
   test('Breaking the iterable should not destroy the underlying stream', async () => {
-    manager.start();
+    await manager.start();
     setImmediate(() => {
       emitValidSubprocessMessage({
         parcelKey: PARCEL_KEY,
@@ -349,7 +349,7 @@ describe('watchCollectionsForRecipients', () => {
     getMockInstance(fork).mockReturnValueOnce(subprocess1);
     const subprocess2 = new PassThrough({ objectMode: true });
     getMockInstance(fork).mockReturnValueOnce(subprocess2);
-    manager.start();
+    await manager.start();
     const parcel2Key = 'another parcel';
 
     setImmediate(async () => {
