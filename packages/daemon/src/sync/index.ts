@@ -12,11 +12,8 @@ export default async function runSync(): Promise<void> {
 }
 
 async function startSubprocesses(): Promise<void> {
-  const gatewayRegistrar = Container.get(GatewayRegistrar);
-  await gatewayRegistrar.waitForRegistration();
+  await Container.get(GatewayRegistrar).waitForRegistration();
 
-  const parcelDeliveryManager = Container.get(ParcelDeliveryManager);
-  const parcelCollectorManager = Container.get(ParcelCollectorManager);
-  parcelCollectorManager.start();
-  await parcelDeliveryManager.deliverWhileConnected();
+  await Container.get(ParcelCollectorManager).start();
+  await Container.get(ParcelDeliveryManager).deliverWhileConnected();
 }

@@ -1,8 +1,7 @@
-import { PrivateKey } from '@relaycorp/keystore-db';
+import { Certificate, IdentityPublicKey, PrivateKey } from '@relaycorp/keystore-db';
+import { getPrivateAddressFromIdentityKey, SessionKeyPair } from '@relaycorp/relaynet-core';
 import {
-  CDACertPath,
-  generateCDACertificationPath,
-  generateNodeKeyPairSet,
+  generateIdentityKeyPairSet,
   generatePDACertificationPath,
   NodeKeyPairSet,
   PDACertPath,
@@ -14,9 +13,9 @@ import { getRepository } from 'typeorm';
 import { Config, ConfigKey } from '../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../constants';
 import { ConfigItem } from '../entity/ConfigItem';
-import { FileStore } from '../fileStore';
+import { DBPublicKeyStore } from '../keystores/DBPublicKeyStore';
 import { DBPrivateKeyStore } from '../keystores/DBPrivateKeyStore';
-import { PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY } from '../sync/publicGateway/GatewayRegistrar';
+import { DBCertificateStore } from '../keystores/DBCertificateStore';
 
 function makeSHA256Hash(plaintext: BinaryLike): Hash {
   return createHash('sha256').update(plaintext);
@@ -29,74 +28,92 @@ export function sha256Hex(plaintext: string): string {
 export type PKIFixtureRetriever = () => {
   readonly keyPairSet: NodeKeyPairSet;
   readonly pdaCertPath: PDACertPath;
-  readonly cdaCertPath: CDACertPath;
 };
 
 export function generatePKIFixture(
-  cb: (keyPairSet: NodeKeyPairSet, pdaCertPath: PDACertPath, cdaCertPath: CDACertPath) => void,
+  cb?: (keyPairSet: NodeKeyPairSet, pdaCertPath: PDACertPath) => void,
 ): PKIFixtureRetriever {
   let keyPairSet: NodeKeyPairSet;
   let pdaCertPath: PDACertPath;
-  let cdaCertPath: CDACertPath;
 
   beforeAll(async () => {
-    keyPairSet = await generateNodeKeyPairSet();
+    keyPairSet = await generateIdentityKeyPairSet();
     pdaCertPath = await generatePDACertificationPath(keyPairSet);
-    cdaCertPath = await generateCDACertificationPath(keyPairSet);
 
-    cb(keyPairSet, pdaCertPath, cdaCertPath);
+    cb?.(keyPairSet, pdaCertPath);
   });
 
   return () => ({
-    cdaCertPath,
     keyPairSet,
     pdaCertPath,
   });
 }
 
+export interface MockGatewayRegistration {
+  readonly undoGatewayRegistration: () => Promise<void>;
+  readonly deletePrivateGateway: () => Promise<void>;
+  readonly getPublicGatewaySessionPrivateKey: () => CryptoKey;
+}
+
 export function mockGatewayRegistration(
   pkiFixtureRetriever: PKIFixtureRetriever,
-): () => Promise<void> {
+): MockGatewayRegistration {
+  let publicGatewaySessionPrivateKey: CryptoKey;
+
   beforeEach(async () => {
-    const { cdaCertPath, pdaCertPath, keyPairSet } = pkiFixtureRetriever();
+    const { pdaCertPath, keyPairSet } = pkiFixtureRetriever();
 
     const privateKeyStore = Container.get(DBPrivateKeyStore);
+    const publicKeyStore = Container.get(DBPublicKeyStore);
+    const certificateStore = Container.get(DBCertificateStore);
     const config = Container.get(Config);
-    const fileStore = Container.get(FileStore);
 
-    await privateKeyStore.saveNodeKey(
-      keyPairSet.privateGateway.privateKey,
-      pdaCertPath.privateGateway,
+    const privateGatewayPrivateAddress = await getPrivateAddressFromIdentityKey(
+      keyPairSet.privateGateway.publicKey!,
     );
-    await config.set(
-      ConfigKey.NODE_KEY_SERIAL_NUMBER,
-      pdaCertPath.privateGateway.getSerialNumberHex(),
-    );
+    const publicGatewayPrivateAddress =
+      await pdaCertPath.publicGateway.calculateSubjectPrivateAddress();
 
-    await config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
-    await fileStore.putObject(
-      Buffer.from(pdaCertPath.publicGateway.serialize()),
-      PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY,
-    );
+    await privateKeyStore.saveIdentityKey(keyPairSet.privateGateway.privateKey!!);
+    await certificateStore.save(pdaCertPath.privateGateway, publicGatewayPrivateAddress);
 
-    await privateKeyStore.saveNodeKey(
-      keyPairSet.privateGateway.privateKey,
-      cdaCertPath.privateGateway,
+    await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateGatewayPrivateAddress);
+
+    await config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
+    await config.set(ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS, publicGatewayPrivateAddress);
+    await publicKeyStore.saveIdentityKey(keyPairSet.publicGateway.publicKey!);
+
+    const publicGatewaySessionKeyPair = await SessionKeyPair.generate();
+    await publicKeyStore.saveSessionKey(
+      publicGatewaySessionKeyPair.sessionKey,
+      publicGatewayPrivateAddress,
+      new Date(),
     );
-    await config.set(
-      ConfigKey.NODE_CCA_ISSUER_KEY_SERIAL_NUMBER,
-      cdaCertPath.privateGateway.getSerialNumberHex(),
-    );
+    publicGatewaySessionPrivateKey = publicGatewaySessionKeyPair.privateKey;
   });
 
-  return async () => {
+  const undoGatewayRegistration = async () => {
     const configItemRepo = getRepository(ConfigItem);
-    await configItemRepo.clear();
+    await configItemRepo.delete({ key: ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS });
+    await configItemRepo.delete({ key: ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS });
 
-    const privateKeyRepo = getRepository(PrivateKey);
-    await privateKeyRepo.clear();
+    const identityPublicKeyRepository = getRepository(IdentityPublicKey);
+    await identityPublicKeyRepository.clear();
+  };
 
-    const fileStore = Container.get(FileStore);
-    await fileStore.deleteObject(PUBLIC_GATEWAY_ID_CERTIFICATE_OBJECT_KEY);
+  const deletePrivateGateway = async () => {
+    await undoGatewayRegistration();
+
+    const privateKeyRepository = getRepository(PrivateKey);
+    await privateKeyRepository.clear();
+
+    const certificateRepository = getRepository(Certificate);
+    await certificateRepository.clear();
+  };
+
+  return {
+    deletePrivateGateway,
+    getPublicGatewaySessionPrivateKey: () => publicGatewaySessionPrivateKey,
+    undoGatewayRegistration,
   };
 }

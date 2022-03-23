@@ -3,9 +3,9 @@ import abortable from 'abortable-iterator';
 import { connect } from 'it-ws';
 
 export enum ConnectionStatus {
+  CONNECTING_TO_PUBLIC_GATEWAY,
   CONNECTED_TO_PUBLIC_GATEWAY,
   CONNECTED_TO_COURIER,
-  DISCONNECTED_FROM_PUBLIC_GATEWAY,
   DISCONNECTED,
   UNREGISTERED,
 }

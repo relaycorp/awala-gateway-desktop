@@ -13,7 +13,7 @@ import { getMockInstance } from '../../testUtils/jest';
 import { getPromiseRejection } from '../../testUtils/promises';
 import { mockFork } from '../../testUtils/subprocess';
 import { mockSleepSeconds, setImmediateAsync } from '../../testUtils/timing';
-import { SubprocessError } from '../../utils/subprocess/SubprocessError';
+import { SubprocessExitError } from '../../utils/subprocess/errors';
 import { GatewayRegistrar } from '../publicGateway/GatewayRegistrar';
 import { CourierSyncManager } from './CourierSyncManager';
 import { DisconnectedFromCourierError } from './errors';
@@ -42,7 +42,7 @@ describe('sync', () => {
   test('Error should be thrown if private gateway is unregistered', async () => {
     setImmediate(() => {
       getSubprocess().destroy(
-        new SubprocessError('whoops', CourierSyncExitCode.UNREGISTERED_GATEWAY),
+        new SubprocessExitError('whoops', CourierSyncExitCode.UNREGISTERED_GATEWAY),
       );
     });
 
@@ -55,7 +55,7 @@ describe('sync', () => {
   });
 
   test('Error should be thrown if sync fails', async () => {
-    const error = new SubprocessError('whoops', CourierSyncExitCode.FAILED_SYNC);
+    const error = new SubprocessExitError('whoops', CourierSyncExitCode.FAILED_SYNC);
     setImmediate(() => {
       getSubprocess().destroy(error);
     });

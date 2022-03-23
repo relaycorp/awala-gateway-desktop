@@ -1,22 +1,18 @@
 import { CogRPCClient } from '@relaycorp/cogrpc';
 import {
   Cargo,
-  CargoCollectionAuthorization,
-  CargoCollectionRequest,
   CargoDeliveryRequest,
   CargoMessageSet,
   CargoMessageStream,
   Certificate,
-  Gateway,
-  issueGatewayCertificate,
+  CertificateRotation,
   Parcel,
   ParcelCollectionAck,
+  PrivateGateway,
+  PrivatePublicGatewayChannel,
   RecipientAddressType,
-  SessionlessEnvelopedData,
-  UnboundKeyPair,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { addDays, differenceInSeconds, subMinutes } from 'date-fns';
 import { v4 as getDefaultGateway } from 'default-gateway';
 import pipe from 'it-pipe';
 import { Logger } from 'pino';
@@ -27,27 +23,22 @@ import uuid from 'uuid-random';
 
 import { COURIER_PORT, CourierSyncExitCode, CourierSyncStage } from '.';
 import { ParcelCollection } from '../../entity/ParcelCollection';
-import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
-import { DBPublicKeyStore } from '../../keystores/DBPublicKeyStore';
 import { ParcelStore } from '../../parcelStore';
 import { LOGGER } from '../../tokens';
 import { MessageDirection } from '../../utils/MessageDirection';
 import { sleepSeconds } from '../../utils/timing';
-import { GatewayRegistrar } from '../publicGateway/GatewayRegistrar';
-import { PublicGateway } from '../publicGateway/PublicGateway';
 import { CourierSyncStageNotification, ParcelCollectionNotification } from './messaging';
+import { PrivateGatewayManager } from '../../PrivateGatewayManager';
+import { DBCertificateStore } from '../../keystores/DBCertificateStore';
 
 const DELAY_BETWEEN_COLLECTION_AND_DELIVERY_SECONDS = 5;
 
-const CLOCK_DRIFT_TOLERANCE_MINUTES = 90;
-const OUTBOUND_CARGO_TTL_DAYS = 14;
-
 export default async function runCourierSync(parentStream: Duplex): Promise<number> {
-  const gatewayRegistrar = Container.get(GatewayRegistrar);
+  const gatewayManager = Container.get(PrivateGatewayManager);
   const logger = Container.get(LOGGER);
 
-  const publicGateway = await gatewayRegistrar.getPublicGateway();
-  if (!publicGateway) {
+  const channel = await gatewayManager.getCurrentChannelIfRegistered();
+  if (!channel) {
     logger.fatal('Private gateway is unregistered');
     return CourierSyncExitCode.UNREGISTERED_GATEWAY;
   }
@@ -62,34 +53,14 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
   }
 
   const parcelStore = Container.get(ParcelStore);
-  const privateKeyStore = Container.get(DBPrivateKeyStore);
-  const publicKeyStore = Container.get(DBPublicKeyStore);
-  const gateway = new Gateway(privateKeyStore, publicKeyStore);
-  const currentKey = (await privateKeyStore.getCurrentKey())!;
+  const privateGateway = await gatewayManager.getCurrent();
   let client: CogRPCClient | null = null;
   try {
     client = await CogRPCClient.init(`https://${defaultGatewayIPAddress}:${COURIER_PORT}`);
 
-    await collectCargo(
-      publicGateway,
-      gateway,
-      client,
-      currentKey,
-      parcelStore,
-      parentStream,
-      privateKeyStore,
-      logger,
-    );
+    await collectCargo(channel, privateGateway, client, parcelStore, parentStream, logger);
     await waitBeforeDelivery(parentStream, logger);
-    await deliverCargo(
-      publicGateway,
-      gateway,
-      client,
-      currentKey,
-      parcelStore,
-      parentStream,
-      logger,
-    );
+    await deliverCargo(channel, client, parcelStore, parentStream, logger);
   } catch (err) {
     logger.fatal({ err }, 'Sync failed');
     return CourierSyncExitCode.FAILED_SYNC;
@@ -102,27 +73,27 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
 }
 
 async function collectCargo(
-  publicGateway: PublicGateway,
-  privateGateway: Gateway,
+  channel: PrivatePublicGatewayChannel,
+  privateGateway: PrivateGateway,
   client: CogRPCClient,
-  currentKey: UnboundKeyPair,
   parcelStore: ParcelStore,
   parentStream: Duplex,
-  privateKeyStore: DBPrivateKeyStore,
   logger: Logger,
 ): Promise<void> {
   logger.debug('Starting cargo collection');
   sendStageNotificationToParent(parentStream, CourierSyncStage.COLLECTION);
 
-  const ccaSerialized = await generateCCA(publicGateway, currentKey, privateKeyStore);
+  const certificateStore = Container.get(DBCertificateStore);
+
+  const ccaSerialized = Buffer.from(await channel.generateCCA());
   await pipe(
     client.collectCargo(ccaSerialized),
     async (cargoesSerialized: AsyncIterable<Buffer>) => {
-      // We shouldn't *have* to filter self-issued certificates, but PKI.js would hang if we don't
-      // filter out trusted certificates with a Subject Key Identifier (SKI) that matches that of
-      // the end entity certificate.
-      const ownCertificates = await privateKeyStore.fetchNodeCertificates();
-      const ownCDACertificates = await filterSelfIssuedCertificates(ownCertificates);
+      const ownPDCCertificates = await certificateStore.retrieveAll(
+        privateGateway.privateAddress,
+        channel.peerPrivateAddress,
+      );
+      const ownCDAIssuers = await channel.getCDAIssuers();
 
       const parcelCollectionRepo = getRepository(ParcelCollection);
 
@@ -137,7 +108,7 @@ async function collectCargo(
         const cargoAwareLogger = logger.child({ cargo: { id: cargo.id } });
 
         try {
-          await cargo.validate(RecipientAddressType.PRIVATE, ownCDACertificates);
+          await cargo.validate(RecipientAddressType.PRIVATE, ownCDAIssuers);
         } catch (err) {
           cargoAwareLogger.warn({ err }, 'Ignoring cargo by unauthorized sender');
           continue;
@@ -154,7 +125,7 @@ async function collectCargo(
         cargoAwareLogger.debug('Processing collected cargo');
 
         for (const itemSerialized of cargoMessageSet.messages) {
-          let item: Parcel | ParcelCollectionAck;
+          let item: Parcel | ParcelCollectionAck | CertificateRotation;
           try {
             item = await CargoMessageSet.deserializeItem(itemSerialized);
           } catch (err) {
@@ -166,50 +137,20 @@ async function collectCargo(
               item,
               itemSerialized,
               parcelStore,
-              ownCertificates,
+              ownPDCCertificates,
               parcelCollectionRepo,
               parentStream,
               cargoAwareLogger,
             );
-          } else {
+          } else if (item instanceof ParcelCollectionAck) {
             await processParcelCollectionAck(item, parcelStore, cargoAwareLogger);
+          } else {
+            cargoAwareLogger.info('Certificate rotations are not yet supported');
           }
         }
       }
     },
   );
-}
-
-async function generateCCA(
-  publicGateway: PublicGateway,
-  currentKey: UnboundKeyPair,
-  privateKeyStore: DBPrivateKeyStore,
-): Promise<Buffer> {
-  const now = new Date();
-  const startDate = subMinutes(now, CLOCK_DRIFT_TOLERANCE_MINUTES);
-  const endDate = addDays(now, OUTBOUND_CARGO_TTL_DAYS);
-
-  const recipientAddress = `https://${publicGateway.publicAddress}`;
-  const ccaIssuer = await privateKeyStore.getOrCreateCCAIssuer();
-  const cargoDeliveryAuthorization = await issueGatewayCertificate({
-    issuerCertificate: ccaIssuer,
-    issuerPrivateKey: currentKey.privateKey,
-    subjectPublicKey: await publicGateway.identityCertificate.getPublicKey(),
-    validityEndDate: endDate,
-  });
-  const ccr = new CargoCollectionRequest(cargoDeliveryAuthorization);
-  const ccaPayload = await SessionlessEnvelopedData.encrypt(
-    await ccr.serialize(),
-    publicGateway.identityCertificate,
-  );
-  const cca = new CargoCollectionAuthorization(
-    recipientAddress,
-    currentKey.certificate,
-    Buffer.from(ccaPayload.serialize()),
-    { creationDate: startDate, ttl: differenceInSeconds(endDate, startDate) },
-  );
-  const ccaSerialized = await cca.serialize(currentKey.privateKey);
-  return Buffer.from(ccaSerialized);
 }
 
 async function processParcel(
@@ -277,10 +218,8 @@ async function waitBeforeDelivery(parentStream: Duplex, logger: Logger): Promise
 }
 
 async function deliverCargo(
-  publicGateway: PublicGateway,
-  privateGateway: Gateway,
+  channel: PrivatePublicGatewayChannel,
   client: CogRPCClient,
-  currentKey: UnboundKeyPair,
   parcelStore: ParcelStore,
   parentStream: Duplex,
   logger: Logger,
@@ -288,13 +227,7 @@ async function deliverCargo(
   logger.debug('Starting cargo delivery');
   sendStageNotificationToParent(parentStream, CourierSyncStage.DELIVERY);
 
-  const cargoDeliveryStream = makeCargoDeliveryStream(
-    publicGateway,
-    privateGateway,
-    currentKey,
-    parcelStore,
-    logger,
-  );
+  const cargoDeliveryStream = makeCargoDeliveryStream(channel, parcelStore, logger);
   await pipe(
     client.deliverCargo(cargoDeliveryStream),
     async (ackDeliveryIds: AsyncIterable<string>) => {
@@ -309,19 +242,11 @@ async function deliverCargo(
 }
 
 async function* makeCargoDeliveryStream(
-  publicGateway: PublicGateway,
-  privateGateway: Gateway,
-  currentKey: UnboundKeyPair,
+  channel: PrivatePublicGatewayChannel,
   parcelStore: ParcelStore,
   logger: Logger,
 ): AsyncIterable<CargoDeliveryRequest> {
-  const cargoStream = privateGateway.generateCargoes(
-    makeCargoMessageStream(parcelStore, logger),
-    publicGateway.identityCertificate,
-    currentKey.privateKey,
-    currentKey.certificate,
-    `https://${publicGateway.publicAddress}`,
-  );
+  const cargoStream = channel.generateCargoes(makeCargoMessageStream(parcelStore, logger));
   yield* await pipe(
     cargoStream,
     async function* (
@@ -393,19 +318,4 @@ function sendStageNotificationToParent(parentStream: Duplex, stage: CourierSyncS
     type: 'stage',
   };
   parentStream.write(stageNotification);
-}
-
-async function filterSelfIssuedCertificates(
-  certificates: readonly Certificate[],
-): Promise<readonly Certificate[]> {
-  // tslint:disable-next-line:readonly-array
-  const selfIssuedCertificates = [];
-  for (const certificate of certificates) {
-    if (
-      certificate.getIssuerPrivateAddress() === (await certificate.calculateSubjectPrivateAddress())
-    ) {
-      selfIssuedCertificates.push(certificate);
-    }
-  }
-  return selfIssuedCertificates;
 }

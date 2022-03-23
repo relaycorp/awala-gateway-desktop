@@ -5,6 +5,8 @@
   "scripts": {
     "prebuild": "run-s clean",
     "build": "lerna run build",
+    "prestart": "run-s build",
+    "start": "lerna run --scope ui start",
     "bootstrap": "lerna bootstrap",
     "fix": "run-s fix:*",
     "fix:prettier": "prettier \"packages/**/*.ts\" --write",
@@ -13,25 +15,21 @@
     "static-checks:lint": "tslint --project .",
     "static-checks:prettier": "prettier \"packages/**/*.ts\" --list-different",
     "test": "lerna run test",
-    "pretest:ci": "run-s build",
     "test:ci": "lerna run test:ci:unit:jest",
     "clean": "lerna run clean"
   },
   "engines": {
-    "node": ">=14"
+    "node": ">=16"
   },
   "devDependencies": {
-    "@relaycorp/shared-config": "^1.5.3",
-    "@semantic-release/exec": "^5.0.0",
+    "@relaycorp/shared-config": "^1.6.1",
+    "@semantic-release/exec": "^6.0.2",
     "lerna": "^4.0.0",
     "npm-run-all": "^4.1.5",
-    "prettier": "^2.3.2",
+    "prettier": "^2.5.1",
     "rimraf": "^3.0.2",
-    "ts-jest": "^27.0.3",
-    "ts-node": "^10.1.0",
-    "ts-node-dev": "^1.1.8",
     "tslint": "^6.1.3",
-    "typescript": "^4.3.5"
+    "typescript": "^4.5.4"
   },
   "prettier": "@relaycorp/shared-config/.prettierrc.json",
   "repository": {

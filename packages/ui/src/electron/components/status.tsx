@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { ConnectionStatus } from '../../ipc/connectionStatus';
 import connected from '../assets/connected.svg';
+import connecting from '../assets/connecting.svg';
 import courier from '../assets/courier.svg';
 import disconnected from '../assets/disconnected.svg';
 import unregistered from '../assets/unregistered.svg';
@@ -55,7 +56,7 @@ class Status extends Component<Props> {
             </p>
           </HomeContent>
         );
-      default:
+      case ConnectionStatus.DISCONNECTED:
         return (
           <HomeContent title="You're disconnected from Awala" image={disconnected}
             className='disconnected'>
@@ -72,6 +73,14 @@ class Status extends Component<Props> {
               <li>Connect to the courier’s network.</li>
               <li>Wait until their device is ready.</li>
             </ol>
+          </HomeContent>
+        );
+      default:
+        return (
+          <HomeContent title="Connecting to Awala..." image={connecting}>
+            <p>
+              Please wait a moment as we connect to Awala via the Internet.
+            </p>
           </HomeContent>
         );
     }

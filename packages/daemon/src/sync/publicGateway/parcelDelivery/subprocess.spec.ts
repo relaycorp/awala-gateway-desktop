@@ -41,7 +41,7 @@ let gatewayCertificate: Certificate;
 const pkiFixtureRetriever = generatePKIFixture((_keyPairSet, certPath) => {
   gatewayCertificate = certPath.privateGateway;
 });
-const undoGatewayRegistration = mockGatewayRegistration(pkiFixtureRetriever);
+const { undoGatewayRegistration } = mockGatewayRegistration(pkiFixtureRetriever);
 
 test('Subprocess should abort if the gateway is unregistered', async () => {
   await undoGatewayRegistration();
@@ -49,6 +49,7 @@ test('Subprocess should abort if the gateway is unregistered', async () => {
   await expect(runParcelDelivery(parentStream)).resolves.toEqual(1);
 
   expect(mockMakeGSCClient).not.toBeCalled();
+  expect(mockLogs).toContainEqual(partialPinoLog('fatal', 'Private gateway is not registered'));
 });
 
 test('Client should connect to appropriate public gateway', async () => {

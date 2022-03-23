@@ -5,7 +5,6 @@ import { Container } from 'typedi';
 import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { GatewayRegistrar } from '../../sync/publicGateway/GatewayRegistrar';
-import { NonExistingAddressError } from '../../sync/publicGateway/gscClient';
 import { ParcelCollectorManager } from '../../sync/publicGateway/parcelCollection/ParcelCollectorManager';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { setUpTestDBConnection } from '../../testUtils/db';
@@ -13,6 +12,7 @@ import { getMockInstance, mockSpy } from '../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
 import { makeServer } from '../index';
 import { CONTROL_API_PREFIX } from './index';
+import { NonExistingAddressError } from '../../sync/publicGateway/errors';
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
@@ -30,7 +30,7 @@ const BASE_HEADERS = { authorization: `Bearer ${AUTH_TOKEN}` };
 describe('Get public gateway', () => {
   test('The current gateway should be returned if registered', async () => {
     const config = Container.get(Config);
-    await config.set(ConfigKey.PUBLIC_GATEWAY_ADDRESS, NEW_PUBLIC_ADDRESS);
+    await config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, NEW_PUBLIC_ADDRESS);
     const fastify = await makeServer(AUTH_TOKEN);
 
     const response = await fastify.inject({

@@ -50,11 +50,15 @@ describe('start', () => {
   });
 
   describe('Initial status', () => {
-    test('Status should be DISCONNECTED if registered', async () => {
+    test('No initial status should be assumed if registered', async () => {
+      mockPubGatewayStatusStream.mockReturnValue(
+        arrayToAsyncIterable([PublicGatewayCollectionStatus.CONNECTED]),
+      );
+
       await monitor.start();
 
       const statuses = await pipe(monitor.streamStatus(), iterableTake(1), asyncIterableToArray);
-      expect(statuses).toEqual([ConnectionStatus.DISCONNECTED]);
+      expect(statuses).toEqual([ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY]);
     });
 
     test('Status should be UNREGISTERED if unregistered', async () => {
@@ -77,8 +81,8 @@ describe('start', () => {
         monitor.start();
       });
 
-      const statuses = await pipe(monitor.streamStatus(), iterableTake(2), asyncIterableToArray);
-      expect(statuses).toEqual([expect.anything(), ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY]);
+      const statuses = await pipe(monitor.streamStatus(), iterableTake(1), asyncIterableToArray);
+      expect(statuses).toEqual([ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY]);
     });
 
     test('Status should change to DISCONNECTED if disconnected but registered', async () => {
@@ -93,12 +97,8 @@ describe('start', () => {
         monitor.start();
       });
 
-      const statuses = await pipe(monitor.streamStatus(), iterableTake(3), asyncIterableToArray);
-      expect(statuses).toEqual([
-        expect.anything(),
-        expect.anything(),
-        ConnectionStatus.DISCONNECTED,
-      ]);
+      const statuses = await pipe(monitor.streamStatus(), iterableTake(2), asyncIterableToArray);
+      expect(statuses).toEqual([expect.anything(), ConnectionStatus.DISCONNECTED]);
     });
 
     test('Status should change to UNREGISTERED if disconnected and unregistered', async () => {
@@ -134,9 +134,8 @@ describe('start', () => {
         monitor.start();
       });
 
-      const statuses = await pipe(monitor.streamStatus(), iterableTake(3), asyncIterableToArray);
+      const statuses = await pipe(monitor.streamStatus(), iterableTake(2), asyncIterableToArray);
       expect(statuses).toEqual([
-        expect.anything(),
         ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY,
         ConnectionStatus.DISCONNECTED,
       ]);
@@ -176,9 +175,8 @@ describe('start', () => {
 
       setImmediate(() => monitor.start());
 
-      const statuses = await pipe(monitor.streamStatus(), iterableTake(3), asyncIterableToArray);
+      const statuses = await pipe(monitor.streamStatus(), iterableTake(2), asyncIterableToArray);
       expect(statuses).toEqual([
-        ConnectionStatus.DISCONNECTED,
         ConnectionStatus.CONNECTED_TO_COURIER,
         ConnectionStatus.DISCONNECTED,
       ]);

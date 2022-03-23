@@ -5,9 +5,9 @@ import { InjectRepository } from 'typeorm-typedi-extensions';
 import { ConfigItem } from './entity/ConfigItem';
 
 export enum ConfigKey {
-  NODE_KEY_SERIAL_NUMBER = 'node_key_serial_number',
-  NODE_CCA_ISSUER_KEY_SERIAL_NUMBER = 'node_cca_issuer_key_serial_number',
-  PUBLIC_GATEWAY_ADDRESS = 'public_gateway_address',
+  CURRENT_PRIVATE_ADDRESS = 'current_private_address',
+  PUBLIC_GATEWAY_PRIVATE_ADDRESS = 'public_address_private_address',
+  PUBLIC_GATEWAY_PUBLIC_ADDRESS = 'public_gateway_public_address',
 }
 
 @Service()

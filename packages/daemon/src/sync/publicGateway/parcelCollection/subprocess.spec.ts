@@ -26,6 +26,7 @@ import { MessageDirection } from '../../../utils/MessageDirection';
 import * as gscClient from '../gscClient';
 import { ParcelCollectionNotification, ParcelCollectorStatus } from './messaging';
 import runParcelCollection from './subprocess';
+import { NonExistingAddressError } from '../errors';
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
@@ -40,7 +41,7 @@ let privateGatewayCertificate: Certificate;
 const retrievePKIFixture = generatePKIFixture((_keyPairSet, certPath) => {
   privateGatewayCertificate = certPath.privateGateway;
 });
-const undoGatewayRegistration = mockGatewayRegistration(retrievePKIFixture);
+const { undoGatewayRegistration } = mockGatewayRegistration(retrievePKIFixture);
 
 let parentStream: PassThrough;
 beforeEach(() => {
@@ -282,7 +283,7 @@ describe('Public gateway resolution failures', () => {
   });
 
   test('Reconnection should be attempted after 60 seconds if DNS record does not exist', async () => {
-    const error = new gscClient.NonExistingAddressError('Not found');
+    const error = new NonExistingAddressError('Not found');
     mockMakeGSCClient.mockRejectedValueOnce(error);
     addEmptyParcelCollectionCall();
 
