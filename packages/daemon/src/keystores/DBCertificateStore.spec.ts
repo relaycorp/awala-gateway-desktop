@@ -1,10 +1,10 @@
 import { Container } from 'typedi';
 
-import { DBPrivateKeyStore } from './DBPrivateKeyStore';
+import { DBCertificateStore } from './DBCertificateStore';
 import { setUpTestDBConnection } from '../testUtils/db';
 
 setUpTestDBConnection();
 
 test('Dependency injection should be configured properly', () => {
-  Container.get(DBPrivateKeyStore);
+  Container.get(DBCertificateStore);
 });

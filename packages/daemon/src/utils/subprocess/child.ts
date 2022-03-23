@@ -10,7 +10,7 @@ const SUBPROCESS_SCRIPT_NAME = IS_TYPESCRIPT ? 'subprocess.ts' : 'subprocess.js'
 const ROOT_DIR = dirname(dirname(__dirname));
 const SUBPROCESS_SCRIPT_PATH = join(ROOT_DIR, 'bin', SUBPROCESS_SCRIPT_NAME);
 
-export function fork(subprocessName: string): Duplex {
+export async function fork(subprocessName: string): Promise<Duplex> {
   const childProcess = forkChildProcess(SUBPROCESS_SCRIPT_PATH, [subprocessName], {
     env: { ...process.env, LOG_FILES: 'true' },
   });
@@ -29,10 +29,6 @@ export function fork(subprocessName: string): Duplex {
     },
   });
 
-  childProcess.once('error', (err) => {
-    duplex.destroy(err);
-  });
-
   childProcess.once('exit', (code) => {
     const error =
       code && 0 < code
@@ -45,6 +41,16 @@ export function fork(subprocessName: string): Duplex {
     duplex.push(message);
   });
 
-  // TODO: When we support Node.js >= 16, return the duplex once the 'spawn' event has been emitted
-  return duplex;
+  return new Promise((resolve, reject) => {
+    childProcess.once('error', reject);
+
+    childProcess.once('spawn', () => {
+      childProcess.removeListener('error', reject);
+      childProcess.once('error', (err) => {
+        duplex.destroy(err);
+      });
+
+      resolve(duplex);
+    });
+  });
 }
