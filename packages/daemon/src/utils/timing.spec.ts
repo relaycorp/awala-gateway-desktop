@@ -33,8 +33,6 @@ describe('sleepSeconds', () => {
 });
 
 describe('sleepUntilDate', () => {
-  const TEN_MINUTES_IN_MS = minutesToMilliseconds(10);
-
   test('Promise should return immediately if date is in the past', async () => {
     jest.useRealTimers();
     const startDate = new Date();
@@ -70,7 +68,7 @@ describe('sleepUntilDate', () => {
 
     const sleepPromise = sleepUntilDate(timeoutDate);
 
-    jest.advanceTimersByTime(TEN_MINUTES_IN_MS);
+    jest.advanceTimersByTime(minutesToMilliseconds(10));
     await sleepPromise;
   });
 });
