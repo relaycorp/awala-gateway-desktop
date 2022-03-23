@@ -1,8 +1,8 @@
-import { fork as forkChildProcess } from 'child_process';
+import { ChildProcess, fork as forkChildProcess } from 'child_process';
 import { dirname, join } from 'path';
 import { Duplex } from 'stream';
 
-import { SubprocessError } from './SubprocessError';
+import { SubprocessError, SubprocessExitError } from './errors';
 
 const IS_TYPESCRIPT = __filename.endsWith('.ts');
 // istanbul ignore next
@@ -14,6 +14,21 @@ export async function fork(subprocessName: string): Promise<Duplex> {
   const childProcess = forkChildProcess(SUBPROCESS_SCRIPT_PATH, [subprocessName], {
     env: { ...process.env, LOG_FILES: 'true' },
   });
+
+  return new Promise((resolve, reject) => {
+    const spawnErrorHandler = (err: Error) => {
+      reject(new SubprocessError(err, `Failed to spawn subprocess ${subprocessName}`));
+    };
+    childProcess.once('error', spawnErrorHandler);
+
+    childProcess.once('spawn', () => {
+      resolve(makeSubprocessStream(childProcess, subprocessName));
+      childProcess.removeListener('error', spawnErrorHandler);
+    });
+  });
+}
+
+function makeSubprocessStream(childProcess: ChildProcess, subprocessName: string): Duplex {
   const duplex = new Duplex({
     objectMode: true,
     read(): void {
@@ -29,10 +44,17 @@ export async function fork(subprocessName: string): Promise<Duplex> {
     },
   });
 
+  childProcess.once('error', (err) => {
+    duplex.destroy(new SubprocessError(err, `Subprocess ${subprocessName} errored out`));
+  });
+
   childProcess.once('exit', (code) => {
     const error =
       code && 0 < code
-        ? new SubprocessError(`Subprocess "${subprocessName}" errored out with code ${code}`, code)
+        ? new SubprocessExitError(
+            `Subprocess "${subprocessName}" errored out with code ${code}`,
+            code,
+          )
         : undefined;
     duplex.destroy(error);
   });
@@ -41,16 +63,5 @@ export async function fork(subprocessName: string): Promise<Duplex> {
     duplex.push(message);
   });
 
-  return new Promise((resolve, reject) => {
-    childProcess.once('error', reject);
-
-    childProcess.once('spawn', () => {
-      childProcess.removeListener('error', reject);
-      childProcess.once('error', (err) => {
-        duplex.destroy(err);
-      });
-
-      resolve(duplex);
-    });
-  });
+  return duplex;
 }

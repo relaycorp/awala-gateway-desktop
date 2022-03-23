@@ -3,10 +3,9 @@ import { source } from 'stream-to-it';
 
 import { asyncIterableToArray, iterableTake } from '../../testUtils/iterables';
 import { makeProcessSendMock } from '../../testUtils/process';
-import { getPromiseRejection } from '../../testUtils/promises';
 import { setImmediateAsync } from '../../testUtils/timing';
 import { makeParentStream } from './parent';
-import { SubprocessError } from './SubprocessError';
+import { SubprocessError } from './errors';
 
 const mockProcessSend = makeProcessSendMock();
 
@@ -18,9 +17,10 @@ const MESSAGES: readonly string[] = ['trois', 'two', 'uno'];
 
 describe('makeParentStream', () => {
   test('Error out if there is no parent process', async () => {
-    const error = await getPromiseRejection(makeParentStream(), SubprocessError);
-
-    expect(error.message).toEqual('The current process was not forked');
+    await expect(makeParentStream()).rejects.toThrowWithMessage(
+      SubprocessError,
+      'The current process was not forked',
+    );
   });
 
   test('Messages from the parent should be read', async () => {

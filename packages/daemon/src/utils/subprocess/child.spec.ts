@@ -10,7 +10,7 @@ import { asyncIterableToArray, iterableTake } from '../../testUtils/iterables';
 import { getMockInstance } from '../../testUtils/jest';
 import { setImmediateAsync } from '../../testUtils/timing';
 import { fork } from './child';
-import { SubprocessError } from './SubprocessError';
+import { SubprocessError, SubprocessExitError } from './errors';
 import { getPromiseRejection } from '../../testUtils/promises';
 
 jest.mock('child_process');
@@ -30,9 +30,10 @@ describe('fork', () => {
       mockChildProcess.emit('error', originalError);
     });
 
-    const error = await getPromiseRejection(fork(SUBPROCESS_NAME), Error);
+    const error = await getPromiseRejection(fork(SUBPROCESS_NAME), SubprocessError);
 
-    expect(error).toBe(originalError);
+    expect(error.message).toStartWith(`Failed to spawn subprocess ${SUBPROCESS_NAME}`);
+    expect(error.cause()).toBe(originalError);
   });
 
   test('Promise should not resolve until child process has been spawn', async () => {
@@ -97,21 +98,16 @@ describe('fork', () => {
     );
   });
 
-  test('Stream should be returned as soon as the process is spawn', async () => {
-    mockChildProcess.queueSpawnEvent();
-
-    const subprocess = await fork(SUBPROCESS_NAME);
-
-    expect(subprocess).toBeInstanceOf(Duplex);
-  });
-
   test('Stream should be destroyed with an error when one is emitted', async () => {
     const originalError = new Error('denied.png');
     mockChildProcess.queueSpawnEvent();
-
     const subprocess = await fork(SUBPROCESS_NAME);
 
-    await expect(mockChildError(subprocess, originalError)).resolves.toBe(originalError);
+    const error = await mockChildError(subprocess, originalError);
+
+    expect(error).toBeInstanceOf(SubprocessError);
+    expect(error.message).toStartWith(`Subprocess ${SUBPROCESS_NAME} errored out`);
+    expect((error as SubprocessError).cause()).toBe(originalError);
   });
 
   test('Stream should be destroyed with an error when the subprocess errors out', async () => {
@@ -121,7 +117,7 @@ describe('fork', () => {
 
     const error = await getPromiseRejection(
       mockChildExit(subprocess, exitCode, null),
-      SubprocessError,
+      SubprocessExitError,
     );
 
     expect(error.message).toEqual(
