@@ -72,7 +72,7 @@ export class CourierSyncManager {
    * @throws DisconnectedFromCourierError
    */
   public async *sync(): AsyncIterable<CourierSyncStage> {
-    const syncSubprocess = fork('courier-sync');
+    const syncSubprocess = await fork('courier-sync');
     const events = this.events;
     yield* await pipe(
       wrapSubprocessErrors(syncSubprocess),
@@ -103,7 +103,7 @@ export class CourierSyncManager {
       const { gateway: defaultGatewayIPAddress } = await getDefaultGateway();
       return defaultGatewayIPAddress;
     } catch (err) {
-      throw new DisconnectedFromCourierError(err, 'Could not find default system gateway');
+      throw new DisconnectedFromCourierError(err as Error, 'Could not find default system gateway');
     }
   }
 
