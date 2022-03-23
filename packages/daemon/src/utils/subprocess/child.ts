@@ -2,7 +2,7 @@ import { fork as forkChildProcess } from 'child_process';
 import { dirname, join } from 'path';
 import { Duplex } from 'stream';
 
-import { SubprocessError } from './SubprocessError';
+import { SubprocessExitError } from './errors';
 
 const IS_TYPESCRIPT = __filename.endsWith('.ts');
 // istanbul ignore next
@@ -32,7 +32,10 @@ export async function fork(subprocessName: string): Promise<Duplex> {
   childProcess.once('exit', (code) => {
     const error =
       code && 0 < code
-        ? new SubprocessError(`Subprocess "${subprocessName}" errored out with code ${code}`, code)
+        ? new SubprocessExitError(
+            `Subprocess "${subprocessName}" errored out with code ${code}`,
+            code,
+          )
         : undefined;
     duplex.destroy(error);
   });

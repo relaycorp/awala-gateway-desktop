@@ -10,7 +10,7 @@ import { asyncIterableToArray, iterableTake } from '../../testUtils/iterables';
 import { getMockInstance } from '../../testUtils/jest';
 import { setImmediateAsync } from '../../testUtils/timing';
 import { fork } from './child';
-import { SubprocessError } from './SubprocessError';
+import { SubprocessExitError } from './errors';
 import { getPromiseRejection } from '../../testUtils/promises';
 
 jest.mock('child_process');
@@ -121,7 +121,7 @@ describe('fork', () => {
 
     const error = await getPromiseRejection(
       mockChildExit(subprocess, exitCode, null),
-      SubprocessError,
+      SubprocessExitError,
     );
 
     expect(error.message).toEqual(

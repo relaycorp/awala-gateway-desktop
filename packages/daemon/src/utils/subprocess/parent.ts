@@ -1,6 +1,6 @@
 import { Duplex } from 'stream';
 
-import { SubprocessError } from './SubprocessError';
+import { SubprocessError } from './errors';
 
 export async function makeParentStream(): Promise<Duplex> {
   if (!process.send) {
