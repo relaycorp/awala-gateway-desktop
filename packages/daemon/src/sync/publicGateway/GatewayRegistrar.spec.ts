@@ -9,9 +9,9 @@ import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
 import { mockSleepSeconds } from '../../testUtils/timing';
 import { GatewayRegistrar } from './GatewayRegistrar';
 import { NonExistingAddressError } from './errors';
-import { PrivateGatewayManager } from '../../PrivateGatewayManager';
 import { mockSpy } from '../../testUtils/jest';
 import { PrivateGateway } from '../../PrivateGateway';
+import { generatePKIFixture, mockGatewayRegistration } from '../../testUtils/crypto';
 
 setUpTestDBConnection();
 
@@ -24,10 +24,11 @@ beforeEach(() => {
   registrar = Container.get(GatewayRegistrar);
 });
 
+const pkiFixtureRetriever = generatePKIFixture();
+const { undoGatewayRegistration } = mockGatewayRegistration(pkiFixtureRetriever);
+
 describe('register', () => {
-  beforeEach(async () => {
-    await Container.get(PrivateGatewayManager).createCurrentIfMissing();
-  });
+  beforeEach(undoGatewayRegistration);
 
   const mockRegisterWithPublicGateway = mockSpy(
     jest.spyOn(PrivateGateway.prototype, 'registerWithPublicGateway'),
@@ -174,6 +175,8 @@ describe('waitForRegistration', () => {
 });
 
 describe('isRegistered', () => {
+  beforeEach(undoGatewayRegistration);
+
   test('True should be returned if gateway is registered', async () => {
     const config = Container.get(Config);
     await config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
