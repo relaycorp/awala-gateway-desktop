@@ -1,16 +1,10 @@
-import {
-  PrivateGateway,
-  PrivateNodeRegistration,
-  UnreachableResolverError,
-} from '@relaycorp/relaynet-core';
+import { UnreachableResolverError } from '@relaycorp/relaynet-core';
 import { Container, Inject, Service } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { LOGGER } from '../../tokens';
 import { sleepSeconds } from '../../utils/timing';
-import { makeGSCClient } from './gscClient';
-import { PublicGatewayProtocolError } from './errors';
 import { PrivateGatewayManager } from '../../PrivateGatewayManager';
 
 @Service()
@@ -35,34 +29,11 @@ export class GatewayRegistrar {
       return;
     }
 
-    const client = await makeGSCClient(publicGatewayAddress);
-
     const privateGateway = await this.gatewayManager.getCurrent();
-
-    const registrationAuth = await client.preRegisterNode(
-      await privateGateway.getIdentityPublicKey(),
-    );
-    const registrationRequest = await privateGateway.requestPublicGatewayRegistration(
-      registrationAuth,
-    );
-
-    let registration: PrivateNodeRegistration;
-    try {
-      registration = await client.registerNode(registrationRequest);
-    } catch (err) {
-      throw new PublicGatewayProtocolError(
-        err as Error,
-        'Failed to register with the public gateway',
-      );
-    }
-
-    await this.saveRegistration(registration, publicGatewayAddress, privateGateway);
+    await privateGateway.registerWithPublicGateway(publicGatewayAddress);
+    await this.config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, publicGatewayAddress);
     logger.info(
-      {
-        publicGatewayPublicAddress: publicGatewayAddress,
-        publicGatewayPrivateAddress:
-          await registration.gatewayCertificate.calculateSubjectPrivateAddress(),
-      },
+      { publicGatewayPublicAddress: publicGatewayAddress },
       'Successfully registered with public gateway',
     );
   }
@@ -94,34 +65,5 @@ export class GatewayRegistrar {
 
   private getPublicGatewayAddress(): Promise<string | null> {
     return this.config.get(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS);
-  }
-
-  private async saveRegistration(
-    registration: PrivateNodeRegistration,
-    publicGatewayAddress: string,
-    privateGateway: PrivateGateway,
-  ): Promise<void> {
-    const sessionKey = registration.sessionKey;
-    if (!sessionKey) {
-      throw new PublicGatewayProtocolError('Registration is missing public gateway session key');
-    }
-
-    try {
-      await privateGateway.savePublicGatewayChannel(
-        registration.privateNodeCertificate,
-        registration.gatewayCertificate,
-        sessionKey,
-      );
-    } catch (err) {
-      throw new PublicGatewayProtocolError(
-        err as Error,
-        'Failed to save channel with public gateway',
-      );
-    }
-    await this.config.set(
-      ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS,
-      await registration.gatewayCertificate.calculateSubjectPrivateAddress(),
-    );
-    await this.config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, publicGatewayAddress);
   }
 }
