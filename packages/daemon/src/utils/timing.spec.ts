@@ -71,4 +71,14 @@ describe('sleepUntilDate', () => {
     jest.advanceTimersByTime(minutesToMilliseconds(10));
     await sleepPromise;
   });
+
+  test('Promise should resolve if specified abort signal is fired', async () => {
+    const timeoutDate = addMinutes(new Date(), 15);
+    const abortController = new AbortController();
+    const sleepPromise = sleepUntilDate(timeoutDate, abortController.signal);
+
+    abortController.abort();
+
+    await sleepPromise;
+  });
 });

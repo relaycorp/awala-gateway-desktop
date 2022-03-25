@@ -8,12 +8,13 @@ export async function sleepSeconds(seconds: number): Promise<void> {
  * Return a promise that only resolves when `date` is reached.
  *
  * @param date When the returned promise should resolve
+ * @param abortSignal
  *
  * The date is checked every 10 minutes, so it could resolve up to that many minutes later. This
  * is because we want this to work reliably when a computer resumes after being suspended, and
  * we prefer saving CPU cycles over accuracy.
  */
-export async function sleepUntilDate(date: Date): Promise<void> {
+export async function sleepUntilDate(date: Date, abortSignal?: AbortSignal): Promise<void> {
   if (date <= new Date()) {
     return;
   }
@@ -22,9 +23,15 @@ export async function sleepUntilDate(date: Date): Promise<void> {
   await new Promise<void>((resolve) => {
     const interval = setInterval(() => {
       if (date <= new Date()) {
-        clearInterval(interval);
-        resolve();
+        cleanUpAndResolve();
       }
     }, intervalLengthMs);
+
+    const cleanUpAndResolve = () => {
+      clearInterval(interval);
+      resolve();
+    };
+
+    abortSignal?.addEventListener('abort', cleanUpAndResolve);
   });
 }
