@@ -1,5 +1,5 @@
 import { UnreachableResolverError } from '@relaycorp/relaynet-core';
-import { subDays } from 'date-fns';
+import { minutesToSeconds, subDays } from 'date-fns';
 import { EventEmitter } from 'events';
 import { Logger } from 'pino';
 import { pipeline } from 'streaming-iterables';
@@ -92,6 +92,8 @@ export class GatewayRegistrar {
     };
     this.internalEvents.on('registration', updatePublicGateway);
 
+    const logger = this.logger;
+
     const internalEvents = this.internalEvents;
     async function* emitRenewal(): AsyncIterable<void> {
       while (true) {
@@ -101,8 +103,9 @@ export class GatewayRegistrar {
         };
         internalEvents.once('registration', abortSleep);
 
-        const nextCheckDate = subDays(certificateExpiryDate, 90);
-        await sleepUntilDate(nextCheckDate, sleepAbortionController.signal);
+        const nextRenewalDate = subDays(certificateExpiryDate, 90);
+        logger.info({ nextRenewalDate }, 'Scheduling registration renewal');
+        await sleepUntilDate(nextRenewalDate, sleepAbortionController.signal);
 
         internalEvents.removeListener('registration', abortSleep);
 
@@ -112,14 +115,28 @@ export class GatewayRegistrar {
       }
     }
 
-    const logger = this.logger;
     async function* continuouslyRenew(emissions: AsyncIterable<void>): AsyncIterable<void> {
       for await (const _ of emissions) {
-        certificateExpiryDate = await privateGateway.registerWithPublicGateway(
-          publicGatewayPublicAddress!,
-        );
-        logger.info(
-          { publicGatewayPublicAddress, certificateExpiryDate },
+        const publicGatewayAwareLogger = logger.child({ publicGatewayPublicAddress });
+        try {
+          certificateExpiryDate = await privateGateway.registerWithPublicGateway(
+            publicGatewayPublicAddress!,
+          );
+        } catch (err) {
+          if (err instanceof UnreachableResolverError) {
+            publicGatewayAwareLogger.info(
+              { err },
+              'Could not renew registration; we seem to be disconnected from the Internet',
+            );
+          } else {
+            publicGatewayAwareLogger.warn({ err }, 'Failed to renew registration');
+          }
+          await sleepSeconds(minutesToSeconds(30));
+          continue;
+        }
+
+        publicGatewayAwareLogger.info(
+          { certificateExpiryDate },
           'Renewed certificate with public gateway',
         );
         yield;

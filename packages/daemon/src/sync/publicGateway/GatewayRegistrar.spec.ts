@@ -1,5 +1,5 @@
 import { UnreachableResolverError } from '@relaycorp/relaynet-core';
-import { addDays, subDays } from 'date-fns';
+import { addDays, minutesToSeconds, subDays } from 'date-fns';
 import { consume, take } from 'streaming-iterables';
 import { Container } from 'typedi';
 
@@ -193,6 +193,11 @@ describe('continuallyRenewRegistration', () => {
     const expectedScheduledDate = subDays(privateGatewayCertificate.expiryDate, 90);
     expect(sleepUntilDateMock).toBeCalledWith(expectedScheduledDate, expect.anything());
     expect(mockRegisterWithPublicGateway).toBeCalled();
+    expect(logs).toContainEqual(
+      partialPinoLog('info', 'Scheduling registration renewal', {
+        nextRenewalDate: expectedScheduledDate.toISOString(),
+      }),
+    );
   });
 
   test('Renewals should be repeated indefinitely', async () => {
@@ -251,6 +256,64 @@ describe('continuallyRenewRegistration', () => {
         certificateExpiryDate: certificate2Date.toISOString(),
       }),
     );
+  });
+
+  describe('Registration errors', () => {
+    const sleepSecondsMock = mockSleepSeconds();
+
+    test('Errors should delay next attempt by 30 minutes', async () => {
+      const registrationError = new Error('Something went wrong');
+      mockRegisterWithPublicGateway.mockRejectedValueOnce(registrationError);
+      mockRegisterWithPublicGateway.mockResolvedValueOnce(addDays(new Date(), 2));
+
+      await consume(take(1, registrar.continuallyRenewRegistration()));
+
+      expect(sleepSecondsMock).toHaveBeenCalledWith(minutesToSeconds(30));
+      expect(mockRegisterWithPublicGateway).toBeCalledTimes(2);
+      expect(sleepSecondsMock.mock.invocationCallOrder[0]).toBeLessThan(
+        mockRegisterWithPublicGateway.mock.invocationCallOrder[1],
+      );
+    });
+
+    test('UnreachableResolverError should be logged with level=INFO', async () => {
+      const registrationError = new UnreachableResolverError('Disconnected from Internet');
+      mockRegisterWithPublicGateway.mockRejectedValueOnce(registrationError);
+      mockRegisterWithPublicGateway.mockResolvedValueOnce(addDays(new Date(), 2));
+
+      await consume(take(1, registrar.continuallyRenewRegistration()));
+
+      expect(logs).toContainEqual(
+        partialPinoLog(
+          'info',
+          'Could not renew registration; we seem to be disconnected from the Internet',
+          {
+            err: expect.objectContaining({
+              message: registrationError.message,
+              type: UnreachableResolverError.name,
+            }),
+            publicGatewayPublicAddress: DEFAULT_PUBLIC_GATEWAY,
+          },
+        ),
+      );
+    });
+
+    test('Other errors should be logged with level=WARNING', async () => {
+      const registrationError = new Error('Unexpected');
+      mockRegisterWithPublicGateway.mockRejectedValueOnce(registrationError);
+      mockRegisterWithPublicGateway.mockResolvedValueOnce(addDays(new Date(), 2));
+
+      await consume(take(1, registrar.continuallyRenewRegistration()));
+
+      expect(logs).toContainEqual(
+        partialPinoLog('warn', 'Failed to renew registration', {
+          err: expect.objectContaining({
+            message: registrationError.message,
+            type: registrationError.name,
+          }),
+          publicGatewayPublicAddress: DEFAULT_PUBLIC_GATEWAY,
+        }),
+      );
+    });
   });
 });
 
