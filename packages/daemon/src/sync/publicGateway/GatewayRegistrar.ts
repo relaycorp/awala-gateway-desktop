@@ -1,21 +1,25 @@
-import {
-  PrivateGateway,
-  PrivateNodeRegistration,
-  UnreachableResolverError,
-} from '@relaycorp/relaynet-core';
-import { Container, Inject, Service } from 'typedi';
+import { UnreachableResolverError } from '@relaycorp/relaynet-core';
+import { minutesToSeconds, subDays } from 'date-fns';
+import { EventEmitter } from 'events';
+import { Logger } from 'pino';
+import { pipeline } from 'streaming-iterables';
+import { Inject, Service } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
-import { LOGGER } from '../../tokens';
-import { sleepSeconds } from '../../utils/timing';
-import { makeGSCClient } from './gscClient';
-import { PublicGatewayProtocolError } from './errors';
+import { sleepSeconds, sleepUntilDate } from '../../utils/timing';
 import { PrivateGatewayManager } from '../../PrivateGatewayManager';
+import { LOGGER } from '../../tokens';
 
 @Service()
 export class GatewayRegistrar {
-  constructor(private config: Config, @Inject() private gatewayManager: PrivateGatewayManager) {}
+  private readonly internalEvents = new EventEmitter();
+
+  constructor(
+    private config: Config,
+    @Inject() private gatewayManager: PrivateGatewayManager,
+    @Inject(LOGGER) private logger: Logger,
+  ) {}
 
   /**
    * Register with the `publicGatewayAddress`.
@@ -27,60 +31,41 @@ export class GatewayRegistrar {
    * @throws PublicGatewayProtocolError if the public gateways violates the protocol
    */
   public async register(publicGatewayAddress: string): Promise<void> {
-    const logger = Container.get(LOGGER);
-
     const currentPublicGatewayAddress = await this.getPublicGatewayAddress();
     if (currentPublicGatewayAddress === publicGatewayAddress) {
-      logger.debug('Skipping registration with public gateway');
+      this.logger.debug('Skipping registration with public gateway');
       return;
     }
 
-    const client = await makeGSCClient(publicGatewayAddress);
-
     const privateGateway = await this.gatewayManager.getCurrent();
-
-    const registrationAuth = await client.preRegisterNode(
-      await privateGateway.getIdentityPublicKey(),
+    const privateGatewayCertificateExpiryDate = await privateGateway.registerWithPublicGateway(
+      publicGatewayAddress,
     );
-    const registrationRequest = await privateGateway.requestPublicGatewayRegistration(
-      registrationAuth,
+    await this.config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, publicGatewayAddress);
+    this.internalEvents.emit(
+      'registration',
+      publicGatewayAddress,
+      privateGatewayCertificateExpiryDate,
     );
-
-    let registration: PrivateNodeRegistration;
-    try {
-      registration = await client.registerNode(registrationRequest);
-    } catch (err) {
-      throw new PublicGatewayProtocolError(
-        err as Error,
-        'Failed to register with the public gateway',
-      );
-    }
-
-    await this.saveRegistration(registration, publicGatewayAddress, privateGateway);
-    logger.info(
-      {
-        publicGatewayPublicAddress: publicGatewayAddress,
-        publicGatewayPrivateAddress:
-          await registration.gatewayCertificate.calculateSubjectPrivateAddress(),
-      },
+    this.logger.info(
+      { privateGatewayCertificateExpiryDate, publicGatewayPublicAddress: publicGatewayAddress },
       'Successfully registered with public gateway',
     );
   }
 
   public async waitForRegistration(): Promise<void> {
-    const logger = Container.get(LOGGER);
     while (!(await this.isRegistered())) {
       try {
         await this.register(DEFAULT_PUBLIC_GATEWAY);
       } catch (err) {
         if (err instanceof UnreachableResolverError) {
           // The device may be disconnected from the Internet or the DNS resolver may be blocked.
-          logger.debug(
+          this.logger.debug(
             'Failed to register with public gateway because DNS resolver is unreachable',
           );
           await sleepSeconds(5);
         } else {
-          logger.error({ err }, 'Failed to register with public gateway');
+          this.logger.error({ err }, 'Failed to register with public gateway');
           await sleepSeconds(60);
         }
       }
@@ -92,36 +77,80 @@ export class GatewayRegistrar {
     return publicGatewayAddress !== null;
   }
 
-  private getPublicGatewayAddress(): Promise<string | null> {
-    return this.config.get(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS);
-  }
+  public async *continuallyRenewRegistration(): AsyncIterable<void> {
+    const privateGateway = await this.gatewayManager.getCurrent();
 
-  private async saveRegistration(
-    registration: PrivateNodeRegistration,
-    publicGatewayAddress: string,
-    privateGateway: PrivateGateway,
-  ): Promise<void> {
-    const sessionKey = registration.sessionKey;
-    if (!sessionKey) {
-      throw new PublicGatewayProtocolError('Registration is missing public gateway session key');
+    const channel = await this.gatewayManager.getCurrentChannel();
+    let publicGatewayPublicAddress = channel.publicGatewayPublicAddress;
+    let certificateExpiryDate = channel.nodeDeliveryAuth.expiryDate;
+    const updatePublicGateway = async (
+      newPublicGatewayPublicAddress: string,
+      newCertificateExpiryDate: Date,
+    ) => {
+      publicGatewayPublicAddress = newPublicGatewayPublicAddress;
+      certificateExpiryDate = newCertificateExpiryDate;
+    };
+    this.internalEvents.on('registration', updatePublicGateway);
+
+    const logger = this.logger;
+
+    const internalEvents = this.internalEvents;
+    async function* emitRenewal(): AsyncIterable<void> {
+      while (true) {
+        const sleepAbortionController = new AbortController();
+        const abortSleep = () => {
+          sleepAbortionController.abort();
+        };
+        internalEvents.once('registration', abortSleep);
+
+        const nextRenewalDate = subDays(certificateExpiryDate, 90);
+        logger.info({ nextRenewalDate }, 'Scheduling registration renewal');
+        await sleepUntilDate(nextRenewalDate, sleepAbortionController.signal);
+
+        internalEvents.removeListener('registration', abortSleep);
+
+        if (!sleepAbortionController.signal.aborted) {
+          yield;
+        }
+      }
+    }
+
+    async function* continuouslyRenew(emissions: AsyncIterable<void>): AsyncIterable<void> {
+      for await (const _ of emissions) {
+        const publicGatewayAwareLogger = logger.child({ publicGatewayPublicAddress });
+        try {
+          certificateExpiryDate = await privateGateway.registerWithPublicGateway(
+            publicGatewayPublicAddress!,
+          );
+        } catch (err) {
+          if (err instanceof UnreachableResolverError) {
+            publicGatewayAwareLogger.info(
+              { err },
+              'Could not renew registration; we seem to be disconnected from the Internet',
+            );
+          } else {
+            publicGatewayAwareLogger.warn({ err }, 'Failed to renew registration');
+          }
+          await sleepSeconds(minutesToSeconds(30));
+          continue;
+        }
+
+        publicGatewayAwareLogger.info(
+          { certificateExpiryDate },
+          'Renewed certificate with public gateway',
+        );
+        yield;
+      }
     }
 
     try {
-      await privateGateway.savePublicGatewayChannel(
-        registration.privateNodeCertificate,
-        registration.gatewayCertificate,
-        sessionKey,
-      );
-    } catch (err) {
-      throw new PublicGatewayProtocolError(
-        err as Error,
-        'Failed to save channel with public gateway',
-      );
+      yield* await pipeline(emitRenewal, continuouslyRenew);
+    } finally {
+      this.internalEvents.removeListener('registration', updatePublicGateway);
     }
-    await this.config.set(
-      ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS,
-      await registration.gatewayCertificate.calculateSubjectPrivateAddress(),
-    );
-    await this.config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, publicGatewayAddress);
+  }
+
+  private getPublicGatewayAddress(): Promise<string | null> {
+    return this.config.get(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS);
   }
 }

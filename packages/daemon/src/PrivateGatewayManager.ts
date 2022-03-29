@@ -3,7 +3,6 @@ import {
   getPrivateAddressFromIdentityKey,
   ParcelCollectionHandshakeVerifier,
   ParcelDeliveryVerifier,
-  PrivateGateway,
   PrivateGatewayManager as BasePrivateGatewayManager,
   PrivatePublicGatewayChannel,
 } from '@relaycorp/relaynet-core';
@@ -14,6 +13,7 @@ import { DBPublicKeyStore } from './keystores/DBPublicKeyStore';
 import { DBCertificateStore } from './keystores/DBCertificateStore';
 import { Config, ConfigKey } from './Config';
 import { MissingGatewayError, UnregisteredGatewayError } from './errors';
+import { PrivateGateway } from './PrivateGateway';
 
 type Verifier = ParcelDeliveryVerifier | ParcelCollectionHandshakeVerifier;
 
@@ -38,7 +38,7 @@ export class PrivateGatewayManager extends BasePrivateGatewayManager {
     if (!privateAddress) {
       throw new MissingGatewayError('Config does not contain current private address');
     }
-    const existingGateway = await this.get(privateAddress);
+    const existingGateway = await this.get(privateAddress, PrivateGateway);
     if (!existingGateway) {
       throw new MissingGatewayError(`Private key (${privateAddress}) is missing`);
     }

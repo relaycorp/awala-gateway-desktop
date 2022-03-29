@@ -1,3 +1,4 @@
+import { consume } from 'streaming-iterables';
 import { Container } from 'typedi';
 
 import { GatewayRegistrar } from './publicGateway/GatewayRegistrar';
@@ -8,12 +9,19 @@ import { StatusMonitor } from './StatusMonitor';
 export default async function runSync(): Promise<void> {
   const statusMonitor = Container.get(StatusMonitor);
 
-  await Promise.all([statusMonitor.start(), startSubprocesses()]);
+  await Promise.all([statusMonitor.start(), sync()]);
+}
+
+async function sync(): Promise<void> {
+  const gatewayRegistrar = Container.get(GatewayRegistrar);
+  await gatewayRegistrar.waitForRegistration();
+  await Promise.all([
+    startSubprocesses(),
+    consume(gatewayRegistrar.continuallyRenewRegistration()),
+  ]);
 }
 
 async function startSubprocesses(): Promise<void> {
-  await Container.get(GatewayRegistrar).waitForRegistration();
-
   await Container.get(ParcelCollectorManager).start();
   await Container.get(ParcelDeliveryManager).deliverWhileConnected();
 }
