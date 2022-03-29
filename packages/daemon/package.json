@@ -53,7 +53,7 @@
     "@types/default-gateway": "^3.0.1",
     "@types/is-valid-domain": "0.0.1",
     "@types/jest": "^27.0.3",
-    "@types/pino": "^6.3.9",
+    "@types/pino": "^7.0.5",
     "@types/split2": "^3.2.1",
     "@types/tcp-port-used": "^1.0.0",
     "@types/verror": "^1.10.5",
