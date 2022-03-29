@@ -9,7 +9,12 @@ import { PublicGatewayProtocolError } from './sync/publicGateway/errors';
 import { Config, ConfigKey } from './Config';
 
 export class PrivateGateway extends BasePrivateGateway {
-  public async registerWithPublicGateway(publicGatewayAddress: string): Promise<void> {
+  /**
+   * Register with public gateway and return the expiry date of the private gateway's certificate.
+   *
+   * @param publicGatewayAddress
+   */
+  public async registerWithPublicGateway(publicGatewayAddress: string): Promise<Date> {
     const client = await makeGSCClient(publicGatewayAddress);
 
     const registrationAuth = await client.preRegisterNode(await this.getIdentityPublicKey());
@@ -26,6 +31,8 @@ export class PrivateGateway extends BasePrivateGateway {
     }
 
     await this.saveRegistration(registration);
+
+    return registration.privateNodeCertificate.expiryDate;
   }
 
   private async saveRegistration(registration: PrivateNodeRegistration): Promise<void> {

@@ -125,6 +125,12 @@ describe('registerWithPublicGateway', () => {
     );
   });
 
+  test('Expiry date of private gateway certificate should be returned', async () => {
+    await expect(privateGateway.registerWithPublicGateway(DEFAULT_PUBLIC_GATEWAY)).resolves.toEqual(
+      idCertificate.expiryDate,
+    );
+  });
+
   test('Error should be thrown if registration fails', async () => {
     const originalError = new Error('oh noes');
     registerCall = new RegisterNodeCall(originalError);
