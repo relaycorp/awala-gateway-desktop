@@ -37,6 +37,8 @@ const mockRegisterWithPublicGateway = mockSpy(
   },
 );
 
+const sleepSeconds = mockSleepSeconds();
+
 describe('register', () => {
   beforeEach(undoGatewayRegistration);
 
@@ -98,8 +100,6 @@ describe('waitForRegistration', () => {
   afterEach(() => {
     mockIsRegistered.mockRestore();
   });
-
-  const sleepSeconds = mockSleepSeconds();
 
   test('Registration should proceed if unregistered', async () => {
     mockIsRegistered.mockResolvedValueOnce(false);
@@ -259,8 +259,6 @@ describe('continuallyRenewRegistration', () => {
   });
 
   describe('Registration errors', () => {
-    const sleepSecondsMock = mockSleepSeconds();
-
     test('Errors should delay next attempt by 30 minutes', async () => {
       const registrationError = new Error('Something went wrong');
       mockRegisterWithPublicGateway.mockRejectedValueOnce(registrationError);
@@ -268,9 +266,9 @@ describe('continuallyRenewRegistration', () => {
 
       await consume(take(1, registrar.continuallyRenewRegistration()));
 
-      expect(sleepSecondsMock).toHaveBeenCalledWith(minutesToSeconds(30));
+      expect(sleepSeconds).toHaveBeenCalledWith(minutesToSeconds(30));
       expect(mockRegisterWithPublicGateway).toBeCalledTimes(2);
-      expect(sleepSecondsMock.mock.invocationCallOrder[0]).toBeLessThan(
+      expect(sleepSeconds.mock.invocationCallOrder[0]).toBeLessThan(
         mockRegisterWithPublicGateway.mock.invocationCallOrder[1],
       );
     });
