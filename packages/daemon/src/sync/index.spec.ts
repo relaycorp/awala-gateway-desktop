@@ -7,6 +7,7 @@ import { GatewayRegistrar } from './publicGateway/GatewayRegistrar';
 import { ParcelCollectorManager } from './publicGateway/parcelCollection/ParcelCollectorManager';
 import { ParcelDeliveryManager } from './publicGateway/parcelDelivery/ParcelDeliveryManager';
 import { StatusMonitor } from './StatusMonitor';
+import { arrayToAsyncIterable } from '../testUtils/iterables';
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
@@ -21,6 +22,10 @@ const mockStatusMonitorStart = mockSpy(jest.spyOn(StatusMonitor.prototype, 'star
 const mockGatewayRegistrarConditionalRegistration = mockSpy(
   jest.spyOn(GatewayRegistrar.prototype, 'waitForRegistration'),
   noOp,
+);
+const mockContinuallyRenewRegistration = mockSpy(
+  jest.spyOn(GatewayRegistrar.prototype, 'continuallyRenewRegistration'),
+  () => arrayToAsyncIterable([]),
 );
 
 const mockParcelDeliveryManagerStart = mockSpy(
@@ -66,6 +71,23 @@ describe('runSync', () => {
 
     expect(mockParcelCollectorManagerStart).toBeCalled();
     expect(mockParcelCollectorManagerStart).toHaveBeenCalledAfter(
+      mockGatewayRegistrarConditionalRegistration as any,
+    );
+  });
+
+  test('Registration with public gateway should be continuously renewed', async () => {
+    expect(mockContinuallyRenewRegistration).not.toBeCalled();
+    let wasIterableConsumed = false;
+    mockContinuallyRenewRegistration.mockImplementation(async function* (): AsyncIterable<void> {
+      yield;
+      wasIterableConsumed = true;
+    });
+
+    await runSync();
+
+    expect(mockContinuallyRenewRegistration).toBeCalled();
+    expect(wasIterableConsumed).toBeTrue();
+    expect(mockContinuallyRenewRegistration).toHaveBeenCalledAfter(
       mockGatewayRegistrarConditionalRegistration as any,
     );
   });

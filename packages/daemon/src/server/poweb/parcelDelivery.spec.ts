@@ -1,8 +1,8 @@
 import {
   Certificate,
-  DETACHED_SIGNATURE_TYPES,
   InvalidMessageError,
   Parcel,
+  ParcelDeliverySigner,
   RAMFSyntaxError,
 } from '@relaycorp/relaynet-core';
 import { subSeconds } from 'date-fns';
@@ -40,10 +40,10 @@ let endpointCertificate: Certificate;
 const pkiFixtureRetriever = generatePKIFixture((keyPairSet, certPath) => {
   gatewayCertificate = certPath.privateGateway;
 
-  endpointPrivateKey = keyPairSet.privateEndpoint.privateKey;
+  endpointPrivateKey = keyPairSet.privateEndpoint.privateKey!;
   endpointCertificate = certPath.privateEndpoint;
 });
-mockGatewayRegistration(pkiFixtureRetriever);
+const { undoGatewayRegistration } = mockGatewayRegistration(pkiFixtureRetriever);
 
 describe('Disallowed methods', () => {
   testDisallowedMethods(['POST'], ENDPOINT_URL, () => makeServer());
@@ -60,6 +60,23 @@ test('Invalid request Content-Type should be refused with an HTTP 415 response',
   });
 
   expect(response).toHaveProperty('statusCode', 415);
+  expect(mockStoreInternetBoundParcel).not.toBeCalled();
+});
+
+test('Requesting before registration should result in HTTP 500', async () => {
+  const fastify = await makeServer();
+  await undoGatewayRegistration();
+
+  const response = await postParcel(arrayBufferFrom(''), fastify);
+
+  expect(response).toHaveProperty('statusCode', 500);
+  expect(JSON.parse(response.payload)).toHaveProperty(
+    'message',
+    'Private gateway is currently unregistered',
+  );
+  expect(mockLogs).toContainEqual(
+    partialPinoLog('info', 'Refusing parcel delivery because private gateway is unregistered'),
+  );
   expect(mockStoreInternetBoundParcel).not.toBeCalled();
 });
 
@@ -103,11 +120,11 @@ describe('Authorization errors', () => {
   test('Invalid parcel delivery countersignatures should result in HTTP 401', async () => {
     const fastify = await makeServer();
     const parcelSerialized = arrayBufferFrom('the parcel');
-    const countersignature = await DETACHED_SIGNATURE_TYPES.PARCEL_DELIVERY.sign(
-      parcelSerialized,
-      endpointPrivateKey,
+    const signer = new ParcelDeliverySigner(
       gatewayCertificate, // Wrong certificate
+      endpointPrivateKey,
     );
+    const countersignature = await signer.sign(parcelSerialized);
 
     const response = await postParcel(
       parcelSerialized,
@@ -240,11 +257,8 @@ async function postParcel(
 }
 
 async function countersignParcelDelivery(parcelSerialized: ArrayBuffer): Promise<string> {
-  const countersignature = await DETACHED_SIGNATURE_TYPES.PARCEL_DELIVERY.sign(
-    parcelSerialized,
-    endpointPrivateKey,
-    endpointCertificate,
-  );
+  const signer = new ParcelDeliverySigner(endpointCertificate, endpointPrivateKey);
+  const countersignature = await signer.sign(parcelSerialized);
   return encodeAuthorizationHeaderValue(countersignature);
 }
 

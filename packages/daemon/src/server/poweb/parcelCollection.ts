@@ -1,8 +1,8 @@
 import {
   Certificate,
-  DETACHED_SIGNATURE_TYPES,
   HandshakeChallenge,
   HandshakeResponse,
+  ParcelCollectionHandshakeVerifier,
   ParcelDelivery,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
@@ -15,11 +15,11 @@ import uuid from 'uuid-random';
 import WebSocket, { Server } from 'ws';
 
 import { POWEB_API_PREFIX } from '.';
-import { DBPrivateKeyStore } from '../../keystores/DBPrivateKeyStore';
 import { ParcelStore } from '../../parcelStore';
 import { LOGGER } from '../../tokens';
 import { MessageDirection } from '../../utils/MessageDirection';
 import { makeWebSocketServer, WebSocketCode } from '../websocket';
+import { PrivateGatewayManager } from '../../PrivateGatewayManager';
 
 export const PATH = `${POWEB_API_PREFIX}/parcel-collection`;
 
@@ -28,10 +28,18 @@ const WEBSOCKET_PING_INTERVAL_SECONDS = 5;
 export default function makeParcelCollectionServer(): Server {
   const logger = Container.get(LOGGER);
   const parcelStore = Container.get(ParcelStore);
+  const gatewayManager = Container.get(PrivateGatewayManager);
 
   return makeWebSocketServer(
     async (connectionStream, socket, requestHeaders) => {
-      const endpointAddresses = await doHandshake(connectionStream, socket, logger);
+      const verifier = await gatewayManager.getVerifier(ParcelCollectionHandshakeVerifier);
+      if (!verifier) {
+        socket.close(WebSocketCode.SERVER_ERROR, 'Private gateway is currently unregistered');
+        logger.info('Refusing parcel collection because private gateway is unregistered');
+        return;
+      }
+
+      const endpointAddresses = await doHandshake(connectionStream, verifier, socket, logger);
       if (!endpointAddresses) {
         return;
       }
@@ -58,14 +66,12 @@ export default function makeParcelCollectionServer(): Server {
 
 async function doHandshake(
   connectionStream: Duplex,
+  verifier: ParcelCollectionHandshakeVerifier,
   socket: WebSocket,
   logger: Logger,
 ): Promise<readonly string[] | null> {
   const nonce = bufferToArray(uuid.bin() as Buffer);
   const handshakeChallenge = new HandshakeChallenge(nonce);
-
-  const privateKeyStore = Container.get(DBPrivateKeyStore);
-  const ownCertificates = await privateKeyStore.fetchNodeCertificates();
 
   logger.debug('Sending handshake challenge');
   connectionStream.write(Buffer.from(handshakeChallenge.serialize()));
@@ -93,10 +99,8 @@ async function doHandshake(
 
   let endpointCertificates: readonly Certificate[];
   try {
-    endpointCertificates = await verifyNonceSignatures(
-      handshakeResponse.nonceSignatures,
-      nonce,
-      ownCertificates,
+    endpointCertificates = await Promise.all(
+      handshakeResponse.nonceSignatures.map((s) => verifier.verify(s, nonce)),
     );
   } catch (err) {
     logger.info({ err }, 'Refusing handshake response with malformed/invalid signatures');
@@ -112,24 +116,6 @@ async function doHandshake(
   );
   logger.debug({ endpointAddresses }, 'Handshake completed successfully');
   return endpointAddresses;
-}
-
-async function verifyNonceSignatures(
-  nonceSignatures: readonly ArrayBuffer[],
-  nonce: ArrayBuffer,
-  ownCertificates: readonly Certificate[],
-): Promise<readonly Certificate[]> {
-  // tslint:disable-next-line:readonly-array
-  const endpointCertificates: Certificate[] = [];
-  for (const nonceSignature of nonceSignatures) {
-    const endpointCertificate = await DETACHED_SIGNATURE_TYPES.NONCE.verify(
-      nonceSignature,
-      nonce,
-      ownCertificates,
-    );
-    endpointCertificates.push(endpointCertificate);
-  }
-  return endpointCertificates;
 }
 
 function makeDeliveryStream(

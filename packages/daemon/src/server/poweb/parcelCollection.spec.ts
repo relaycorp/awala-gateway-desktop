@@ -2,13 +2,12 @@ import {
   Certificate,
   CertificateError,
   CMSError,
-  DETACHED_SIGNATURE_TYPES,
   generateRSAKeyPair,
   HandshakeChallenge,
   HandshakeResponse,
   issueEndpointCertificate,
+  ParcelCollectionHandshakeSigner,
   ParcelDelivery,
-  Signer,
   StreamingMode,
 } from '@relaycorp/relaynet-core';
 import { CloseFrame, MockClient } from '@relaycorp/ws-mock';
@@ -40,20 +39,20 @@ mockWebsocketStream();
 const mockLogs = mockLoggerToken();
 
 let trustedEndpointAddress: string;
-let trustedEndpointSigner: Signer;
+let trustedEndpointSigner: ParcelCollectionHandshakeSigner;
 let privateGatewayCertificate: Certificate;
 let privateGatewayPrivateKey: CryptoKey;
 const pkiFixtureRetriever = generatePKIFixture(async (keyPairSet, certPath) => {
   trustedEndpointAddress = await certPath.privateEndpoint.calculateSubjectPrivateAddress();
-  trustedEndpointSigner = new Signer(
+  trustedEndpointSigner = new ParcelCollectionHandshakeSigner(
     certPath.privateEndpoint,
-    keyPairSet.privateEndpoint.privateKey,
+    keyPairSet.privateEndpoint.privateKey!,
   );
 
   privateGatewayCertificate = certPath.privateGateway;
-  privateGatewayPrivateKey = keyPairSet.privateGateway.privateKey;
+  privateGatewayPrivateKey = keyPairSet.privateGateway.privateKey!;
 });
-mockGatewayRegistration(pkiFixtureRetriever);
+const { undoGatewayRegistration } = mockGatewayRegistration(pkiFixtureRetriever);
 
 const mockParcelStoreStream = mockSpy(
   jest.spyOn(ParcelStore.prototype, 'streamEndpointBound'),
@@ -61,6 +60,22 @@ const mockParcelStoreStream = mockSpy(
 );
 const mockParcelStoreRetrieve = mockSpy(jest.spyOn(ParcelStore.prototype, 'retrieve'), () => null);
 const mockParcelStoreDelete = mockSpy(jest.spyOn(ParcelStore.prototype, 'delete'), () => undefined);
+
+test('Connection should error out if gateway is not registered', async () => {
+  await undoGatewayRegistration();
+  const client = new MockParcelCollectionClient();
+
+  await client.use(async () => {
+    await expect(client.waitForPeerClosure()).resolves.toEqual({
+      code: WebSocketCode.SERVER_ERROR,
+      reason: 'Private gateway is currently unregistered',
+    });
+  });
+
+  expect(mockLogs).toContainEqual(
+    partialPinoLog('info', 'Refusing parcel collection because private gateway is unregistered'),
+  );
+});
 
 describe('Handshake', () => {
   test('Challenge should be sent as soon as client connects', async () => {
@@ -150,10 +165,7 @@ describe('Handshake', () => {
       const challenge = HandshakeChallenge.deserialize(
         bufferToArray((await client.receive()) as Buffer),
       );
-      const validSignature = await trustedEndpointSigner.sign(
-        challenge.nonce,
-        DETACHED_SIGNATURE_TYPES.NONCE,
-      );
+      const validSignature = await trustedEndpointSigner.sign(challenge.nonce);
       const handshakeResponse = new HandshakeResponse([
         validSignature,
         arrayBufferFrom('malformed'),
@@ -176,13 +188,13 @@ describe('Handshake', () => {
   test('Handshake should fail if a signer of response nonce is not trusted', async () => {
     const untrustedEndpointKeyPair = await generateRSAKeyPair();
     const untrustedEndpointCertificate = await issueEndpointCertificate({
-      issuerPrivateKey: untrustedEndpointKeyPair.privateKey,
-      subjectPublicKey: untrustedEndpointKeyPair.publicKey,
+      issuerPrivateKey: untrustedEndpointKeyPair.privateKey!,
+      subjectPublicKey: untrustedEndpointKeyPair.publicKey!,
       validityEndDate: privateGatewayCertificate.expiryDate,
     });
-    const untrustedEndpointSigner = new Signer(
+    const untrustedEndpointSigner = new ParcelCollectionHandshakeSigner(
       untrustedEndpointCertificate,
-      untrustedEndpointKeyPair.privateKey,
+      untrustedEndpointKeyPair.privateKey!,
     );
     const client = new MockParcelCollectionClient();
 
@@ -208,10 +220,13 @@ describe('Handshake', () => {
     const endpoint2Certificate = await issueEndpointCertificate({
       issuerCertificate: privateGatewayCertificate,
       issuerPrivateKey: privateGatewayPrivateKey,
-      subjectPublicKey: endpoint2KeyPair.publicKey,
+      subjectPublicKey: endpoint2KeyPair.publicKey!,
       validityEndDate: privateGatewayCertificate.expiryDate,
     });
-    const trustedEndpoint2Signer = new Signer(endpoint2Certificate, endpoint2KeyPair.privateKey);
+    const trustedEndpoint2Signer = new ParcelCollectionHandshakeSigner(
+      endpoint2Certificate,
+      endpoint2KeyPair.privateKey!,
+    );
     const client = new MockParcelCollectionClient();
 
     await client.use(async () => {
@@ -481,14 +496,12 @@ class MockParcelCollectionClient extends MockClient {
     await setImmediateAsync();
   }
 
-  public async doHandshake(signers?: readonly Signer[]): Promise<void> {
+  public async doHandshake(signers?: readonly ParcelCollectionHandshakeSigner[]): Promise<void> {
     const finalSigners = signers ?? [trustedEndpointSigner];
     const challenge = HandshakeChallenge.deserialize(
       bufferToArray((await this.receive()) as Buffer),
     );
-    const signatures = await Promise.all(
-      finalSigners.map((s) => s.sign(challenge.nonce, DETACHED_SIGNATURE_TYPES.NONCE)),
-    );
+    const signatures = await Promise.all(finalSigners.map((s) => s.sign(challenge.nonce)));
     const handshakeResponse = new HandshakeResponse(signatures);
     await this.send(handshakeResponse.serialize());
   }
