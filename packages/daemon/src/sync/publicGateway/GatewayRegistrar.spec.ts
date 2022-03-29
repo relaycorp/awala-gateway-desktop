@@ -1,36 +1,19 @@
-import {
-  Certificate,
-  derSerializePublicKey,
-  GSCClient,
-  PrivateGateway,
-  PrivateNodeRegistration,
-  PrivateNodeRegistrationRequest,
-  SessionKey,
-  SessionKeyPair,
-  UnreachableResolverError,
-} from '@relaycorp/relaynet-core';
-import {
-  generateIdentityKeyPairSet,
-  generatePDACertificationPath,
-  MockGSCClient,
-  PreRegisterNodeCall,
-  RegisterNodeCall,
-} from '@relaycorp/relaynet-testing';
+import { UnreachableResolverError } from '@relaycorp/relaynet-core';
+import { addDays, minutesToSeconds, subDays } from 'date-fns';
+import { consume, take } from 'streaming-iterables';
 import { Container } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
-import { arrayBufferFrom } from '../../testUtils/buffer';
 import { setUpTestDBConnection } from '../../testUtils/db';
-import { mockSpy } from '../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
-import { mockSleepSeconds } from '../../testUtils/timing';
+import { mockSleepSeconds, mockSleepUntilDate } from '../../testUtils/timing';
 import { GatewayRegistrar } from './GatewayRegistrar';
-import * as gscClient from './gscClient';
-import { NonExistingAddressError, PublicGatewayProtocolError } from './errors';
-import { getPromiseRejection } from '../../testUtils/promises';
-import { PrivateGatewayManager } from '../../PrivateGatewayManager';
+import { NonExistingAddressError } from './errors';
+import { mockSpy } from '../../testUtils/jest';
+import { PrivateGateway } from '../../PrivateGateway';
+import { generatePKIFixture, mockGatewayRegistration } from '../../testUtils/crypto';
 
 setUpTestDBConnection();
 
@@ -43,45 +26,21 @@ beforeEach(() => {
   registrar = Container.get(GatewayRegistrar);
 });
 
-let mockGSCClient: GSCClient | null;
-beforeEach(() => {
-  mockGSCClient = null;
-});
+const pkiFixtureRetriever = generatePKIFixture();
+const { undoGatewayRegistration } = mockGatewayRegistration(pkiFixtureRetriever);
 
-const mockMakeGSCClient = mockSpy(jest.spyOn(gscClient, 'makeGSCClient'), () => mockGSCClient);
+const mockRegisterWithPublicGateway = mockSpy(
+  jest.spyOn(PrivateGateway.prototype, 'registerWithPublicGateway'),
+  async () => {
+    const privateGatewayCertificate = pkiFixtureRetriever().pdaCertPath.privateGateway;
+    return privateGatewayCertificate.expiryDate;
+  },
+);
 
-let publicGatewayIdCertificate: Certificate;
-let publicGatewaySessionKey: SessionKey;
-let idCertificate: Certificate;
-beforeAll(async () => {
-  const certPath = await generatePDACertificationPath(await generateIdentityKeyPairSet());
-  publicGatewayIdCertificate = certPath.publicGateway;
-  idCertificate = certPath.privateGateway;
-
-  publicGatewaySessionKey = (await SessionKeyPair.generate()).sessionKey;
-});
+const sleepSeconds = mockSleepSeconds();
 
 describe('register', () => {
-  const registrationAuth = arrayBufferFrom('the auth');
-  let preRegisterCall: PreRegisterNodeCall;
-  let registration: PrivateNodeRegistration;
-  let registerCall: RegisterNodeCall;
-  beforeEach(() => {
-    preRegisterCall = new PreRegisterNodeCall(registrationAuth);
-
-    registration = new PrivateNodeRegistration(
-      idCertificate,
-      publicGatewayIdCertificate,
-      publicGatewaySessionKey,
-    );
-    registerCall = new RegisterNodeCall(registration);
-
-    mockGSCClient = new MockGSCClient([preRegisterCall, registerCall]);
-  });
-
-  beforeEach(async () => {
-    await Container.get(PrivateGatewayManager).createCurrentIfMissing();
-  });
+  beforeEach(undoGatewayRegistration);
 
   test('Registration should be skipped if already registered with new gateway', async () => {
     const config = Container.get(Config);
@@ -89,63 +48,22 @@ describe('register', () => {
 
     await registrar.register(DEFAULT_PUBLIC_GATEWAY);
 
-    expect(mockMakeGSCClient).not.toBeCalled();
-    expect(preRegisterCall.wasCalled).toBeFalsy();
+    expect(mockRegisterWithPublicGateway).not.toBeCalled();
     expect(logs).toContainEqual(
       partialPinoLog('debug', 'Skipping registration with public gateway'),
     );
   });
 
-  test('PoWeb client should complete registration with resolved address', async () => {
+  test('Registration should be completed if not already registered with peer', async () => {
     await registrar.register(DEFAULT_PUBLIC_GATEWAY);
 
-    expect(mockMakeGSCClient).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
+    expect(mockRegisterWithPublicGateway).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
+    const privateGatewayCertificate = pkiFixtureRetriever().pdaCertPath.privateGateway;
     expect(logs).toContainEqual(
       partialPinoLog('info', 'Successfully registered with public gateway', {
+        privateGatewayCertificateExpiryDate: privateGatewayCertificate.expiryDate.toISOString(),
         publicGatewayPublicAddress: DEFAULT_PUBLIC_GATEWAY,
-        publicGatewayPrivateAddress:
-          await publicGatewayIdCertificate.calculateSubjectPrivateAddress(),
       }),
-    );
-  });
-
-  test('PoWeb client should do pre-registration', async () => {
-    await registrar.register(DEFAULT_PUBLIC_GATEWAY);
-
-    expect(preRegisterCall.wasCalled).toBeTruthy();
-  });
-
-  test('PoWeb client should complete registration with given authorisation', async () => {
-    await registrar.register(DEFAULT_PUBLIC_GATEWAY);
-
-    expect(registerCall.wasCalled).toBeTruthy();
-    const registrationRequest = await PrivateNodeRegistrationRequest.deserialize(
-      registerCall.arguments!.pnrrSerialized,
-    );
-    await expect(derSerializePublicKey(registrationRequest.privateNodePublicKey)).resolves.toEqual(
-      await derSerializePublicKey(preRegisterCall.arguments!.nodePublicKey),
-    );
-    expect(registrationRequest.pnraSerialized).toEqual(registrationAuth);
-  });
-
-  test('Channel with public gateway should be stored', async () => {
-    const saveChannelSpy = jest.spyOn(PrivateGateway.prototype, 'savePublicGatewayChannel');
-
-    await registrar.register(DEFAULT_PUBLIC_GATEWAY);
-
-    expect(saveChannelSpy).toBeCalledWith(
-      idCertificate,
-      publicGatewayIdCertificate,
-      publicGatewaySessionKey,
-    );
-  });
-
-  test('Private address of public gateway should be stored in config', async () => {
-    await registrar.register(DEFAULT_PUBLIC_GATEWAY);
-
-    const config = Container.get(Config);
-    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS)).resolves.toEqual(
-      await publicGatewayIdCertificate.calculateSubjectPrivateAddress(),
     );
   });
 
@@ -158,53 +76,11 @@ describe('register', () => {
     );
   });
 
-  test('Error should be thrown if registration fails', async () => {
+  test('Registration errors should be propagated', async () => {
     const originalError = new Error('oh noes');
-    registerCall = new RegisterNodeCall(originalError);
-    mockGSCClient = new MockGSCClient([preRegisterCall, registerCall]);
+    mockRegisterWithPublicGateway.mockRejectedValue(originalError);
 
-    const error = await getPromiseRejection(
-      registrar.register(DEFAULT_PUBLIC_GATEWAY),
-      PublicGatewayProtocolError,
-    );
-    expect(error.message).toMatch(/^Failed to register with the public gateway:/);
-    expect(error.cause()).toBe(originalError);
-  });
-
-  test('Error should be thrown if the public gateway session key is missing', async () => {
-    registration = new PrivateNodeRegistration(idCertificate, publicGatewayIdCertificate);
-    registerCall = new RegisterNodeCall(registration);
-    mockGSCClient = new MockGSCClient([preRegisterCall, registerCall]);
-    const saveChannelSpy = jest.spyOn(PrivateGateway.prototype, 'savePublicGatewayChannel');
-
-    await expect(registrar.register(DEFAULT_PUBLIC_GATEWAY)).rejects.toThrowWithMessage(
-      PublicGatewayProtocolError,
-      'Registration is missing public gateway session key',
-    );
-
-    expect(saveChannelSpy).not.toBeCalled();
-    const config = Container.get(Config);
-    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS)).resolves.toBeNull();
-    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS)).resolves.toBeNull();
-  });
-
-  test('Error should be thrown if the channel creation is rejected', async () => {
-    registration = new PrivateNodeRegistration(
-      idCertificate,
-      idCertificate, // Invalid public gateway certificate
-      publicGatewaySessionKey,
-    );
-    registerCall = new RegisterNodeCall(registration);
-    mockGSCClient = new MockGSCClient([preRegisterCall, registerCall]);
-
-    await expect(registrar.register(DEFAULT_PUBLIC_GATEWAY)).rejects.toThrowWithMessage(
-      PublicGatewayProtocolError,
-      /^Failed to save channel with public gateway:/,
-    );
-
-    const config = Container.get(Config);
-    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS)).resolves.toBeNull();
-    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS)).resolves.toBeNull();
+    await expect(registrar.register(DEFAULT_PUBLIC_GATEWAY)).rejects.toBe(originalError);
   });
 });
 
@@ -224,8 +100,6 @@ describe('waitForRegistration', () => {
   afterEach(() => {
     mockIsRegistered.mockRestore();
   });
-
-  const sleepSeconds = mockSleepSeconds();
 
   test('Registration should proceed if unregistered', async () => {
     mockIsRegistered.mockResolvedValueOnce(false);
@@ -308,7 +182,142 @@ describe('waitForRegistration', () => {
   });
 });
 
+describe('continuallyRenewRegistration', () => {
+  const sleepUntilDateMock = mockSleepUntilDate();
+
+  test('Renewal should be attempted once certificate has less than 90 days left', async () => {
+    const privateGatewayCertificate = pkiFixtureRetriever().pdaCertPath.privateGateway;
+
+    await consume(take(1, registrar.continuallyRenewRegistration()));
+
+    const expectedScheduledDate = subDays(privateGatewayCertificate.expiryDate, 90);
+    expect(sleepUntilDateMock).toBeCalledWith(expectedScheduledDate, expect.anything());
+    expect(mockRegisterWithPublicGateway).toBeCalled();
+    expect(logs).toContainEqual(
+      partialPinoLog('info', 'Scheduling registration renewal', {
+        nextRenewalDate: expectedScheduledDate.toISOString(),
+      }),
+    );
+  });
+
+  test('Renewals should be repeated indefinitely', async () => {
+    const certificate1Date = pkiFixtureRetriever().pdaCertPath.privateGateway.expiryDate;
+    const certificate2Date = new Date();
+    mockRegisterWithPublicGateway.mockResolvedValueOnce(certificate2Date);
+
+    await consume(take(2, registrar.continuallyRenewRegistration()));
+
+    expect(sleepUntilDateMock).toBeCalledTimes(2);
+    expect(sleepUntilDateMock).toHaveBeenNthCalledWith(
+      1,
+      subDays(certificate1Date, 90),
+      expect.anything(),
+    );
+    expect(sleepUntilDateMock).toHaveBeenNthCalledWith(
+      2,
+      subDays(certificate2Date, 90),
+      expect.anything(),
+    );
+    expect(mockRegisterWithPublicGateway).toBeCalledTimes(2);
+  });
+
+  test('Public gateway migrations should be reflected', async () => {
+    // Migrate to a different public gateway before the first renewal
+    const publicGateway2PublicAddress = `not-${DEFAULT_PUBLIC_GATEWAY}`;
+    sleepUntilDateMock.mockImplementationOnce(async () => {
+      await registrar.register(publicGateway2PublicAddress);
+    });
+    sleepUntilDateMock.mockResolvedValueOnce(undefined);
+    const certificate2Date = addDays(new Date(), 3);
+    mockRegisterWithPublicGateway.mockResolvedValueOnce(certificate2Date);
+
+    await consume(take(1, registrar.continuallyRenewRegistration()));
+
+    expect(sleepUntilDateMock).toBeCalledTimes(2);
+    expect(sleepUntilDateMock).toHaveBeenNthCalledWith(
+      2,
+      subDays(certificate2Date, 90),
+      expect.anything(),
+    );
+    expect(mockRegisterWithPublicGateway).toBeCalledTimes(2);
+    expect(mockRegisterWithPublicGateway).toHaveBeenCalledWith(publicGateway2PublicAddress);
+    expect(mockRegisterWithPublicGateway).not.toHaveBeenCalledWith(DEFAULT_PUBLIC_GATEWAY);
+  });
+
+  test('Renewal should be logged', async () => {
+    const certificate2Date = new Date();
+    mockRegisterWithPublicGateway.mockResolvedValueOnce(certificate2Date);
+
+    await consume(take(1, registrar.continuallyRenewRegistration()));
+
+    expect(logs).toContainEqual(
+      partialPinoLog('info', 'Renewed certificate with public gateway', {
+        publicGatewayPublicAddress: DEFAULT_PUBLIC_GATEWAY,
+        certificateExpiryDate: certificate2Date.toISOString(),
+      }),
+    );
+  });
+
+  describe('Registration errors', () => {
+    test('Errors should delay next attempt by 30 minutes', async () => {
+      const registrationError = new Error('Something went wrong');
+      mockRegisterWithPublicGateway.mockRejectedValueOnce(registrationError);
+      mockRegisterWithPublicGateway.mockResolvedValueOnce(addDays(new Date(), 2));
+
+      await consume(take(1, registrar.continuallyRenewRegistration()));
+
+      expect(sleepSeconds).toHaveBeenCalledWith(minutesToSeconds(30));
+      expect(mockRegisterWithPublicGateway).toBeCalledTimes(2);
+      expect(sleepSeconds.mock.invocationCallOrder[0]).toBeLessThan(
+        mockRegisterWithPublicGateway.mock.invocationCallOrder[1],
+      );
+    });
+
+    test('UnreachableResolverError should be logged with level=INFO', async () => {
+      const registrationError = new UnreachableResolverError('Disconnected from Internet');
+      mockRegisterWithPublicGateway.mockRejectedValueOnce(registrationError);
+      mockRegisterWithPublicGateway.mockResolvedValueOnce(addDays(new Date(), 2));
+
+      await consume(take(1, registrar.continuallyRenewRegistration()));
+
+      expect(logs).toContainEqual(
+        partialPinoLog(
+          'info',
+          'Could not renew registration; we seem to be disconnected from the Internet',
+          {
+            err: expect.objectContaining({
+              message: registrationError.message,
+              type: UnreachableResolverError.name,
+            }),
+            publicGatewayPublicAddress: DEFAULT_PUBLIC_GATEWAY,
+          },
+        ),
+      );
+    });
+
+    test('Other errors should be logged with level=WARNING', async () => {
+      const registrationError = new Error('Unexpected');
+      mockRegisterWithPublicGateway.mockRejectedValueOnce(registrationError);
+      mockRegisterWithPublicGateway.mockResolvedValueOnce(addDays(new Date(), 2));
+
+      await consume(take(1, registrar.continuallyRenewRegistration()));
+
+      expect(logs).toContainEqual(
+        partialPinoLog('warn', 'Failed to renew registration', {
+          err: expect.objectContaining({
+            message: registrationError.message,
+            type: registrationError.name,
+          }),
+          publicGatewayPublicAddress: DEFAULT_PUBLIC_GATEWAY,
+        }),
+      );
+    });
+  });
+});
+
 describe('isRegistered', () => {
+  beforeEach(undoGatewayRegistration);
+
   test('True should be returned if gateway is registered', async () => {
     const config = Container.get(Config);
     await config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, DEFAULT_PUBLIC_GATEWAY);

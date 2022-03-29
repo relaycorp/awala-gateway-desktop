@@ -18,6 +18,7 @@ import { DBCertificateStore } from './keystores/DBCertificateStore';
 import { generatePKIFixture, mockGatewayRegistration } from './testUtils/crypto';
 import { DEFAULT_PUBLIC_GATEWAY } from './constants';
 import { useTemporaryAppDirs } from './testUtils/appDirs';
+import { PrivateGateway } from './PrivateGateway';
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
@@ -91,6 +92,12 @@ describe('getCurrent', () => {
     await expect(Container.get(Config).get(ConfigKey.CURRENT_PRIVATE_ADDRESS)).resolves.toEqual(
       gateway.privateAddress,
     );
+  });
+
+  test('Custom gateway class should be returned', async () => {
+    await gatewayManager.createCurrentIfMissing();
+
+    await expect(gatewayManager.getCurrent()).resolves.toBeInstanceOf(PrivateGateway);
   });
 });
 

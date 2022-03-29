@@ -18,6 +18,7 @@ import { GatewayRegistrar } from '../publicGateway/GatewayRegistrar';
 import { CourierSyncManager } from './CourierSyncManager';
 import { DisconnectedFromCourierError } from './errors';
 import { CourierSyncStageNotification, ParcelCollectionNotification } from './messaging';
+import { mockLoggerToken } from '../../testUtils/logging';
 
 jest.mock('default-gateway', () => ({ v4: jest.fn() }));
 const mockGatewayIPAddress = '192.168.0.12';
@@ -30,6 +31,7 @@ jest.mock('tcp-port-used', () => ({ waitUntilUsedOnHost: jest.fn() }));
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
+mockLoggerToken();
 
 let courierSync: CourierSyncManager;
 beforeEach(() => {
