@@ -43,6 +43,7 @@ import runCourierSync from './subprocess';
 import { PrivateGatewayManager } from '../../PrivateGatewayManager';
 import { DBCertificateStore } from '../../keystores/DBCertificateStore';
 import { mockSleepSeconds } from '../../testUtils/timing';
+import { arrayBufferFrom } from '../../testUtils/buffer';
 
 jest.mock('default-gateway', () => ({ v4: jest.fn() }));
 const mockGatewayIPAddress = '192.168.0.12';
@@ -311,7 +312,7 @@ describe('Cargo collection', () => {
     const cargo = new Cargo(
       await privateGatewayPDACertificate.calculateSubjectPrivateAddress(),
       publicGatewayPDACertificate, // Sent by the public gateway, but using wrong certificate
-      await makeCargoPayloadFromMessages([parcelSerialized]),
+      Buffer.from(await makeCargoPayloadFromMessages([parcelSerialized])),
     );
     const cargoSerialized = Buffer.from(await cargo.serialize(publicGatewayPrivateKey));
     mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
@@ -328,7 +329,7 @@ describe('Cargo collection', () => {
   });
 
   test('Invalid encapsulated message should be logged and ignored', async () => {
-    const { cargo, cargoSerialized } = await makeCargo(Buffer.from('malformed payload'));
+    const { cargo, cargoSerialized } = await makeCargo(arrayBufferFrom('malformed payload'));
     mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
 
     await runCourierSync(getParentStream());
@@ -343,7 +344,7 @@ describe('Cargo collection', () => {
 
   test('Malformed message encapsulated in cargo should be logged and ignored', async () => {
     const { cargo, cargoSerialized } = await makeCargoFromMessages([
-      Buffer.from('malformed message'),
+      arrayBufferFrom('malformed message'),
     ]);
     mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
 
@@ -507,13 +508,13 @@ describe('Cargo collection', () => {
       senderEndpointPrivateAddress: string,
       recipientEndpointAddress: string,
       parcelId: string,
-    ): Buffer {
+    ): ArrayBuffer {
       const ack = new ParcelCollectionAck(
         senderEndpointPrivateAddress,
         recipientEndpointAddress,
         parcelId,
       );
-      return Buffer.from(ack.serialize());
+      return ack.serialize();
     }
   });
 
@@ -641,7 +642,10 @@ describe('Cargo collection', () => {
     readonly cargoSerialized: Buffer;
   }
 
-  async function makeCargo(payloadSerialized: Buffer, cda?: Certificate): Promise<GeneratedCargo> {
+  async function makeCargo(
+    payloadSerialized: ArrayBuffer,
+    cda?: Certificate,
+  ): Promise<GeneratedCargo> {
     const { keyPairSet } = pkiFixtureRetriever();
 
     let finalCDA = cda;
@@ -659,7 +663,7 @@ describe('Cargo collection', () => {
     const cargo = new Cargo(
       await getPrivateAddressFromIdentityKey(keyPairSet.privateGateway.publicKey!),
       finalCDA,
-      payloadSerialized,
+      Buffer.from(payloadSerialized),
     );
     const cargoSerialized = Buffer.from(
       await cargo.serialize(keyPairSet.publicGateway.privateKey!),
@@ -677,7 +681,7 @@ describe('Cargo collection', () => {
 
   async function makeCargoPayloadFromMessages(
     messagesSerialized: readonly (Buffer | ArrayBuffer)[],
-  ): Promise<Buffer> {
+  ): Promise<ArrayBuffer> {
     const cargoMessageSet = new CargoMessageSet(
       messagesSerialized.map((s) => (Buffer.isBuffer(s) ? bufferToArray(s) : s)),
     );
@@ -689,7 +693,7 @@ describe('Cargo collection', () => {
       await cargoMessageSet.serialize(),
       privateGatewaySessionKey,
     );
-    return Buffer.from(envelopedData.serialize());
+    return envelopedData.serialize();
   }
 
   async function getStoredParcelKeys(): Promise<readonly string[]> {
