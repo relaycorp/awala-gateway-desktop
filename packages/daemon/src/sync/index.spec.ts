@@ -8,6 +8,7 @@ import { ParcelCollectorManager } from './publicGateway/parcelCollection/ParcelC
 import { ParcelDeliveryManager } from './publicGateway/parcelDelivery/ParcelDeliveryManager';
 import { StatusMonitor } from './StatusMonitor';
 import { arrayToAsyncIterable } from '../testUtils/iterables';
+import { DBCertificateStore } from '../keystores/DBCertificateStore';
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
@@ -38,6 +39,11 @@ const mockParcelCollectorManagerStart = mockSpy(
   noOp,
 );
 
+const mockDeleteExpiredCertificates = mockSpy(
+  jest.spyOn(DBCertificateStore.prototype, 'deleteExpired'),
+  noOp,
+);
+
 describe('runSync', () => {
   test('Status monitor should be started', async () => {
     expect(mockStatusMonitorStart).not.toBeCalled();
@@ -51,6 +57,17 @@ describe('runSync', () => {
     await runSync();
 
     expect(mockGatewayRegistrarConditionalRegistration).toBeCalled();
+  });
+
+  test('Expired certificates should be deleted', async () => {
+    expect(mockParcelDeliveryManagerStart).not.toBeCalled();
+
+    await runSync();
+
+    expect(mockDeleteExpiredCertificates).toBeCalled();
+    expect(mockDeleteExpiredCertificates).toHaveBeenCalledBefore(
+      mockGatewayRegistrarConditionalRegistration as any,
+    );
   });
 
   test('Parcel Delivery Manager should be started', async () => {

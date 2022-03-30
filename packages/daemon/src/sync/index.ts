@@ -5,6 +5,7 @@ import { GatewayRegistrar } from './publicGateway/GatewayRegistrar';
 import { ParcelCollectorManager } from './publicGateway/parcelCollection/ParcelCollectorManager';
 import { ParcelDeliveryManager } from './publicGateway/parcelDelivery/ParcelDeliveryManager';
 import { StatusMonitor } from './StatusMonitor';
+import { DBCertificateStore } from '../keystores/DBCertificateStore';
 
 export default async function runSync(): Promise<void> {
   const statusMonitor = Container.get(StatusMonitor);
@@ -13,6 +14,9 @@ export default async function runSync(): Promise<void> {
 }
 
 async function sync(): Promise<void> {
+  const certificateStore = Container.get(DBCertificateStore);
+  await certificateStore.deleteExpired();
+
   const gatewayRegistrar = Container.get(GatewayRegistrar);
   await gatewayRegistrar.waitForRegistration();
   await Promise.all([
