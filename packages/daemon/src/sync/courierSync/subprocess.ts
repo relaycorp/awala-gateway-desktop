@@ -145,7 +145,13 @@ async function collectCargo(
           } else if (item instanceof ParcelCollectionAck) {
             await processParcelCollectionAck(item, parcelStore, cargoAwareLogger);
           } else {
-            cargoAwareLogger.info('Certificate rotations are not yet supported');
+            await processCertificateRotation(
+              item,
+              privateGateway.privateAddress,
+              channel.peerPrivateAddress,
+              certificateStore,
+              cargoAwareLogger,
+            );
           }
         }
       }
@@ -209,6 +215,38 @@ async function processParcelCollectionAck(
     'Deleting ACKed parcel',
   );
   await parcelStore.deleteInternetBoundFromACK(ack);
+}
+
+async function processCertificateRotation(
+  rotation: CertificateRotation,
+  privateGatewayPrivateAddress: string,
+  publicGatewayPrivateAddress: string,
+  certificateStore: DBCertificateStore,
+  logger: Logger,
+): Promise<void> {
+  const newPrivateGatewayCertificate = rotation.subjectCertificate;
+  const subjectPrivateAddress = await newPrivateGatewayCertificate.calculateSubjectPrivateAddress();
+  if (subjectPrivateAddress !== privateGatewayPrivateAddress) {
+    logger.warn(
+      { subjectPrivateAddress, privateGatewayPrivateAddress },
+      'Ignored rotation containing certificate for different private gateway',
+    );
+    return;
+  }
+  const issuerPrivateAddress = newPrivateGatewayCertificate.getIssuerPrivateAddress();
+  if (issuerPrivateAddress !== publicGatewayPrivateAddress) {
+    logger.warn(
+      { issuerPrivateAddress, publicGatewayPrivateAddress },
+      'Ignored rotation containing certificate from different public gateway',
+    );
+    return;
+  }
+
+  await certificateStore.save(newPrivateGatewayCertificate, publicGatewayPrivateAddress);
+  logger.info(
+    { certificateExpiryDate: newPrivateGatewayCertificate.expiryDate },
+    'New certificate in rotation was saved',
+  );
 }
 
 async function waitBeforeDelivery(parentStream: Duplex, logger: Logger): Promise<void> {
