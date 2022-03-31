@@ -8,7 +8,7 @@ export function makeStubPassThrough(): () => PassThrough {
   });
 
   afterEach(async () => {
-    stream.destroy();
+    stream?.destroy();
   });
 
   return () => stream;
