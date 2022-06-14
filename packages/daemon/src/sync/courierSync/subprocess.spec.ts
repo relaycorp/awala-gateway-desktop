@@ -8,6 +8,7 @@ import {
   CertificateRotation,
   CMSError,
   derSerializePublicKey,
+  generateRSAKeyPair,
   getPrivateAddressFromIdentityKey,
   InvalidMessageError,
   issueGatewayCertificate,
@@ -18,6 +19,7 @@ import {
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays, addSeconds, subMinutes } from 'date-fns';
 import { v4 } from 'default-gateway';
+import { PassThrough } from 'stream';
 import { Container } from 'typedi';
 import { getRepository } from 'typeorm';
 import uuid from 'uuid-random';
@@ -36,12 +38,12 @@ import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
 import { GeneratedParcel, makeParcel } from '../../testUtils/ramf';
 import { makeStubPassThrough, recordReadableStreamMessages } from '../../testUtils/stream';
 import { MessageDirection } from '../../utils/MessageDirection';
-import { sleepSeconds } from '../../utils/timing';
 import { CourierSyncStageNotification, ParcelCollectionNotification } from './messaging';
 import runCourierSync from './subprocess';
 import { PrivateGatewayManager } from '../../PrivateGatewayManager';
 import { DBCertificateStore } from '../../keystores/DBCertificateStore';
-import { PassThrough } from 'stream';
+import { mockSleepSeconds } from '../../testUtils/timing';
+import { arrayBufferFrom } from '../../testUtils/buffer';
 
 jest.mock('default-gateway', () => ({ v4: jest.fn() }));
 const mockGatewayIPAddress = '192.168.0.12';
@@ -51,7 +53,6 @@ beforeEach(() => {
 });
 
 jest.mock('@relaycorp/cogrpc', () => ({ CogRPCClient: { init: jest.fn() } }));
-jest.mock('../../utils/timing');
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
@@ -59,6 +60,7 @@ const mockLogs = mockLoggerToken();
 
 let privateGatewayPrivateAddress: string;
 let privateGatewayPDACertificate: Certificate;
+let publicGatewayPrivateAddress: string;
 let publicGatewayPrivateKey: CryptoKey;
 let publicGatewayPDACertificate: Certificate;
 const pkiFixtureRetriever = generatePKIFixture(async (keyPairSet, pdaCertPath) => {
@@ -67,7 +69,10 @@ const pkiFixtureRetriever = generatePKIFixture(async (keyPairSet, pdaCertPath) =
   );
   privateGatewayPDACertificate = pdaCertPath.privateGateway;
 
-  publicGatewayPrivateKey = keyPairSet.publicGateway.privateKey!!;
+  publicGatewayPrivateAddress = await getPrivateAddressFromIdentityKey(
+    keyPairSet.publicGateway.publicKey!,
+  );
+  publicGatewayPrivateKey = keyPairSet.publicGateway.privateKey!;
   publicGatewayPDACertificate = pdaCertPath.publicGateway;
 });
 const { undoGatewayRegistration, getPublicGatewaySessionPrivateKey } =
@@ -86,11 +91,15 @@ beforeEach(() => {
 });
 
 let parcelStore: ParcelStore;
+let certificateStore: DBCertificateStore;
 beforeEach(() => {
   parcelStore = Container.get(ParcelStore);
+  certificateStore = Container.get(DBCertificateStore);
 });
 
 const getParentStream = makeStubPassThrough();
+
+const sleepSeconds = mockSleepSeconds();
 
 test('Subprocess should error out if private gateway is unregistered', async () => {
   await undoGatewayRegistration();
@@ -239,7 +248,6 @@ describe('Cargo collection', () => {
 
         const cca = await retrieveCCA();
         const cargoDeliveryAuthorization = await extractCDA(cca);
-        const certificateStore = Container.get(DBCertificateStore);
         const cdaIssuers = await certificateStore.retrieveAll(
           privateGatewayPrivateAddress,
           privateGatewayPrivateAddress,
@@ -304,7 +312,7 @@ describe('Cargo collection', () => {
     const cargo = new Cargo(
       await privateGatewayPDACertificate.calculateSubjectPrivateAddress(),
       publicGatewayPDACertificate, // Sent by the public gateway, but using wrong certificate
-      await makeCargoPayloadFromMessages([parcelSerialized]),
+      Buffer.from(await makeCargoPayloadFromMessages([parcelSerialized])),
     );
     const cargoSerialized = Buffer.from(await cargo.serialize(publicGatewayPrivateKey));
     mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
@@ -321,7 +329,7 @@ describe('Cargo collection', () => {
   });
 
   test('Invalid encapsulated message should be logged and ignored', async () => {
-    const { cargo, cargoSerialized } = await makeCargo(Buffer.from('malformed payload'));
+    const { cargo, cargoSerialized } = await makeCargo(arrayBufferFrom('malformed payload'));
     mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
 
     await runCourierSync(getParentStream());
@@ -336,7 +344,7 @@ describe('Cargo collection', () => {
 
   test('Malformed message encapsulated in cargo should be logged and ignored', async () => {
     const { cargo, cargoSerialized } = await makeCargoFromMessages([
-      Buffer.from('malformed message'),
+      arrayBufferFrom('malformed message'),
     ]);
     mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
 
@@ -500,30 +508,105 @@ describe('Cargo collection', () => {
       senderEndpointPrivateAddress: string,
       recipientEndpointAddress: string,
       parcelId: string,
-    ): Buffer {
+    ): ArrayBuffer {
       const ack = new ParcelCollectionAck(
         senderEndpointPrivateAddress,
         recipientEndpointAddress,
         parcelId,
       );
-      return Buffer.from(ack.serialize());
+      return ack.serialize();
     }
   });
 
   describe('Encapsulated certificate rotation', () => {
-    test('Certificate rotation should be ignored for now', async () => {
-      const certificateRotation = new CertificateRotation(privateGatewayPDACertificate, [
-        publicGatewayPDACertificate,
-      ]);
-      const { cargoSerialized } = await makeCargoFromMessages([
-        Buffer.from(certificateRotation.serialize()),
-      ]);
+    test('Certificate for different private gateway should be ignored', async () => {
+      const certificateRotation = new CertificateRotation(
+        publicGatewayPDACertificate, // Invalid certificate: wrong subject private address
+        [],
+      );
+      const { cargoSerialized } = await makeCargoFromMessages([certificateRotation.serialize()]);
       mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
 
       await runCourierSync(getParentStream());
 
+      await expect(
+        certificateStore.retrieveLatest(privateGatewayPrivateAddress, publicGatewayPrivateAddress),
+      ).resolves.toSatisfy((c) => c.isEqual(privateGatewayPDACertificate));
       expect(mockLogs).toContainEqual(
-        partialPinoLog('info', 'Certificate rotations are not yet supported'),
+        partialPinoLog(
+          'warn',
+          'Ignored rotation containing certificate for different private gateway',
+          {
+            privateGatewayPrivateAddress,
+            subjectPrivateAddress: publicGatewayPrivateAddress,
+          },
+        ),
+      );
+    });
+
+    test('Certificate from different public gateway should be ignored', async () => {
+      const differentPublicGatewayKeyPair = await generateRSAKeyPair();
+      const differentPublicGatewayCertificate = await issueGatewayCertificate({
+        subjectPublicKey: differentPublicGatewayKeyPair.publicKey!,
+        issuerPrivateKey: differentPublicGatewayKeyPair.privateKey!,
+        validityEndDate: addSeconds(publicGatewayPDACertificate.expiryDate, 1),
+      });
+      const newCertificate = await issueGatewayCertificate({
+        subjectPublicKey: await privateGatewayPDACertificate.getPublicKey(),
+        issuerCertificate: differentPublicGatewayCertificate, // Invalid
+        issuerPrivateKey: differentPublicGatewayKeyPair.privateKey!, // Invalid
+        validityEndDate: addSeconds(privateGatewayPDACertificate.expiryDate, 1),
+      });
+      const certificateRotation = new CertificateRotation(newCertificate, []);
+      const { cargoSerialized } = await makeCargoFromMessages([certificateRotation.serialize()]);
+      mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
+
+      await runCourierSync(getParentStream());
+
+      await expect(
+        certificateStore.retrieveLatest(privateGatewayPrivateAddress, publicGatewayPrivateAddress),
+      ).resolves.toSatisfy((c) => c.isEqual(privateGatewayPDACertificate));
+      expect(mockLogs).toContainEqual(
+        partialPinoLog(
+          'warn',
+          'Ignored rotation containing certificate from different public gateway',
+          {
+            issuerPrivateAddress: await getPrivateAddressFromIdentityKey(
+              differentPublicGatewayKeyPair.publicKey!,
+            ),
+            publicGatewayPrivateAddress,
+          },
+        ),
+      );
+    });
+
+    test('New private gateway certificate should be stored', async () => {
+      const newPublicGatewayCertificate = await issueGatewayCertificate({
+        subjectPublicKey: await publicGatewayPDACertificate.getPublicKey(),
+        issuerPrivateKey: publicGatewayPrivateKey,
+        validityEndDate: addSeconds(publicGatewayPDACertificate.expiryDate, 1),
+      });
+      const newPrivateGatewayCertificate = await issueGatewayCertificate({
+        subjectPublicKey: await privateGatewayPDACertificate.getPublicKey(),
+        issuerCertificate: newPublicGatewayCertificate,
+        issuerPrivateKey: publicGatewayPrivateKey,
+        validityEndDate: addSeconds(privateGatewayPDACertificate.expiryDate, 1),
+      });
+      const certificateRotation = new CertificateRotation(newPrivateGatewayCertificate, []);
+      const { cargoSerialized } = await makeCargoFromMessages([certificateRotation.serialize()]);
+      mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
+
+      await runCourierSync(getParentStream());
+
+      const latestCertificate = await certificateStore.retrieveLatest(
+        privateGatewayPrivateAddress,
+        publicGatewayPrivateAddress,
+      );
+      await expect(latestCertificate!.isEqual(newPrivateGatewayCertificate)).toBeTrue();
+      expect(mockLogs).toContainEqual(
+        partialPinoLog('info', 'New certificate in rotation was saved', {
+          certificateExpiryDate: newPrivateGatewayCertificate.expiryDate.toISOString(),
+        }),
       );
     });
   });
@@ -559,7 +642,10 @@ describe('Cargo collection', () => {
     readonly cargoSerialized: Buffer;
   }
 
-  async function makeCargo(payloadSerialized: Buffer, cda?: Certificate): Promise<GeneratedCargo> {
+  async function makeCargo(
+    payloadSerialized: ArrayBuffer,
+    cda?: Certificate,
+  ): Promise<GeneratedCargo> {
     const { keyPairSet } = pkiFixtureRetriever();
 
     let finalCDA = cda;
@@ -577,7 +663,7 @@ describe('Cargo collection', () => {
     const cargo = new Cargo(
       await getPrivateAddressFromIdentityKey(keyPairSet.privateGateway.publicKey!),
       finalCDA,
-      payloadSerialized,
+      Buffer.from(payloadSerialized),
     );
     const cargoSerialized = Buffer.from(
       await cargo.serialize(keyPairSet.publicGateway.privateKey!),
@@ -586,7 +672,7 @@ describe('Cargo collection', () => {
   }
 
   async function makeCargoFromMessages(
-    messagesSerialized: readonly Buffer[],
+    messagesSerialized: readonly (Buffer | ArrayBuffer)[],
     cda?: Certificate,
   ): Promise<GeneratedCargo> {
     const payloadSerialized = await makeCargoPayloadFromMessages(messagesSerialized);
@@ -594,18 +680,20 @@ describe('Cargo collection', () => {
   }
 
   async function makeCargoPayloadFromMessages(
-    messagesSerialized: readonly Buffer[],
-  ): Promise<Buffer> {
-    const cargoMessageSet = new CargoMessageSet(messagesSerialized.map(bufferToArray));
+    messagesSerialized: readonly (Buffer | ArrayBuffer)[],
+  ): Promise<ArrayBuffer> {
+    const cargoMessageSet = new CargoMessageSet(
+      messagesSerialized.map((s) => (Buffer.isBuffer(s) ? bufferToArray(s) : s)),
+    );
     const privateGatewayManager = Container.get(PrivateGatewayManager);
     const privateGatewaySessionKey = await privateGatewayManager.generateSessionKey(
-      await publicGatewayPDACertificate.calculateSubjectPrivateAddress(),
+      publicGatewayPrivateAddress,
     );
     const { envelopedData } = await SessionEnvelopedData.encrypt(
       await cargoMessageSet.serialize(),
       privateGatewaySessionKey,
     );
-    return Buffer.from(envelopedData.serialize());
+    return envelopedData.serialize();
   }
 
   async function getStoredParcelKeys(): Promise<readonly string[]> {
