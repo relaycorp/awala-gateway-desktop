@@ -7,6 +7,8 @@ import { GatewayRegistrar } from './publicGateway/GatewayRegistrar';
 import { ParcelCollectorManager } from './publicGateway/parcelCollection/ParcelCollectorManager';
 import { ParcelDeliveryManager } from './publicGateway/parcelDelivery/ParcelDeliveryManager';
 import { StatusMonitor } from './StatusMonitor';
+import { arrayToAsyncIterable } from '../testUtils/iterables';
+import { DBCertificateStore } from '../keystores/DBCertificateStore';
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
@@ -22,6 +24,10 @@ const mockGatewayRegistrarConditionalRegistration = mockSpy(
   jest.spyOn(GatewayRegistrar.prototype, 'waitForRegistration'),
   noOp,
 );
+const mockContinuallyRenewRegistration = mockSpy(
+  jest.spyOn(GatewayRegistrar.prototype, 'continuallyRenewRegistration'),
+  () => arrayToAsyncIterable([]),
+);
 
 const mockParcelDeliveryManagerStart = mockSpy(
   jest.spyOn(ParcelDeliveryManager.prototype, 'deliverWhileConnected'),
@@ -30,6 +36,11 @@ const mockParcelDeliveryManagerStart = mockSpy(
 
 const mockParcelCollectorManagerStart = mockSpy(
   jest.spyOn(ParcelCollectorManager.prototype, 'start'),
+  noOp,
+);
+
+const mockDeleteExpiredCertificates = mockSpy(
+  jest.spyOn(DBCertificateStore.prototype, 'deleteExpired'),
   noOp,
 );
 
@@ -46,6 +57,17 @@ describe('runSync', () => {
     await runSync();
 
     expect(mockGatewayRegistrarConditionalRegistration).toBeCalled();
+  });
+
+  test('Expired certificates should be deleted', async () => {
+    expect(mockParcelDeliveryManagerStart).not.toBeCalled();
+
+    await runSync();
+
+    expect(mockDeleteExpiredCertificates).toBeCalled();
+    expect(mockDeleteExpiredCertificates).toHaveBeenCalledBefore(
+      mockGatewayRegistrarConditionalRegistration as any,
+    );
   });
 
   test('Parcel Delivery Manager should be started', async () => {
@@ -66,6 +88,23 @@ describe('runSync', () => {
 
     expect(mockParcelCollectorManagerStart).toBeCalled();
     expect(mockParcelCollectorManagerStart).toHaveBeenCalledAfter(
+      mockGatewayRegistrarConditionalRegistration as any,
+    );
+  });
+
+  test('Registration with public gateway should be continuously renewed', async () => {
+    expect(mockContinuallyRenewRegistration).not.toBeCalled();
+    let wasIterableConsumed = false;
+    mockContinuallyRenewRegistration.mockImplementation(async function* (): AsyncIterable<void> {
+      yield;
+      wasIterableConsumed = true;
+    });
+
+    await runSync();
+
+    expect(mockContinuallyRenewRegistration).toBeCalled();
+    expect(wasIterableConsumed).toBeTrue();
+    expect(mockContinuallyRenewRegistration).toHaveBeenCalledAfter(
       mockGatewayRegistrarConditionalRegistration as any,
     );
   });

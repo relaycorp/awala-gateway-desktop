@@ -11,3 +11,7 @@ export async function setImmediateAsync(): Promise<void> {
 export function mockSleepSeconds(): jest.SpyInstance {
   return mockSpy(jest.spyOn(timing, 'sleepSeconds'), () => undefined);
 }
+
+export function mockSleepUntilDate(): jest.SpyInstance {
+  return mockSpy(jest.spyOn(timing, 'sleepUntilDate'), () => undefined);
+}

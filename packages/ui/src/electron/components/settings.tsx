@@ -1,11 +1,9 @@
 import React, { Component } from 'react';
 import { getPublicGatewayAddress, migratePublicGatewayAddress, SettingError } from '../../ipc/settings';
 import migrated from '../assets/migrated.svg';
-import Gateway from './gateway';
 import GatewayEditor from './gatewayEditor';
 
 enum Status {
-  DISPLAY,
   EDIT,
   DONE
 }
@@ -24,9 +22,9 @@ class Settings extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = {
-      gateway: 'example.relaycorp.cloud',
+      gateway: '',
       gatewayError: false,
-      status: Status.DISPLAY,
+      status: Status.EDIT,
     }
   }
 
@@ -51,6 +49,7 @@ class Settings extends Component<Props, State> {
         </div>
       );
       case Status.EDIT:
+      default:
       return (
         <div className='settings'>
           <button className='back' onClick={this.props.onComplete}>Return to home</button>
@@ -59,19 +58,6 @@ class Settings extends Component<Props, State> {
               gateway={ this.state.gateway }
               onMigrate={ this.onMigrate.bind(this) }
               gatewayError={ this.state.gatewayError }
-            />
-          </div>
-        </div>
-      );
-      case Status.DISPLAY:
-      default:
-      return (
-        <div className='settings'>
-          <button className='back' onClick={this.props.onComplete}>Return to home</button>
-          <div className='content'>
-            <Gateway
-              gateway={ this.state.gateway }
-              onEdit={ this.editGateway.bind(this) }
             />
           </div>
         </div>
@@ -92,10 +78,6 @@ class Settings extends Component<Props, State> {
         this.setState({status: Status.EDIT, gatewayError: true});
       }
     }
-  }
-
-  private editGateway() : void {
-    this.setState({status: Status.EDIT});
   }
 }
 

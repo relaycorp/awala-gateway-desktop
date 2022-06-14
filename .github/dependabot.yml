@@ -4,23 +4,11 @@ updates:
   directory: "/"
   schedule:
     interval: weekly
-    time: "08:00"
-    timezone: Etc/UCT
-  open-pull-requests-limit: 99
   versioning-strategy: increase
-- package-ecosystem: npm
-  directory: "/packages/daemon"
-  schedule:
-    interval: weekly
-    time: "08:00"
-    timezone: Etc/UCT
-  open-pull-requests-limit: 99
-  versioning-strategy: increase
-- package-ecosystem: npm
-  directory: "/packages/ui"
-  schedule:
-    interval: weekly
-    time: "08:00"
-    timezone: Etc/UCT
-  open-pull-requests-limit: 99
-  versioning-strategy: increase
+  commit-message:
+    prefix: "fix(deps):"
+    prefix-development: "chore(deps):"
+  ignore:
+    - dependency-name: "electron"
+      # Major upgrades should be done manually until we have functional tests
+      update-types: ["version-update:semver-major"]

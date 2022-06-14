@@ -20,25 +20,34 @@ class GatewayEditor extends Component<Props, State> {
       valid: false
     }
   }
+
   public render() : JSX.Element {
+    const gatewayAddress =
+      this.state.newGateway.length === 0 ? this.props.gateway : this.state.newGateway;
+    const canMigrate = this.state.valid && this.state.confirmed;
     return (
       <div className='gatewayEditor'>
-        <h3>New Public Gateway</h3>
+        <h3>Public gateway</h3>
         <p>
-          Migrating to a new gateway should only be done by advanced users who
-          understand the consequences.
+          Your computer needs to be paired to an <em>Awala public gateway</em> on the Internet,
+          and by default it will use one run by Relaycorp.
         </p>
         <p>
-          At present, changing this gateway will most likely prevent your
-          existing Awala apps from receiving data for a while.
+          <strong>You should not migrate to another gateway</strong>, unless you’re
+          an advanced user who understands the consequences:
         </p>
-        <p>
-          Gateways ending with “.relaycorp.cloud” are provide by Relaycorp,
-          and we don’t spy or censors our users. If you switch to another
-          provider, make sure they don’t either.
-        </p>
-        <h4>Enter the new address</h4>
-        <input name='gateway' type='text' placeholder='New Public Gateway'
+        <ul>
+          <li>
+            Your Awala-compatible apps will be losing incoming data for a while.
+          </li>
+          <li>
+            Gateways ending with “.relaycorp.cloud” are provided by Relaycorp,
+            and we don’t spy or censor our users. If you switch to another
+            provider, make sure they don’t either.
+          </li>
+        </ul>
+        <h4>Public gateway address</h4>
+        <input name='gateway' type='text' value={gatewayAddress}
           onChange={this.onChange.bind(this)} />
         <div className='info'>
           { this.infoMessage() }
@@ -47,7 +56,7 @@ class GatewayEditor extends Component<Props, State> {
           <input name='confirm' type='checkbox' onChange={this.onCheckbox.bind(this)}/>
           I understand the consequences of this change.
         </label>
-        <button className='yellow submit' onClick={this.submit.bind(this)}>
+        <button className='yellow submit' disabled={!canMigrate} onClick={this.submit.bind(this)}>
           Migrate
         </button>
       </div>
@@ -76,17 +85,11 @@ class GatewayEditor extends Component<Props, State> {
   }
 
   private onChange(event: ChangeEvent<HTMLInputElement>) : void {
+    const newAddress = event.target.value;
     this.setState({
-      newGateway: event.target.value,
-      valid: this.validateGateway(event.target.value)
+      newGateway: newAddress,
+      valid: isValidDomain(newAddress) && newAddress !== this.props.gateway,
     });
-  }
-
-  private validateGateway(newGateway: string) : boolean {
-    if (isValidDomain(newGateway)) {
-      return true;
-    }
-    return false;
   }
 
   private submit() : void {

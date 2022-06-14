@@ -1,8 +1,8 @@
-import { fork as forkChildProcess } from 'child_process';
+import { ChildProcess, fork as forkChildProcess } from 'child_process';
 import { dirname, join } from 'path';
 import { Duplex } from 'stream';
 
-import { SubprocessError } from './SubprocessError';
+import { SubprocessError, SubprocessExitError } from './errors';
 
 const IS_TYPESCRIPT = __filename.endsWith('.ts');
 // istanbul ignore next
@@ -10,10 +10,25 @@ const SUBPROCESS_SCRIPT_NAME = IS_TYPESCRIPT ? 'subprocess.ts' : 'subprocess.js'
 const ROOT_DIR = dirname(dirname(__dirname));
 const SUBPROCESS_SCRIPT_PATH = join(ROOT_DIR, 'bin', SUBPROCESS_SCRIPT_NAME);
 
-export function fork(subprocessName: string): Duplex {
+export async function fork(subprocessName: string): Promise<Duplex> {
   const childProcess = forkChildProcess(SUBPROCESS_SCRIPT_PATH, [subprocessName], {
     env: { ...process.env, LOG_FILES: 'true' },
   });
+
+  return new Promise((resolve, reject) => {
+    const spawnErrorHandler = (err: Error) => {
+      reject(new SubprocessError(err, `Failed to spawn subprocess ${subprocessName}`));
+    };
+    childProcess.once('error', spawnErrorHandler);
+
+    childProcess.once('spawn', () => {
+      resolve(makeSubprocessStream(childProcess, subprocessName));
+      childProcess.removeListener('error', spawnErrorHandler);
+    });
+  });
+}
+
+function makeSubprocessStream(childProcess: ChildProcess, subprocessName: string): Duplex {
   const duplex = new Duplex({
     objectMode: true,
     read(): void {
@@ -30,13 +45,16 @@ export function fork(subprocessName: string): Duplex {
   });
 
   childProcess.once('error', (err) => {
-    duplex.destroy(err);
+    duplex.destroy(new SubprocessError(err, `Subprocess ${subprocessName} errored out`));
   });
 
   childProcess.once('exit', (code) => {
     const error =
       code && 0 < code
-        ? new SubprocessError(`Subprocess "${subprocessName}" errored out with code ${code}`, code)
+        ? new SubprocessExitError(
+            `Subprocess "${subprocessName}" errored out with code ${code}`,
+            code,
+          )
         : undefined;
     duplex.destroy(error);
   });
@@ -45,6 +63,5 @@ export function fork(subprocessName: string): Duplex {
     duplex.push(message);
   });
 
-  // TODO: When we support Node.js >= 16, return the duplex once the 'spawn' event has been emitted
   return duplex;
 }

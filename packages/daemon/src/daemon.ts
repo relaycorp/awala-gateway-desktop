@@ -6,6 +6,8 @@ import { ParcelCollection } from './entity/ParcelCollection';
 import { makeServer, runServer } from './server';
 import startup from './startup';
 import runSync from './sync';
+import { Container } from 'typedi';
+import { PrivateGatewayManager } from './PrivateGatewayManager';
 
 const TYPEORM_DATE_FORMAT = 'yyyy-MM-dd HH:mm:ss.SSS';
 
@@ -13,6 +15,9 @@ export default async function (): Promise<void> {
   await startup('daemon');
 
   await purgeExpiredParcelCollections();
+
+  const gatewayManager = Container.get(PrivateGatewayManager);
+  await gatewayManager.createCurrentIfMissing();
 
   const server = await makeServer();
   await Promise.all([runServer(server), runSync()]);

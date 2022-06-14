@@ -14,6 +14,7 @@ import { IPCMessage } from '../ipc';
 import { GatewayRegistrar } from '../publicGateway/GatewayRegistrar';
 import { DisconnectedFromCourierError } from './errors';
 import { CourierSyncStageNotification, ParcelCollectionNotification } from './messaging';
+import { SubprocessExitError } from '../../utils/subprocess/errors';
 
 const COURIER_CHECK_TIMEOUT_MS = 3_000;
 const COURIER_CHECK_RETRY_MS = 500;
@@ -72,7 +73,7 @@ export class CourierSyncManager {
    * @throws DisconnectedFromCourierError
    */
   public async *sync(): AsyncIterable<CourierSyncStage> {
-    const syncSubprocess = fork('courier-sync');
+    const syncSubprocess = await fork('courier-sync');
     const events = this.events;
     yield* await pipe(
       wrapSubprocessErrors(syncSubprocess),
@@ -103,7 +104,7 @@ export class CourierSyncManager {
       const { gateway: defaultGatewayIPAddress } = await getDefaultGateway();
       return defaultGatewayIPAddress;
     } catch (err) {
-      throw new DisconnectedFromCourierError(err, 'Could not find default system gateway');
+      throw new DisconnectedFromCourierError(err as Error, 'Could not find default system gateway');
     }
   }
 
@@ -134,8 +135,8 @@ async function* wrapSubprocessErrors(
   try {
     yield* await messages;
   } catch (err) {
-    throw err.exitCode === 1
+    throw (err as SubprocessExitError).exitCode === 1
       ? new UnregisteredGatewayError('Private gateway is unregistered')
-      : new DisconnectedFromCourierError(err, 'Courier sync failed');
+      : new DisconnectedFromCourierError(err as Error, 'Courier sync failed');
   }
 }
