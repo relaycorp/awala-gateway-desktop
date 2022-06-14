@@ -133,7 +133,7 @@ describe('WebSocket server configuration', () => {
     await mockClient.connect();
     const closureReason = 'I have to run';
 
-    mockClient.close(WebSocketCode.NORMAL, closureReason as any);
+    mockClient.close(WebSocketCode.NORMAL, closureReason);
 
     expect(mockLogs).toContainEqual(
       partialPinoLog('debug', 'Closing connection', {
