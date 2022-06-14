@@ -8,19 +8,3 @@ updates:
   commit-message:
     prefix: "fix(deps):"
     prefix-development: "chore(deps):"
-- package-ecosystem: npm
-  directory: "/packages/daemon"
-  schedule:
-    interval: weekly
-  versioning-strategy: increase
-  commit-message:
-    prefix: "fix(deps):"
-    prefix-development: "chore(deps):"
-- package-ecosystem: npm
-  directory: "/packages/ui"
-  schedule:
-    interval: weekly
-  versioning-strategy: increase
-  commit-message:
-    prefix: "fix(deps):"
-    prefix-development: "chore(deps):"
