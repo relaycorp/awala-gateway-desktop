@@ -26,12 +26,12 @@ export function useTemporaryAppDirs(): () => Paths {
   beforeEach(async () => {
     Container.set(APP_DIRS, tempAppDirs);
 
-    await fs.rmdir(tempDir, { recursive: true });
+    await (fs as any).rm(tempDir, { recursive: true });
     await fs.mkdir(tempDir);
   });
 
   afterAll(async () => {
-    await fs.rmdir(tempDir, { recursive: true });
+    await (fs as any).rm(tempDir, { recursive: true });
   });
 
   return () => tempAppDirs;
