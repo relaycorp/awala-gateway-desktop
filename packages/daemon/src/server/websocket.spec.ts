@@ -101,7 +101,6 @@ describe('WebSocket server configuration', () => {
       await mockClient.send(serverResponseFrame);
       const response = await mockClient.receive();
       expect(response).toEqual(serverResponseFrame);
-      await mockClient.waitForPeerClosure();
     });
 
     expect(handlerSpied).toBeCalledWith(expect.any(Duplex), expect.any(EventEmitter), headers);
@@ -134,7 +133,7 @@ describe('WebSocket server configuration', () => {
     await mockClient.connect();
     const closureReason = 'I have to run';
 
-    mockClient.close(WebSocketCode.NORMAL, closureReason);
+    mockClient.close(WebSocketCode.NORMAL, closureReason as any);
 
     expect(mockLogs).toContainEqual(
       partialPinoLog('debug', 'Closing connection', {
@@ -213,7 +212,5 @@ describe('WebSocket server configuration', () => {
     socket.on('message', (message) => {
       connectionStream.write(message);
     });
-
-    setImmediate(() => socket.close());
   }
 });
