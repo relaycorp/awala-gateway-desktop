@@ -8,19 +8,7 @@ updates:
   commit-message:
     prefix: "fix(deps):"
     prefix-development: "chore(deps):"
-- package-ecosystem: npm
-  directory: "/packages/daemon"
-  schedule:
-    interval: weekly
-  versioning-strategy: increase
-  commit-message:
-    prefix: "fix(deps):"
-    prefix-development: "chore(deps):"
-- package-ecosystem: npm
-  directory: "/packages/ui"
-  schedule:
-    interval: weekly
-  versioning-strategy: increase
-  commit-message:
-    prefix: "fix(deps):"
-    prefix-development: "chore(deps):"
+  ignore:
+    - dependency-name: "electron"
+      # Major upgrades should be done manually until we have functional tests
+      update-types: ["version-update:semver-major"]
