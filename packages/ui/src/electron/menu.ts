@@ -1,6 +1,32 @@
-import { BrowserWindow, Menu, MenuItemConstructorOptions } from 'electron';
+import { app, BrowserWindow, Menu, MenuItemConstructorOptions } from 'electron';
 
 const isMac = process.platform === 'darwin';
+
+const developerMenu = {
+  label: 'Developer',
+  submenu: [
+    {
+      accelerator: isMac ? 'Alt+Cmd+I' : 'Alt+Shift+I',
+      click: () => {
+        const win = BrowserWindow.getFocusedWindow();
+        if (win) {
+          win.webContents.toggleDevTools();
+        }
+      },
+      label: 'Open Dev Tools',
+    },
+    {
+      accelerator: isMac ? 'Cmd+R' : 'Ctrl+R',
+      click: () => {
+        const win = BrowserWindow.getFocusedWindow();
+        if (win) {
+          win.webContents.reload();
+        }
+      },
+      label: 'Reload',
+    },
+  ],
+};
 
 export default function buildMenu(
   showMainWindow: () => void,
@@ -34,31 +60,7 @@ export default function buildMenu(
         },
       ],
     },
-    {
-      label: 'Developer',
-      submenu: [
-        {
-          accelerator: isMac ? 'Alt+Cmd+I' : 'Alt+Shift+I',
-          click: () => {
-            const win = BrowserWindow.getFocusedWindow();
-            if (win) {
-              win.webContents.toggleDevTools();
-            }
-          },
-          label: 'Open Dev Tools',
-        },
-        {
-          accelerator: isMac ? 'Cmd+R' : 'Ctrl+R',
-          click: () => {
-            const win = BrowserWindow.getFocusedWindow();
-            if (win) {
-              win.webContents.reload();
-            }
-          },
-          label: 'Reload',
-        },
-      ],
-    },
+    ...(app.isPackaged ? [] : [developerMenu]),
   ]);
 }
 
