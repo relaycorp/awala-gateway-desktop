@@ -46,7 +46,7 @@
     "copy-webpack-plugin": "^10.0.0",
     "cross-env": "^7.0.3",
     "css-loader": "^6.7.1",
-    "electron": "^16.0.6",
+    "electron": "^16.2.6",
     "electron-builder": "^22.14.5",
     "fetch-mock-jest": "^1.5.1",
     "html-webpack-plugin": "^5.5.0",
