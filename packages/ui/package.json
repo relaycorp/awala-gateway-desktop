@@ -28,7 +28,7 @@
     "pino": "^7.6.0",
     "utf-8-validate": "^5.0.8",
     "verror": "^1.10.1",
-    "ws": "^8.4.0"
+    "ws": "^8.8.0"
   },
   "devDependencies": {
     "@mapbox/node-pre-gyp": "^1.0.8",
@@ -41,7 +41,7 @@
     "@types/react": "^17.0.36",
     "@types/react-dom": "^17.0.11",
     "@types/verror": "^1.10.5",
-    "@types/ws": "^8.2.2",
+    "@types/ws": "^8.5.3",
     "abort-controller": "^3.0.0",
     "copy-webpack-plugin": "^11.0.0",
     "cross-env": "^7.0.3",
