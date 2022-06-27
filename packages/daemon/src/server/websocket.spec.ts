@@ -101,7 +101,6 @@ describe('WebSocket server configuration', () => {
       await mockClient.send(serverResponseFrame);
       const response = await mockClient.receive();
       expect(response).toEqual(serverResponseFrame);
-      await mockClient.waitForPeerClosure();
     });
 
     expect(handlerSpied).toBeCalledWith(expect.any(Duplex), expect.any(EventEmitter), headers);
@@ -213,7 +212,5 @@ describe('WebSocket server configuration', () => {
     socket.on('message', (message) => {
       connectionStream.write(message);
     });
-
-    setImmediate(() => socket.close());
   }
 });
