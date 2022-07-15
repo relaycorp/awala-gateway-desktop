@@ -1,6 +1,4 @@
 import {
-  generateRSAKeyPair,
-  getPrivateAddressFromIdentityKey,
   ParcelCollectionHandshakeVerifier,
   ParcelDeliveryVerifier,
   PrivateGatewayManager as BasePrivateGatewayManager,
@@ -57,9 +55,7 @@ export class PrivateGatewayManager extends BasePrivateGatewayManager {
       }
     }
 
-    const keyPair = await generateRSAKeyPair();
-    await this.keyStores.privateKeyStore.saveIdentityKey(keyPair.privateKey!);
-    const privateAddress = await getPrivateAddressFromIdentityKey(keyPair.publicKey!);
+    const { privateAddress } = await this.keyStores.privateKeyStore.generateIdentityKeyPair();
     await this.config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
   }
 

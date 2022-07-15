@@ -33,7 +33,10 @@ describe('set', () => {
   test('Missing key should be created', async () => {
     await config.set(TOKEN, VALUE);
 
-    await expect(configRepository.findOne(TOKEN)).resolves.toHaveProperty('value', VALUE);
+    await expect(configRepository.findOneBy({ key: TOKEN })).resolves.toHaveProperty(
+      'value',
+      VALUE,
+    );
   });
 
   test('Existing key should be replaced', async () => {
@@ -42,6 +45,9 @@ describe('set', () => {
     await config.set(TOKEN, VALUE);
     await config.set(TOKEN, newValue);
 
-    await expect(configRepository.findOne(TOKEN)).resolves.toHaveProperty('value', newValue);
+    await expect(configRepository.findOneBy({ key: TOKEN })).resolves.toHaveProperty(
+      'value',
+      newValue,
+    );
   });
 });

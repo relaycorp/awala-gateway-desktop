@@ -13,7 +13,6 @@ import pipe from 'it-pipe';
 import { join } from 'path';
 import { PassThrough } from 'stream';
 import { Container } from 'typedi';
-import { getRepository } from 'typeorm';
 
 import { ParcelCollection } from './entity/ParcelCollection';
 import { FileStore } from './fileStore';
@@ -31,7 +30,7 @@ import { GeneratedParcel } from './testUtils/ramf';
 import { LOGGER } from './tokens';
 import { MessageDirection } from './utils/MessageDirection';
 
-setUpTestDBConnection();
+const getConnection = setUpTestDBConnection();
 
 const getAppDirs = useTemporaryAppDirs();
 
@@ -60,6 +59,7 @@ beforeEach(() => {
   parcelStore = new ParcelStore(
     Container.get(FileStore),
     Container.get(DBPrivateKeyStore),
+    getConnection().getRepository(ParcelCollection),
     Container.get(LOGGER),
   );
 });
@@ -110,7 +110,7 @@ describe('storeEndpointBound', () => {
   test('Parcel should be overridden if it was stored but has not been delivered to endpoint', async () => {
     const { parcel, parcelSerialized } = await makeEndpointBoundParcel();
     await parcelStore.storeEndpointBound(parcelSerialized, parcel);
-    const collectionRepo = getRepository(ParcelCollection);
+    const collectionRepo = getConnection().getRepository(ParcelCollection);
     await collectionRepo.save(
       collectionRepo.create({
         parcelExpiryDate: parcel.expiryDate,
@@ -130,7 +130,7 @@ describe('storeEndpointBound', () => {
 
   test('Parcel should be ignored if it was already stored and delivered to endpoint', async () => {
     const { parcel, parcelSerialized } = await makeEndpointBoundParcel();
-    const collectionRepo = getRepository(ParcelCollection);
+    const collectionRepo = getConnection().getRepository(ParcelCollection);
     await collectionRepo.save(
       collectionRepo.create({
         parcelExpiryDate: parcel.expiryDate,

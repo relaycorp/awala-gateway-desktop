@@ -1,5 +1,6 @@
 import {
   Certificate,
+  CertificationPath,
   getRSAPublicKeyFromPrivate,
   issueGatewayCertificate,
   ParcelDeliveryVerifier,
@@ -178,7 +179,10 @@ describe('getVerifier', () => {
   test('Verifier should be returned if private address of public gateway is set', async () => {
     const publicGatewayPrivateAddress = '0deadbeef';
     const certificate = await selfIssuedCertificate();
-    await Container.get(DBCertificateStore).save(certificate, publicGatewayPrivateAddress);
+    await Container.get(DBCertificateStore).save(
+      new CertificationPath(certificate, []),
+      publicGatewayPrivateAddress,
+    );
     await Container.get(Config).set(
       ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS,
       publicGatewayPrivateAddress,

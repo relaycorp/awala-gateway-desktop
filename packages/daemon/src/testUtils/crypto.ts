@@ -1,5 +1,9 @@
-import { Certificate, IdentityPublicKey, PrivateKey } from '@relaycorp/keystore-db';
-import { getPrivateAddressFromIdentityKey, SessionKeyPair } from '@relaycorp/relaynet-core';
+import { Certificate, IdentityPublicKey, IdentityPrivateKey } from '@relaycorp/keystore-db';
+import {
+  CertificationPath,
+  getPrivateAddressFromIdentityKey,
+  SessionKeyPair,
+} from '@relaycorp/relaynet-core';
 import {
   generateIdentityKeyPairSet,
   generatePDACertificationPath,
@@ -74,8 +78,14 @@ export function mockGatewayRegistration(
     const publicGatewayPrivateAddress =
       await pdaCertPath.publicGateway.calculateSubjectPrivateAddress();
 
-    await privateKeyStore.saveIdentityKey(keyPairSet.privateGateway.privateKey!!);
-    await certificateStore.save(pdaCertPath.privateGateway, publicGatewayPrivateAddress);
+    await privateKeyStore.saveIdentityKey(
+      privateGatewayPrivateAddress,
+      keyPairSet.privateGateway.privateKey!,
+    );
+    await certificateStore.save(
+      new CertificationPath(pdaCertPath.privateGateway, [pdaCertPath.publicGateway]),
+      publicGatewayPrivateAddress,
+    );
 
     await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateGatewayPrivateAddress);
 
@@ -104,7 +114,7 @@ export function mockGatewayRegistration(
   const deletePrivateGateway = async () => {
     await undoGatewayRegistration();
 
-    const privateKeyRepository = getRepository(PrivateKey);
+    const privateKeyRepository = getRepository(IdentityPrivateKey);
     await privateKeyRepository.clear();
 
     const certificateRepository = getRepository(Certificate);

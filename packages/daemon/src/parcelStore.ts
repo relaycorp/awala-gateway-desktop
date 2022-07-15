@@ -6,7 +6,8 @@ import { join } from 'path';
 import { Logger } from 'pino';
 import { parallelMerge } from 'streaming-iterables';
 import { Container, Inject, Service } from 'typedi';
-import { getRepository } from 'typeorm';
+import { InjectRepository } from 'typeorm-typedi-extensions';
+import { Repository } from 'typeorm';
 
 import { ParcelCollection } from './entity/ParcelCollection';
 import { FileStore } from './fileStore';
@@ -35,6 +36,7 @@ export class ParcelStore {
   constructor(
     @Inject() protected fileStore: FileStore,
     @Inject() protected privateKeyStore: DBPrivateKeyStore,
+    @InjectRepository(ParcelCollection) protected collectionRepo: Repository<ParcelCollection>,
     @Inject(LOGGER) protected logger: Logger,
   ) {}
 
@@ -49,7 +51,7 @@ export class ParcelStore {
     parcel: Parcel,
   ): Promise<string | null> {
     let isParcelNew = true;
-    if (await wasEndpointBoundParcelCollected(parcel)) {
+    if (await wasEndpointBoundParcelCollected(parcel, this.collectionRepo)) {
       isParcelNew = false;
       if (await this.wasEndpointBoundParcelDelivered(parcel)) {
         return null;
@@ -271,9 +273,11 @@ function getAbsoluteParcelKey(direction: MessageDirection, parcelRelativeKey?: s
   return join(ParcelStore.FILE_STORE_PREFIX, subComponent, ...trailingComponents);
 }
 
-async function wasEndpointBoundParcelCollected(parcel: Parcel): Promise<boolean> {
-  const collectionRepo = getRepository(ParcelCollection);
-  const parcelCollectionsCount = await collectionRepo.count({
+async function wasEndpointBoundParcelCollected(
+  parcel: Parcel,
+  collectionRepo: Repository<ParcelCollection>,
+): Promise<boolean> {
+  const parcelCollectionsCount = await collectionRepo.countBy({
     parcelId: parcel.id,
     recipientEndpointAddress: parcel.recipientAddress,
     senderEndpointPrivateAddress: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
