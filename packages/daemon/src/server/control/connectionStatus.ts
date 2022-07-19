@@ -1,4 +1,3 @@
-import AbortController from 'abort-controller';
 import { source as makeSourceAbortable } from 'abortable-iterator';
 import pipe from 'it-pipe';
 import { sink } from 'stream-to-it';

@@ -18,16 +18,14 @@ class Stepper extends Component<Props, State> {
     super(props);
     this.state = { step: 0 };
   }
-  public render() : JSX.Element {
+  public override render(): JSX.Element {
     return (
-      <div className='stepper'>
-        <div className='left'>
+      <div className="stepper">
+        <div className="left">
           <img src={this.props.getImage(this.state.step)} />
         </div>
-        <div className='right'>
-          <div className='content'>
-            {this.props.getContent(this.state.step)}
-          </div>
+        <div className="right">
+          <div className="content">{this.props.getContent(this.state.step)}</div>
           <StepperButtons
             numSteps={this.props.numSteps}
             selected={this.state.step}
@@ -40,14 +38,14 @@ class Stepper extends Component<Props, State> {
       </div>
     );
   }
-  private prevStep() : void {
+  private prevStep(): void {
     if (this.state.step > 0) {
-      this.setState({step: this.state.step - 1});
+      this.setState({ step: this.state.step - 1 });
     }
   }
-  private nextStep() : void {
+  private nextStep(): void {
     if (this.state.step < this.props.numSteps) {
-      this.setState({step: this.state.step + 1});
+      this.setState({ step: this.state.step + 1 });
     }
   }
 }

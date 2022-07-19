@@ -15,7 +15,7 @@ export class Config {
   constructor(@InjectRepository(ConfigItem) private configRepository: Repository<ConfigItem>) {}
 
   public async get(key: ConfigKey): Promise<string | null> {
-    const item = await this.configRepository.findOne(key);
+    const item = await this.configRepository.findOneBy({ key });
     return item?.value ?? null;
   }
 

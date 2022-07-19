@@ -6,6 +6,7 @@ import {
   CargoMessageSet,
   Certificate,
   CertificateRotation,
+  CertificationPath,
   CMSError,
   derSerializePublicKey,
   generateRSAKeyPair,
@@ -248,11 +249,16 @@ describe('Cargo collection', () => {
 
         const cca = await retrieveCCA();
         const cargoDeliveryAuthorization = await extractCDA(cca);
-        const cdaIssuers = await certificateStore.retrieveAll(
+        const cdaIssuerPaths = await certificateStore.retrieveAll(
           privateGatewayPrivateAddress,
           privateGatewayPrivateAddress,
         );
-        await expect(cargoDeliveryAuthorization.getCertificationPath([], cdaIssuers)).toResolve();
+        await expect(
+          cargoDeliveryAuthorization.getCertificationPath(
+            [],
+            cdaIssuerPaths.map((p) => p.leafCertificate),
+          ),
+        ).toResolve();
       });
 
       test('Cargo produced with prior CDA should be accepted', async () => {
@@ -420,13 +426,13 @@ describe('Cargo collection', () => {
       await runCourierSync(getParentStream());
 
       const parcelCollectionRepo = getRepository(ParcelCollection);
-      const collection = await parcelCollectionRepo.findOneOrFail({
+      const collection = await parcelCollectionRepo.findOneBy({
         parcelId: parcel.id,
         recipientEndpointAddress: parcel.recipientAddress,
         senderEndpointPrivateAddress:
           await parcel.senderCertificate.calculateSubjectPrivateAddress(),
       });
-      expect(collection.parcelExpiryDate).toEqual(parcel.expiryDate);
+      expect(collection!.parcelExpiryDate).toEqual(parcel.expiryDate);
     });
 
     test('Parent process should be notified about collection if parcel is new', async () => {
@@ -521,8 +527,10 @@ describe('Cargo collection', () => {
   describe('Encapsulated certificate rotation', () => {
     test('Certificate for different private gateway should be ignored', async () => {
       const certificateRotation = new CertificateRotation(
-        publicGatewayPDACertificate, // Invalid certificate: wrong subject private address
-        [],
+        new CertificationPath(
+          publicGatewayPDACertificate, // Invalid certificate: wrong subject private address
+          [],
+        ),
       );
       const { cargoSerialized } = await makeCargoFromMessages([certificateRotation.serialize()]);
       mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
@@ -531,7 +539,7 @@ describe('Cargo collection', () => {
 
       await expect(
         certificateStore.retrieveLatest(privateGatewayPrivateAddress, publicGatewayPrivateAddress),
-      ).resolves.toSatisfy((c) => c.isEqual(privateGatewayPDACertificate));
+      ).resolves.toSatisfy((p) => p.leafCertificate.isEqual(privateGatewayPDACertificate));
       expect(mockLogs).toContainEqual(
         partialPinoLog(
           'warn',
@@ -557,7 +565,9 @@ describe('Cargo collection', () => {
         issuerPrivateKey: differentPublicGatewayKeyPair.privateKey!, // Invalid
         validityEndDate: addSeconds(privateGatewayPDACertificate.expiryDate, 1),
       });
-      const certificateRotation = new CertificateRotation(newCertificate, []);
+      const certificateRotation = new CertificateRotation(
+        new CertificationPath(newCertificate, []),
+      );
       const { cargoSerialized } = await makeCargoFromMessages([certificateRotation.serialize()]);
       mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
 
@@ -565,7 +575,7 @@ describe('Cargo collection', () => {
 
       await expect(
         certificateStore.retrieveLatest(privateGatewayPrivateAddress, publicGatewayPrivateAddress),
-      ).resolves.toSatisfy((c) => c.isEqual(privateGatewayPDACertificate));
+      ).resolves.toSatisfy((p) => p.leafCertificate.isEqual(privateGatewayPDACertificate));
       expect(mockLogs).toContainEqual(
         partialPinoLog(
           'warn',
@@ -592,17 +602,25 @@ describe('Cargo collection', () => {
         issuerPrivateKey: publicGatewayPrivateKey,
         validityEndDate: addSeconds(privateGatewayPDACertificate.expiryDate, 1),
       });
-      const certificateRotation = new CertificateRotation(newPrivateGatewayCertificate, []);
+      const certificateRotation = new CertificateRotation(
+        new CertificationPath(newPrivateGatewayCertificate, [newPublicGatewayCertificate]),
+      );
       const { cargoSerialized } = await makeCargoFromMessages([certificateRotation.serialize()]);
       mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
 
       await runCourierSync(getParentStream());
 
-      const latestCertificate = await certificateStore.retrieveLatest(
+      const latestCertificatePath = await certificateStore.retrieveLatest(
         privateGatewayPrivateAddress,
         publicGatewayPrivateAddress,
       );
-      await expect(latestCertificate!.isEqual(newPrivateGatewayCertificate)).toBeTrue();
+      await expect(
+        latestCertificatePath!.leafCertificate.isEqual(newPrivateGatewayCertificate),
+      ).toBeTrue();
+      await expect(latestCertificatePath!.certificateAuthorities).toHaveLength(1);
+      await expect(
+        latestCertificatePath!.certificateAuthorities[0].isEqual(newPublicGatewayCertificate),
+      ).toBeTrue();
       expect(mockLogs).toContainEqual(
         partialPinoLog('info', 'New certificate in rotation was saved', {
           certificateExpiryDate: newPrivateGatewayCertificate.expiryDate.toISOString(),
@@ -686,7 +704,8 @@ describe('Cargo collection', () => {
       messagesSerialized.map((s) => (Buffer.isBuffer(s) ? bufferToArray(s) : s)),
     );
     const privateGatewayManager = Container.get(PrivateGatewayManager);
-    const privateGatewaySessionKey = await privateGatewayManager.generateSessionKey(
+    const privateGateway = await privateGatewayManager.getCurrent();
+    const privateGatewaySessionKey = await privateGateway.generateSessionKey(
       publicGatewayPrivateAddress,
     );
     const { envelopedData } = await SessionEnvelopedData.encrypt(

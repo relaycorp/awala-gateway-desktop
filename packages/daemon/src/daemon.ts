@@ -1,12 +1,12 @@
 import { format } from 'date-fns';
 import { utcToZonedTime } from 'date-fns-tz';
+import { Container } from 'typedi';
 import { getConnection } from 'typeorm';
 
 import { ParcelCollection } from './entity/ParcelCollection';
 import { makeServer, runServer } from './server';
 import startup from './startup';
 import runSync from './sync';
-import { Container } from 'typedi';
 import { PrivateGatewayManager } from './PrivateGatewayManager';
 
 const TYPEORM_DATE_FORMAT = 'yyyy-MM-dd HH:mm:ss.SSS';

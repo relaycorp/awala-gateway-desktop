@@ -12,7 +12,7 @@ class SyncContent extends Component<Props> {
     title: "Syncing with a courier"
   };
 
-  public render() : JSX.Element {
+  public override render() : JSX.Element {
     return (
       <div className="sync">
         <h2>{this.props.title}</h2>

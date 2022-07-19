@@ -27,7 +27,7 @@ class StepperButtons extends Component<Props> {
     super(props);
     this.state = { step: 0 };
   }
-  public render() : JSX.Element {
+  public override render() : JSX.Element {
     return <div className='buttons'>{ this.buttons() }</div>;
   }
   private backButton() : JSX.Element {

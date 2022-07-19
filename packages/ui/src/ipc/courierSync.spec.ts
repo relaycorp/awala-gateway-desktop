@@ -57,7 +57,7 @@ describe('synchronizeWithCourier', () => {
       for await (const item of synchronizeWithCourier('TOKEN').promise) {
         handleStatus(item);
       }
-    } catch (err) {
+    } catch (err: any) {
       expect(err).toBeInstanceOf(CourierSyncError);
       expect(err.message).toMatch(/Unknown status/i);
       expect(handleStatus).toHaveBeenCalledTimes(0);
@@ -125,7 +125,7 @@ describe('synchronizeWithCourier', () => {
       for await (const item of promise) {
         handleStatus(item);
       }
-    } catch (err) {
+    } catch (err: any) {
       expect(err).toBeInstanceOf(CourierSyncError);
       expect(err.message).toMatch(/1011/i);
     }

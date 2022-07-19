@@ -19,9 +19,9 @@ class Onboarding extends Component<Props> {
   constructor(props: Props) {
     super(props);
   }
-  public render() : JSX.Element {
+  public override render(): JSX.Element {
     return (
-      <div className='onboarding'>
+      <div className="onboarding">
         <Stepper
           getContent={this.getContent}
           getImage={this.getImage}
@@ -31,52 +31,48 @@ class Onboarding extends Component<Props> {
       </div>
     );
   }
-  private getContent(step: number) : JSX.Element {
+  private getContent(step: number): JSX.Element {
     switch (step) {
       case OnboardingStep.WELCOME:
-      return (
-        <div>
-          <h1>Welcome to Awala</h1>
-          <p>
-            Awala enables compatible apps on your device to send and receive data
-            from the Internet securely, even when you’re disconnected from the
-            Internet.
-          </p>
-        </div>
-      );
+        return (
+          <div>
+            <h1>Welcome to Awala</h1>
+            <p>
+              Awala enables compatible apps on your device to send and receive data from the
+              Internet securely, even when you’re disconnected from the Internet.
+            </p>
+          </div>
+        );
       case OnboardingStep.EASY:
-      return (
-        <div>
-          <h1>Using Awala is easy</h1>
-          <p>
-            When you’re connected to the Internet, your apps will simply use
-            it seamlessly.
-          </p>
-          <p>
-            When you’re cut off from the Internet, Awala couriers will
-            transport your apps’ data to and from the Internet.
-          </p>
-        </div>
-      );
+        return (
+          <div>
+            <h1>Using Awala is easy</h1>
+            <p>When you’re connected to the Internet, your apps will simply use it seamlessly.</p>
+            <p>
+              When you’re cut off from the Internet, Awala couriers will transport your apps’ data
+              to and from the Internet.
+            </p>
+          </div>
+        );
       case OnboardingStep.START:
       default:
-      return (
-        <div>
-        <h1>Awala keeps you safe</h1>
-          <p>
-            Awala apps use end-to-end encryption, so it’s impossible for this
-            app or couriers to see their data.
-          </p>
-          <p>
-            It’s also impossible for couriers to find out which apps you’re
-            using. And needless to say we aren’t tracking you or your apps!
-          </p>
-        </div>
-      );
+        return (
+          <div>
+            <h1>Awala keeps you safe</h1>
+            <p>
+              Awala apps use end-to-end encryption, so it’s impossible for this app or couriers to
+              see their data.
+            </p>
+            <p>
+              It’s also impossible for couriers to find out which apps you’re using. And needless to
+              say we aren’t tracking you or your apps!
+            </p>
+          </div>
+        );
     }
   }
 
-  private getImage(step: number) : string {
+  private getImage(step: number): string {
     switch (step) {
       case OnboardingStep.WELCOME:
         return image1;
@@ -86,7 +82,6 @@ class Onboarding extends Component<Props> {
       default:
         return image3;
     }
-
   }
 }
 

@@ -6,6 +6,7 @@ import {
   CargoMessageStream,
   Certificate,
   CertificateRotation,
+  CertificationPath,
   Parcel,
   ParcelCollectionAck,
   PrivateGateway,
@@ -89,10 +90,12 @@ async function collectCargo(
   await pipe(
     client.collectCargo(ccaSerialized),
     async (cargoesSerialized: AsyncIterable<Buffer>) => {
-      const ownPDCCertificates = await certificateStore.retrieveAll(
-        privateGateway.privateAddress,
-        channel.peerPrivateAddress,
-      );
+      const ownPDCCertificates = (
+        await certificateStore.retrieveAll(
+          privateGateway.privateAddress,
+          channel.peerPrivateAddress,
+        )
+      ).map((p) => p.leafCertificate);
       const ownCDAIssuers = await channel.getCDAIssuers();
 
       const parcelCollectionRepo = getRepository(ParcelCollection);
@@ -224,7 +227,8 @@ async function processCertificateRotation(
   certificateStore: DBCertificateStore,
   logger: Logger,
 ): Promise<void> {
-  const newPrivateGatewayCertificate = rotation.subjectCertificate;
+  const certificationPath = rotation.certificationPath;
+  const newPrivateGatewayCertificate = certificationPath.leafCertificate;
   const subjectPrivateAddress = await newPrivateGatewayCertificate.calculateSubjectPrivateAddress();
   if (subjectPrivateAddress !== privateGatewayPrivateAddress) {
     logger.warn(
@@ -242,7 +246,10 @@ async function processCertificateRotation(
     return;
   }
 
-  await certificateStore.save(newPrivateGatewayCertificate, publicGatewayPrivateAddress);
+  await certificateStore.save(
+    new CertificationPath(newPrivateGatewayCertificate, certificationPath.certificateAuthorities),
+    publicGatewayPrivateAddress,
+  );
   logger.info(
     { certificateExpiryDate: newPrivateGatewayCertificate.expiryDate },
     'New certificate in rotation was saved',

@@ -22,7 +22,7 @@ export class FileStore {
     try {
       await fs.stat(objectPath);
       return true;
-    } catch (err) {
+    } catch (err: any) {
       if (err.code === 'ENOENT') {
         // File does not exist
         return false;
@@ -35,7 +35,7 @@ export class FileStore {
     const objectPath = this.getObjectPath(key);
     try {
       return await fs.readFile(objectPath);
-    } catch (err) {
+    } catch (err: any) {
       if (err.code === 'ENOENT') {
         // File does not exist
         return null;
@@ -59,7 +59,7 @@ export class FileStore {
     const objectPath = this.getObjectPath(key);
     try {
       await fs.unlink(objectPath);
-    } catch (err) {
+    } catch (err: any) {
       if (err.code !== 'ENOENT') {
         throw new FileStoreError(err, 'Failed to delete object');
       }
@@ -71,7 +71,7 @@ export class FileStore {
     let directoryContents: readonly Dirent[];
     try {
       directoryContents = await fs.readdir(directoryPath, { withFileTypes: true });
-    } catch (err) {
+    } catch (err: any) {
       if (err.code === 'ENOENT') {
         directoryContents = [];
       } else {

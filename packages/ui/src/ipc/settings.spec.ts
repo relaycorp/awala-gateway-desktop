@@ -29,7 +29,7 @@ describe('getPublicGatewayAddress', () => {
     });
     try {
       await getPublicGatewayAddress('TOKEN');
-    } catch (error) {
+    } catch (error: any) {
       expect(error).toBeInstanceOf(SettingError);
       expect(error.message).toEqual('error message');
     }

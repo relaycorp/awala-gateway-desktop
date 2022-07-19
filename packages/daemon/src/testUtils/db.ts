@@ -4,7 +4,7 @@ import { Connection, createConnection, getConnectionOptions } from 'typeorm';
 
 const IS_TYPESCRIPT = __filename.endsWith('.ts');
 
-export function setUpTestDBConnection(): void {
+export function setUpTestDBConnection(): () => Connection {
   let connection: Connection;
 
   beforeAll(async () => {
@@ -31,4 +31,6 @@ export function setUpTestDBConnection(): void {
   afterAll(async () => {
     await connection?.close();
   });
+
+  return () => connection;
 }
