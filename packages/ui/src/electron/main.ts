@@ -163,7 +163,7 @@ async function updateTray(): Promise<void> {
       for await (const item of promise) {
         tray.setToolTip(ConnectionStatus[item]);
       }
-    } catch (err) {
+    } catch (err: any) {
       if (err.target instanceof WebSocket) {
         abort();
       } else {

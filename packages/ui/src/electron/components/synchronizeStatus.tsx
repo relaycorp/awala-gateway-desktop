@@ -18,7 +18,7 @@ class SynchronizeStatus extends Component<Props> {
     super(props);
   }
 
-  public render() : JSX.Element {
+  public override render() : JSX.Element {
     if (this.props.error) {
       return (
         <SyncContent image={syncingError} title="Something went wrong"

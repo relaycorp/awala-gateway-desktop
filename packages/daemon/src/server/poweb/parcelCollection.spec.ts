@@ -491,7 +491,7 @@ class MockParcelCollectionClient extends MockClient {
     });
   }
 
-  public async send(message: Data): Promise<void> {
+  public override async send(message: Data): Promise<void> {
     await super.send(message);
     await setImmediateAsync();
   }

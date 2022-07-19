@@ -25,8 +25,8 @@ export default async function subprocessEntrypoint(subprocessName: string): Prom
     const logger = Container.get(LOGGER);
 
     process.once('disconnect', () => {
-      process.exit();
       logger.fatal('Exiting due to parent disconnection');
+      process.exit();
     });
 
     try {

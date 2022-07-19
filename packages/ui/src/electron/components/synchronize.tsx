@@ -23,7 +23,7 @@ class Synchronize extends Component<Props, State> {
     };
   }
 
-  public async componentDidMount() : Promise<void> {
+  public override async componentDidMount() : Promise<void> {
     try {
       const {promise, abort} = synchronizeWithCourier(this.props.token);
       this.setState({ abort });
@@ -36,13 +36,13 @@ class Synchronize extends Component<Props, State> {
     }
   }
 
-  public componentWillUnmount() : void {
+  public override componentWillUnmount() : void {
     if (this.state.abort) {
       this.state.abort();
     }
   }
 
-  public render() : JSX.Element {
+  public override render() : JSX.Element {
     return (
       <SynchronizeStatus
         status={this.state.status}

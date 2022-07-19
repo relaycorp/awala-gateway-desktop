@@ -6,14 +6,12 @@ interface HomeContentProps {
   readonly className?: string
 }
 class HomeContent extends Component<HomeContentProps> {
-  public render() : JSX.Element {
+  public override render(): JSX.Element {
     return (
       <div className="home">
         <img src={this.props.image} />
         <h1>{this.props.title}</h1>
-        <div className={'content ' + this.props.className}>
-          {this.props.children}
-        </div>
+        <div className={'content ' + this.props.className}>{this.props.children}</div>
       </div>
     );
   }

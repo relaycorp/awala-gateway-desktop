@@ -3,29 +3,33 @@ import React, { Component } from 'react';
 import { version } from '../template.package.json';
 
 class AboutAwala extends Component {
-  public render() : JSX.Element {
+  public override render(): JSX.Element {
     return (
-      <div className='about'>
-        <div className='logo'></div>
+      <div className="about">
+        <div className="logo"></div>
         <p>
           Version {version}
           <br />
           By Relaycorp
         </p>
         <div>
-          <a href='https://awala.network/' onClick={this.onClickAwala}>Learn more about Awala</a>
+          <a href="https://awala.network/" onClick={this.onClickAwala}>
+            Learn more about Awala
+          </a>
           <br />
-          <a href='https://awala.network/legal' onClick={this.onClickLegal}>Legal policies</a>
+          <a href="https://awala.network/legal" onClick={this.onClickLegal}>
+            Legal policies
+          </a>
         </div>
       </div>
     );
   }
 
-  private onClickAwala(event: React.MouseEvent<HTMLElement>) : void {
+  private onClickAwala(event: React.MouseEvent<HTMLElement>): void {
     event.preventDefault();
     shell.openExternal('https://awala.network/');
   }
-  private onClickLegal(event: React.MouseEvent<HTMLElement>) : void {
+  private onClickLegal(event: React.MouseEvent<HTMLElement>): void {
     event.preventDefault();
     shell.openExternal('https://awala.network/legal');
   }

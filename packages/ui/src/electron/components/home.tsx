@@ -17,24 +17,22 @@ class Home extends Component<Props, State> {
     this.state = { status: ConnectionStatus.CONNECTING_TO_PUBLIC_GATEWAY };
   }
 
-  public async componentDidMount() : Promise<void> {
-    const {promise, abort} = pollConnectionStatus(this.props.token);
+  public override async componentDidMount(): Promise<void> {
+    const { promise, abort } = pollConnectionStatus(this.props.token);
     this.setState({ abort });
     for await (const item of promise) {
-      this.setState({status: item});
+      this.setState({ status: item });
     }
   }
 
-  public componentWillUnmount() : void {
+  public override componentWillUnmount(): void {
     if (this.state.abort) {
       this.state.abort();
     }
   }
 
-  public render() : JSX.Element {
-    return (
-      <Status status={this.state.status} onSynchronize={this.props.onSynchronize} />
-    );
+  public override render(): JSX.Element {
+    return <Status status={this.state.status} onSynchronize={this.props.onSynchronize} />;
   }
 }
 

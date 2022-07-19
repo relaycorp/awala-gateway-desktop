@@ -71,7 +71,7 @@ async function* _synchronizeWithCourier(token: string): AsyncIterable<CourierSyn
     }
     // Server does not send this one, but the UI is waiting for it
     yield CourierSyncStatus.COMPLETE;
-  } catch (err) {
+  } catch (err: any) {
     throw new CourierSyncError(err);
   }
 }
