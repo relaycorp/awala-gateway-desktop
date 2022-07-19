@@ -253,7 +253,7 @@ describe('listInternetBound', () => {
       ).resolves.toBeNull();
       expect(mockLogs).toContainEqual(
         partialPinoLog('warn', 'Malformed parcel metadata file', {
-          err: expect.objectContaining({ type: 'Error' }),
+          err: expect.objectContaining({ type: 'BSONError' }),
           parcelKey,
         }),
       );
