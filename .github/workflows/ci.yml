@@ -57,15 +57,18 @@ jobs:
 
       - run: npm test
 
-      - run: npm run build
-        working-directory: packages/daemon
-      # Work around https://github.com/webpack-contrib/copy-webpack-plugin/issues/59
-      - run: npm prune --omit=dev
-        working-directory: packages/daemon
-      - run: ../../node_modules/.bin/npm ci
-        working-directory: packages/ui
-      - run: npm run build
-        working-directory: packages/ui
+      - name: Build
+        working-directory: packages
+        run: |
+          set -o nounset -o errexit -o pipefail
+
+          cd daemon
+          npm run build
+          # Work around https://github.com/webpack-contrib/copy-webpack-plugin/issues/59
+          npm prune --omit=dev
+
+          cd ../ui
+          npm run build
 
       - run: npm run dist
         working-directory: packages/ui
