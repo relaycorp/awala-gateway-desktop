@@ -73,6 +73,7 @@ module.exports = [
           { from: './node_modules/daemon/**/*', to: '.' },
           { from: './node_modules/daemon/ormconfig.json', to: '.' }
         ],
+        options: { concurrency: 50 },
       }),
     ]
   },
