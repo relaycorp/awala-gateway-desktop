@@ -60,7 +60,7 @@ jobs:
       - run: npm run build
         working-directory: packages/daemon
       # Work around https://github.com/webpack-contrib/copy-webpack-plugin/issues/59
-      - run: npm prune --production
+      - run: npm prune --omit=dev
         working-directory: packages/daemon
       - run: npm run build
         working-directory: packages/ui
@@ -159,6 +159,15 @@ jobs:
 
       - run: npm run build
         if: ${{ steps.version-artefact.outcome == 'success' }}
+        working-directory: packages/daemon
+      # Work around https://github.com/webpack-contrib/copy-webpack-plugin/issues/59
+      - run: npm prune --omit=dev
+        if: ${{ steps.version-artefact.outcome == 'success' }}
+        working-directory: packages/daemon
+      - run: npm run build
+        if: ${{ steps.version-artefact.outcome == 'success' }}
+        working-directory: packages/ui
+
       - name: Set version in app
         if: ${{ steps.version-artefact.outcome == 'success' }}
         run: npm version ${{ steps.set-version.outputs.content }}
