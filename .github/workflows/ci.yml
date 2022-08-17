@@ -58,9 +58,9 @@ jobs:
       - run: npm run build
         timeout-minutes: 5
         working-directory: packages/daemon
-      - run: npm prune --production
-        timeout-minutes: 5
-        working-directory: packages/daemon
+#      - run: npm prune --production
+#        timeout-minutes: 5
+#        working-directory: packages/daemon
       - run: npm run build
         timeout-minutes: 5
         working-directory: packages/ui
