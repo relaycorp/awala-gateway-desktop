@@ -1,3 +1,6 @@
+// Work around "EMFILE: too many open files error" on Windows
+require('graceful-fs').gracefulify(require('fs'));
+
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const CopyPlugin = require("copy-webpack-plugin");
