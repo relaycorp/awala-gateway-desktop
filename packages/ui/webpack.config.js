@@ -70,10 +70,22 @@ module.exports = [
       new CopyPlugin({
         patterns: [
           { from: './src/electron/template.package.json', to: 'package.json' },
-          { from: './node_modules/daemon/**/*', to: '.' },
+          {
+            from: './node_modules/daemon/**/*',
+            to: '.',
+            globOptions: {
+              gitignore: true,
+              ignore: [
+                '**/coverage/**',
+                '**/src/**',
+                '**/README.md',
+                '**/jest.*.js',
+                '**/tsconfig.json',
+              ],
+            },
+          },
           { from: './node_modules/daemon/ormconfig.json', to: '.' }
         ],
-        options: { concurrency: 50 },
       }),
     ]
   },
