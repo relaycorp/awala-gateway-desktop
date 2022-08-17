@@ -15,7 +15,6 @@
     "static-checks:lint": "tslint --project .",
     "static-checks:prettier": "prettier \"packages/**/*.ts\" --list-different",
     "test": "lerna run test",
-    "test:ci": "lerna run test:ci:unit:jest",
     "clean": "lerna run clean"
   },
   "engines": {
