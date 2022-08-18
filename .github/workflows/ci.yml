@@ -59,6 +59,7 @@ jobs:
 
       - name: Build
         working-directory: packages
+        shell: bash
         run: |
           set -o nounset -o errexit -o pipefail
 
