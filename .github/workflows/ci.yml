@@ -58,18 +58,8 @@ jobs:
       - run: npm test
 
       - name: Build
-        working-directory: packages
         shell: bash
-        run: |
-          set -o nounset -o errexit -o pipefail
-
-          cd daemon
-          npm run build
-          # Work around https://github.com/webpack-contrib/copy-webpack-plugin/issues/59
-          npm prune --omit=dev
-
-          cd ../ui
-          npm run build
+        run: .github/scripts/build.sh
 
       - run: npm run dist
         working-directory: packages/ui
@@ -163,16 +153,10 @@ jobs:
         if: ${{ steps.version-artefact.outcome == 'success' }}
         working-directory: packages/ui
 
-      - run: npm run build
+      - name: Build
         if: ${{ steps.version-artefact.outcome == 'success' }}
-        working-directory: packages/daemon
-      # Work around https://github.com/webpack-contrib/copy-webpack-plugin/issues/59
-      - run: npm prune --omit=dev
-        if: ${{ steps.version-artefact.outcome == 'success' }}
-        working-directory: packages/daemon
-      - run: npm run build
-        if: ${{ steps.version-artefact.outcome == 'success' }}
-        working-directory: packages/ui
+        shell: bash
+        run: .github/scripts/build.sh
 
       - name: Set version in app
         if: ${{ steps.version-artefact.outcome == 'success' }}
