@@ -19,7 +19,7 @@ const mockPoWebClient = {};
 const mockPoWebInitRemote = mockSpy(jest.spyOn(PoWebClient, 'initRemote'), () => mockPoWebClient);
 
 describe('makeGSCClient', () => {
-  test('InternetAddressingError should be thrown if address does not exist', async () => {
+  test('NonExistingAddressError should be thrown if address does not exist', async () => {
     const error = await getPromiseRejection(
       makeGSCClient(DEFAULT_INTERNET_GATEWAY),
       NonExistingAddressError,

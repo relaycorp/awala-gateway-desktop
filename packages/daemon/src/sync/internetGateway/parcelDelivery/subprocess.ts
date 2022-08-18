@@ -43,12 +43,12 @@ export default async function runParcelDelivery(parentStream: Duplex): Promise<n
 }
 
 async function deliverParcels(
-  publicGatewayAddress: string,
+  internetGatewayAddress: string,
   signer: ParcelDeliverySigner,
   parcelStore: ParcelStore,
   logger: Logger,
 ): Promise<(parcelKeys: AsyncIterable<string>) => Promise<void>> {
-  const gcsClient = await makeGSCClient(publicGatewayAddress);
+  const gcsClient = await makeGSCClient(internetGatewayAddress);
 
   return async (parcelKeys: AsyncIterable<string>) => {
     for await (const parcelKey of parcelKeys) {
@@ -66,7 +66,7 @@ async function deliverParcels(
         } catch (err) {
           const errorAwareLogger = parcelAwareLogger.child({ err });
           if (err instanceof RefusedParcelError) {
-            errorAwareLogger.info('Parcel was refused by the public gateway');
+            errorAwareLogger.info('Parcel was refused by the Internet gateway');
             deleteParcel = true;
           } else if (err instanceof ServerError) {
             errorAwareLogger.warn('Parcel delivery failed due to server error');

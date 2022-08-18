@@ -2,8 +2,8 @@ import abortable from 'abortable-iterator';
 import { connect } from 'it-ws';
 
 export enum ConnectionStatus {
-  CONNECTING_TO_PUBLIC_GATEWAY,
-  CONNECTED_TO_PUBLIC_GATEWAY,
+  CONNECTING_TO_INTERNET_GATEWAY,
+  CONNECTED_TO_INTERNET_GATEWAY,
   CONNECTED_TO_COURIER,
   DISCONNECTED,
   UNREGISTERED,
@@ -37,8 +37,8 @@ async function* _pollConnectionStatus(token: string): AsyncIterable<ConnectionSt
   for await (const buffer of stream.source) {
     const name = buffer.toString();
     switch (name) {
-      case 'CONNECTED_TO_PUBLIC_GATEWAY':
-        yield ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY;
+      case 'CONNECTED_TO_INTERNET_GATEWAY':
+        yield ConnectionStatus.CONNECTED_TO_INTERNET_GATEWAY;
         break;
       case 'CONNECTED_TO_COURIER':
         yield ConnectionStatus.CONNECTED_TO_COURIER;

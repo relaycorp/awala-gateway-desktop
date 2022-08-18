@@ -3,9 +3,9 @@ import { setUpTestDBConnection } from '../testUtils/db';
 import { mockSpy } from '../testUtils/jest';
 import { mockLoggerToken } from '../testUtils/logging';
 import runSync from './index';
-import { GatewayRegistrar } from './publicGateway/GatewayRegistrar';
-import { ParcelCollectorManager } from './publicGateway/parcelCollection/ParcelCollectorManager';
-import { ParcelDeliveryManager } from './publicGateway/parcelDelivery/ParcelDeliveryManager';
+import { GatewayRegistrar } from './internetGateway/GatewayRegistrar';
+import { ParcelCollectorManager } from './internetGateway/parcelCollection/ParcelCollectorManager';
+import { ParcelDeliveryManager } from './internetGateway/parcelDelivery/ParcelDeliveryManager';
 import { StatusMonitor } from './StatusMonitor';
 import { arrayToAsyncIterable } from '../testUtils/iterables';
 import { DBCertificateStore } from '../keystores/DBCertificateStore';
@@ -92,7 +92,7 @@ describe('runSync', () => {
     );
   });
 
-  test('Registration with public gateway should be continuously renewed', async () => {
+  test('Registration with Internet gateway should be continuously renewed', async () => {
     expect(mockContinuallyRenewRegistration).not.toBeCalled();
     let wasIterableConsumed = false;
     mockContinuallyRenewRegistration.mockImplementation(async function* (): AsyncIterable<void> {

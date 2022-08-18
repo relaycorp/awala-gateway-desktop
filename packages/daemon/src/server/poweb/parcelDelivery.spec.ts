@@ -11,7 +11,7 @@ import { FastifyInstance } from 'fastify';
 import { Response as LightMyRequestResponse } from 'light-my-request';
 
 import { ParcelStore } from '../../parcelStore';
-import { ParcelDeliveryManager } from '../../sync/publicGateway/parcelDelivery/ParcelDeliveryManager';
+import { ParcelDeliveryManager } from '../../sync/internetGateway/parcelDelivery/ParcelDeliveryManager';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { arrayBufferFrom } from '../../testUtils/buffer';
 import { generatePKIFixture, mockGatewayRegistration } from '../../testUtils/crypto';

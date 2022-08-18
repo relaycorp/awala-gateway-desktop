@@ -61,18 +61,18 @@ const mockLogs = mockLoggerToken();
 
 let privateGatewayPrivateAddress: string;
 let privateGatewayPDACertificate: Certificate;
-let publicGatewayPrivateAddress: string;
-let publicGatewayPrivateKey: CryptoKey;
-let publicGatewayPDACertificate: Certificate;
+let internetGatewayId: string;
+let internetGatewayPrivateKey: CryptoKey;
+let internetGatewayPDACertificate: Certificate;
 const pkiFixtureRetriever = generatePKIFixture(async (keyPairSet, pdaCertPath) => {
   privateGatewayPrivateAddress = await getIdFromIdentityKey(keyPairSet.privateGateway.publicKey!);
   privateGatewayPDACertificate = pdaCertPath.privateGateway;
 
-  publicGatewayPrivateAddress = await getIdFromIdentityKey(keyPairSet.internetGateway.publicKey!);
-  publicGatewayPrivateKey = keyPairSet.internetGateway.privateKey!;
-  publicGatewayPDACertificate = pdaCertPath.internetGateway;
+  internetGatewayId = await getIdFromIdentityKey(keyPairSet.internetGateway.publicKey!);
+  internetGatewayPrivateKey = keyPairSet.internetGateway.privateKey!;
+  internetGatewayPDACertificate = pdaCertPath.internetGateway;
 });
-const { undoGatewayRegistration, getPublicGatewaySessionPrivateKey } =
+const { undoGatewayRegistration, getInternetGatewaySessionPrivateKey } =
   mockGatewayRegistration(pkiFixtureRetriever);
 
 const mockCollectCargo = mockSpy(jest.fn(), () => arrayToAsyncIterable([]));
@@ -218,16 +218,16 @@ describe('Cargo collection', () => {
     });
 
     describe('Cargo Delivery Authorization in Cargo Collection Request', () => {
-      test('Public key should be that of the public gateway', async () => {
+      test('Public key should be that of the Internet gateway', async () => {
         await runCourierSync(getParentStream());
 
         const cca = await retrieveCCA();
         const cargoDeliveryAuthorization = await extractCDA(cca);
-        expect(cargoDeliveryAuthorization.isEqual(publicGatewayPDACertificate)).toBeFalse();
+        expect(cargoDeliveryAuthorization.isEqual(internetGatewayPDACertificate)).toBeFalse();
         await expect(
           derSerializePublicKey(await cargoDeliveryAuthorization.getPublicKey()),
         ).resolves.toEqual(
-          await derSerializePublicKey(await publicGatewayPDACertificate.getPublicKey()),
+          await derSerializePublicKey(await internetGatewayPDACertificate.getPublicKey()),
         );
       });
 
@@ -284,8 +284,8 @@ describe('Cargo collection', () => {
       });
 
       async function extractCDA(cca: CargoCollectionAuthorization): Promise<Certificate> {
-        const publicGatewaySessionPrivateKey = getPublicGatewaySessionPrivateKey();
-        const { payload: ccr } = await cca.unwrapPayload(publicGatewaySessionPrivateKey);
+        const internetGatewaySessionPrivateKey = getInternetGatewaySessionPrivateKey();
+        const { payload: ccr } = await cca.unwrapPayload(internetGatewaySessionPrivateKey);
         return ccr.cargoDeliveryAuthorization;
       }
     });
@@ -313,10 +313,10 @@ describe('Cargo collection', () => {
     const { parcelSerialized } = await makeDummyParcel();
     const cargo = new Cargo(
       { id: await privateGatewayPDACertificate.calculateSubjectId() },
-      publicGatewayPDACertificate, // Sent by the public gateway, but using wrong certificate
+      internetGatewayPDACertificate, // Sent by the Internet gateway, but using wrong certificate
       Buffer.from(await makeCargoPayloadFromMessages([parcelSerialized])),
     );
-    const cargoSerialized = Buffer.from(await cargo.serialize(publicGatewayPrivateKey));
+    const cargoSerialized = Buffer.from(await cargo.serialize(internetGatewayPrivateKey));
     mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
 
     await runCourierSync(getParentStream());
@@ -518,7 +518,7 @@ describe('Cargo collection', () => {
     test('Certificate for different private gateway should be ignored', async () => {
       const certificateRotation = new CertificateRotation(
         new CertificationPath(
-          publicGatewayPDACertificate, // Invalid certificate: wrong subject private address
+          internetGatewayPDACertificate, // Invalid certificate: wrong subject private address
           [],
         ),
       );
@@ -528,7 +528,7 @@ describe('Cargo collection', () => {
       await runCourierSync(getParentStream());
 
       await expect(
-        certificateStore.retrieveLatest(privateGatewayPrivateAddress, publicGatewayPrivateAddress),
+        certificateStore.retrieveLatest(privateGatewayPrivateAddress, internetGatewayId),
       ).resolves.toSatisfy((p) => p.leafCertificate.isEqual(privateGatewayPDACertificate));
       expect(mockLogs).toContainEqual(
         partialPinoLog(
@@ -536,23 +536,23 @@ describe('Cargo collection', () => {
           'Ignored rotation containing certificate for different private gateway',
           {
             privateGatewayPrivateAddress,
-            subjectPrivateAddress: publicGatewayPrivateAddress,
+            subjectPrivateAddress: internetGatewayId,
           },
         ),
       );
     });
 
-    test('Certificate from different public gateway should be ignored', async () => {
-      const differentPublicGatewayKeyPair = await generateRSAKeyPair();
-      const differentPublicGatewayCertificate = await issueGatewayCertificate({
-        subjectPublicKey: differentPublicGatewayKeyPair.publicKey!,
-        issuerPrivateKey: differentPublicGatewayKeyPair.privateKey!,
-        validityEndDate: addSeconds(publicGatewayPDACertificate.expiryDate, 1),
+    test('Certificate from different Internet gateway should be ignored', async () => {
+      const differentInternetGatewayKeyPair = await generateRSAKeyPair();
+      const differentInternetGatewayCertificate = await issueGatewayCertificate({
+        subjectPublicKey: differentInternetGatewayKeyPair.publicKey!,
+        issuerPrivateKey: differentInternetGatewayKeyPair.privateKey!,
+        validityEndDate: addSeconds(internetGatewayPDACertificate.expiryDate, 1),
       });
       const newCertificate = await issueGatewayCertificate({
         subjectPublicKey: await privateGatewayPDACertificate.getPublicKey(),
-        issuerCertificate: differentPublicGatewayCertificate, // Invalid
-        issuerPrivateKey: differentPublicGatewayKeyPair.privateKey!, // Invalid
+        issuerCertificate: differentInternetGatewayCertificate, // Invalid
+        issuerPrivateKey: differentInternetGatewayKeyPair.privateKey!, // Invalid
         validityEndDate: addSeconds(privateGatewayPDACertificate.expiryDate, 1),
       });
       const certificateRotation = new CertificateRotation(
@@ -564,34 +564,34 @@ describe('Cargo collection', () => {
       await runCourierSync(getParentStream());
 
       await expect(
-        certificateStore.retrieveLatest(privateGatewayPrivateAddress, publicGatewayPrivateAddress),
+        certificateStore.retrieveLatest(privateGatewayPrivateAddress, internetGatewayId),
       ).resolves.toSatisfy((p) => p.leafCertificate.isEqual(privateGatewayPDACertificate));
       expect(mockLogs).toContainEqual(
         partialPinoLog(
           'warn',
           'Ignored rotation containing certificate from different Internet gateway',
           {
-            issuerId: await getIdFromIdentityKey(differentPublicGatewayKeyPair.publicKey!),
-            publicGatewayPrivateAddress,
+            issuerId: await getIdFromIdentityKey(differentInternetGatewayKeyPair.publicKey!),
+            internetGatewayId,
           },
         ),
       );
     });
 
     test('New private gateway certificate should be stored', async () => {
-      const newPublicGatewayCertificate = await issueGatewayCertificate({
-        subjectPublicKey: await publicGatewayPDACertificate.getPublicKey(),
-        issuerPrivateKey: publicGatewayPrivateKey,
-        validityEndDate: addSeconds(publicGatewayPDACertificate.expiryDate, 1),
+      const newInternetGatewayCertificate = await issueGatewayCertificate({
+        subjectPublicKey: await internetGatewayPDACertificate.getPublicKey(),
+        issuerPrivateKey: internetGatewayPrivateKey,
+        validityEndDate: addSeconds(internetGatewayPDACertificate.expiryDate, 1),
       });
       const newPrivateGatewayCertificate = await issueGatewayCertificate({
         subjectPublicKey: await privateGatewayPDACertificate.getPublicKey(),
-        issuerCertificate: newPublicGatewayCertificate,
-        issuerPrivateKey: publicGatewayPrivateKey,
+        issuerCertificate: newInternetGatewayCertificate,
+        issuerPrivateKey: internetGatewayPrivateKey,
         validityEndDate: addSeconds(privateGatewayPDACertificate.expiryDate, 1),
       });
       const certificateRotation = new CertificateRotation(
-        new CertificationPath(newPrivateGatewayCertificate, [newPublicGatewayCertificate]),
+        new CertificationPath(newPrivateGatewayCertificate, [newInternetGatewayCertificate]),
       );
       const { cargoSerialized } = await makeCargoFromMessages([certificateRotation.serialize()]);
       mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
@@ -600,14 +600,14 @@ describe('Cargo collection', () => {
 
       const latestCertificatePath = await certificateStore.retrieveLatest(
         privateGatewayPrivateAddress,
-        publicGatewayPrivateAddress,
+        internetGatewayId,
       );
       await expect(
         latestCertificatePath!.leafCertificate.isEqual(newPrivateGatewayCertificate),
       ).toBeTrue();
       await expect(latestCertificatePath!.certificateAuthorities).toHaveLength(1);
       await expect(
-        latestCertificatePath!.certificateAuthorities[0].isEqual(newPublicGatewayCertificate),
+        latestCertificatePath!.certificateAuthorities[0].isEqual(newInternetGatewayCertificate),
       ).toBeTrue();
       expect(mockLogs).toContainEqual(
         partialPinoLog('info', 'New certificate in rotation was saved', {
@@ -693,9 +693,7 @@ describe('Cargo collection', () => {
     );
     const privateGatewayManager = Container.get(PrivateGatewayManager);
     const privateGateway = await privateGatewayManager.getCurrent();
-    const privateGatewaySessionKey = await privateGateway.generateSessionKey(
-      publicGatewayPrivateAddress,
-    );
+    const privateGatewaySessionKey = await privateGateway.generateSessionKey(internetGatewayId);
     const { envelopedData } = await SessionEnvelopedData.encrypt(
       await cargoMessageSet.serialize(),
       privateGatewaySessionKey,
@@ -788,7 +786,7 @@ describe('Cargo delivery', () => {
     );
   });
 
-  test('Recipient should be paired public gateway', async () => {
+  test('Recipient should be paired Internet gateway', async () => {
     await makeAndStoreParcel();
 
     await runCourierSync(getParentStream());
@@ -824,7 +822,7 @@ describe('Cargo delivery', () => {
     expect(cargo.expiryDate).toEqual(newestCollectionACK.parcelExpiryDate);
   });
 
-  test('Sender certificate should be the one issued by public gateway', async () => {
+  test('Sender certificate should be the one issued by Internet gateway', async () => {
     await makeAndStoreParcel();
 
     await runCourierSync(getParentStream());
@@ -1016,8 +1014,10 @@ describe('Cargo delivery', () => {
 
   async function unwrapCargoMessages(cargoSerialized: Buffer): Promise<readonly Buffer[]> {
     const cargo = await Cargo.deserialize(bufferToArray(cargoSerialized));
-    const publicGatewaySessionPrivateKey = getPublicGatewaySessionPrivateKey();
-    const { payload: cargoMessageSet } = await cargo.unwrapPayload(publicGatewaySessionPrivateKey);
+    const internetGatewaySessionPrivateKey = getInternetGatewaySessionPrivateKey();
+    const { payload: cargoMessageSet } = await cargo.unwrapPayload(
+      internetGatewaySessionPrivateKey,
+    );
     return cargoMessageSet.messages.map((m) => Buffer.from(m));
   }
 });

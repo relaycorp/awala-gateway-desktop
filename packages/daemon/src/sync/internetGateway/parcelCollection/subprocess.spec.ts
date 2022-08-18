@@ -64,7 +64,7 @@ test('Subprocess should abort if the gateway is unregistered', async () => {
   expect(mockLogs).toContainEqual(partialPinoLog('fatal', 'Private gateway is not registered'));
 });
 
-test('Client should connect to appropriate public gateway', async () => {
+test('Client should connect to appropriate Internet gateway', async () => {
   addEmptyParcelCollectionCall();
 
   await runParcelCollection(parentStream);
@@ -226,7 +226,7 @@ describe('Parcel collection', () => {
   });
 });
 
-describe('Public gateway resolution failures', () => {
+describe('Internet gateway resolution failures', () => {
   const sleepSeconds = mockSleepSeconds();
 
   test('Parent process should be notified about failure', (cb) => {
@@ -276,7 +276,7 @@ describe('Public gateway resolution failures', () => {
     expect(sleepSeconds).toBeCalledWith(30);
     expect(mockMakeGSCClient).toBeCalledTimes(2);
     expect(mockLogs).toContainEqual(
-      partialPinoLog('error', 'Failed to resolve DNS record for public gateway', {
+      partialPinoLog('error', 'Failed to resolve DNS record for Internet gateway', {
         err: expect.objectContaining({ message: error.message }),
       }),
     );
@@ -292,9 +292,9 @@ describe('Public gateway resolution failures', () => {
     expect(sleepSeconds).toBeCalledWith(60);
     expect(mockMakeGSCClient).toBeCalledTimes(2);
     expect(mockLogs).toContainEqual(
-      partialPinoLog('error', 'Public gateway does not appear to exist', {
+      partialPinoLog('error', 'Internet gateway does not appear to exist', {
         err: expect.objectContaining({ message: error.message }),
-        publicGatewayAddress: DEFAULT_INTERNET_GATEWAY,
+        internetGatewayAddress: DEFAULT_INTERNET_GATEWAY,
       }),
     );
   });

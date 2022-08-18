@@ -4,15 +4,15 @@ import { Container } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_INTERNET_GATEWAY } from '../../constants';
-import { GatewayRegistrar } from '../../sync/publicGateway/GatewayRegistrar';
-import { ParcelCollectorManager } from '../../sync/publicGateway/parcelCollection/ParcelCollectorManager';
+import { GatewayRegistrar } from '../../sync/internetGateway/GatewayRegistrar';
+import { ParcelCollectorManager } from '../../sync/internetGateway/parcelCollection/ParcelCollectorManager';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { getMockInstance, mockSpy } from '../../testUtils/jest';
 import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
 import { makeServer } from '../index';
 import { CONTROL_API_PREFIX } from './index';
-import { NonExistingAddressError } from '../../sync/publicGateway/errors';
+import { NonExistingAddressError } from '../../sync/internetGateway/errors';
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
@@ -27,7 +27,7 @@ const ENDPOINT_PATH = `${CONTROL_API_PREFIX}/public-gateway`;
 const AUTH_TOKEN = 'the-auth-token';
 const BASE_HEADERS = { authorization: `Bearer ${AUTH_TOKEN}` };
 
-describe('Get public gateway', () => {
+describe('Get Internet gateway', () => {
   test('The current gateway should be returned if registered', async () => {
     const config = Container.get(Config);
     await config.set(ConfigKey.INTERNET_GATEWAY_ADDRESS, NEW_PUBLIC_ADDRESS);
@@ -65,7 +65,7 @@ describe('Get public gateway', () => {
   });
 });
 
-describe('Set public gateway', () => {
+describe('Set Internet gateway', () => {
   const mockParcelCollectorManagerRestart = mockSpy(
     jest.spyOn(ParcelCollectorManager.prototype, 'restart'),
     () => {

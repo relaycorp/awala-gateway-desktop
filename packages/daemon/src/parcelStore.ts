@@ -13,7 +13,7 @@ import { ParcelCollection } from './entity/ParcelCollection';
 import { FileStore } from './fileStore';
 import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 import { CourierSyncManager } from './sync/courierSync/CourierSyncManager';
-import { ParcelCollectorManager } from './sync/publicGateway/parcelCollection/ParcelCollectorManager';
+import { ParcelCollectorManager } from './sync/internetGateway/parcelCollection/ParcelCollectorManager';
 import { LOGGER } from './tokens';
 import { MessageDirection } from './utils/MessageDirection';
 

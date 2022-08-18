@@ -5,11 +5,11 @@ import { Container } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
 import { DEFAULT_INTERNET_GATEWAY } from '../../constants';
-import { GatewayRegistrar } from '../../sync/publicGateway/GatewayRegistrar';
-import { ParcelCollectorManager } from '../../sync/publicGateway/parcelCollection/ParcelCollectorManager';
+import { GatewayRegistrar } from '../../sync/internetGateway/GatewayRegistrar';
+import { ParcelCollectorManager } from '../../sync/internetGateway/parcelCollection/ParcelCollectorManager';
 import { getBearerTokenFromAuthHeader } from '../../utils/auth';
 import RouteOptions from '../RouteOptions';
-import { NonExistingAddressError } from '../../sync/publicGateway/errors';
+import { NonExistingAddressError } from '../../sync/internetGateway/errors';
 
 enum ErrorCode {
   ADDRESS_RESOLUTION_FAILURE = 'ADDRESS_RESOLUTION_FAILURE',

@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { getPublicGatewayAddress, migratePublicGatewayAddress, SettingError } from '../../ipc/settings';
+import { getInternetGatewayAddress, migrateInternetGatewayAddress, SettingError } from '../../ipc/settings';
 import migrated from '../assets/migrated.svg';
 import GatewayEditor from './gatewayEditor';
 
@@ -29,7 +29,7 @@ class Settings extends Component<Props, State> {
   }
 
   public override async componentDidMount(): Promise<void> {
-    const gateway = await getPublicGatewayAddress(this.props.token);
+    const gateway = await getInternetGatewayAddress(this.props.token);
     this.setState({ gateway });
   }
 
@@ -73,7 +73,7 @@ class Settings extends Component<Props, State> {
 
   private async migrateGateway(newAddress: string): Promise<void> {
     try {
-      await migratePublicGatewayAddress(newAddress, this.props.token);
+      await migrateInternetGatewayAddress(newAddress, this.props.token);
       this.setState({ status: Status.DONE, gateway: newAddress });
     } catch (error) {
       if (error instanceof SettingError) {

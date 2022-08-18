@@ -14,7 +14,7 @@ import { getPromiseRejection } from '../../testUtils/promises';
 import { mockFork } from '../../testUtils/subprocess';
 import { mockSleepSeconds, setImmediateAsync } from '../../testUtils/timing';
 import { SubprocessExitError } from '../../utils/subprocess/errors';
-import { GatewayRegistrar } from '../publicGateway/GatewayRegistrar';
+import { GatewayRegistrar } from '../internetGateway/GatewayRegistrar';
 import { CourierSyncManager } from './CourierSyncManager';
 import { DisconnectedFromCourierError } from './errors';
 import { CourierSyncStageNotification, ParcelCollectionNotification } from './messaging';

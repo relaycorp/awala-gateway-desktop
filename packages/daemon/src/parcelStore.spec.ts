@@ -19,7 +19,7 @@ import { FileStore } from './fileStore';
 import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 import { ParcelStore, ParcelWithExpiryDate } from './parcelStore';
 import { CourierSyncManager } from './sync/courierSync/CourierSyncManager';
-import { ParcelCollectorManager } from './sync/publicGateway/parcelCollection/ParcelCollectorManager';
+import { ParcelCollectorManager } from './sync/internetGateway/parcelCollection/ParcelCollectorManager';
 import { useTemporaryAppDirs } from './testUtils/appDirs';
 import { generatePKIFixture, mockGatewayRegistration, sha256Hex } from './testUtils/crypto';
 import { setUpTestDBConnection } from './testUtils/db';

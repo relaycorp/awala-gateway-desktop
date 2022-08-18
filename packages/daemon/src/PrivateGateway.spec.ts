@@ -19,13 +19,13 @@ import { Container } from 'typedi';
 import { DEFAULT_INTERNET_GATEWAY } from './constants';
 import { Config, ConfigKey } from './Config';
 import { getPromiseRejection } from './testUtils/promises';
-import { InternetGatewayProtocolError } from './sync/publicGateway/errors';
+import { InternetGatewayProtocolError } from './sync/internetGateway/errors';
 import { arrayBufferFrom } from './testUtils/buffer';
 import { PrivateGatewayManager } from './PrivateGatewayManager';
 import { setUpTestDBConnection } from './testUtils/db';
 import { useTemporaryAppDirs } from './testUtils/appDirs';
 import { mockSpy } from './testUtils/jest';
-import * as gscClient from './sync/publicGateway/gscClient';
+import * as gscClient from './sync/internetGateway/gscClient';
 import { PrivateGateway } from './PrivateGateway';
 
 setUpTestDBConnection();
@@ -40,14 +40,14 @@ beforeEach(() => {
 const mockMakeGSCClient = mockSpy(jest.spyOn(gscClient, 'makeGSCClient'), () => mockGSCClient);
 
 let internetGatewayIdCertificate: Certificate;
-let publicGatewaySessionKey: SessionKey;
+let internetGatewaySessionKey: SessionKey;
 let idCertificate: Certificate;
 beforeAll(async () => {
   const certPath = await generatePDACertificationPath(await generateIdentityKeyPairSet());
   internetGatewayIdCertificate = certPath.internetGateway;
   idCertificate = certPath.privateGateway;
 
-  publicGatewaySessionKey = (await SessionKeyPair.generate()).sessionKey;
+  internetGatewaySessionKey = (await SessionKeyPair.generate()).sessionKey;
 });
 
 let privateGateway: PrivateGateway;
@@ -57,7 +57,7 @@ beforeEach(async () => {
   privateGateway = await manager.getCurrent();
 });
 
-describe('registerWithPublicGateway', () => {
+describe('registerWithInternetGateway', () => {
   const registrationAuth = arrayBufferFrom('the auth');
   let preRegisterCall: PreRegisterNodeCall;
   let registration: PrivateNodeRegistration;
@@ -69,7 +69,7 @@ describe('registerWithPublicGateway', () => {
       idCertificate,
       internetGatewayIdCertificate,
       DEFAULT_INTERNET_GATEWAY,
-      publicGatewaySessionKey,
+      internetGatewaySessionKey,
     );
     registerCall = new RegisterNodeCall(registration);
 
@@ -81,19 +81,19 @@ describe('registerWithPublicGateway', () => {
   });
 
   test('PoWeb client should connect to resolved address', async () => {
-    await privateGateway.registerWithPublicGateway(DEFAULT_INTERNET_GATEWAY);
+    await privateGateway.registerWithInternetGateway(DEFAULT_INTERNET_GATEWAY);
 
     expect(mockMakeGSCClient).toBeCalledWith(DEFAULT_INTERNET_GATEWAY);
   });
 
   test('PoWeb client should do pre-registration', async () => {
-    await privateGateway.registerWithPublicGateway(DEFAULT_INTERNET_GATEWAY);
+    await privateGateway.registerWithInternetGateway(DEFAULT_INTERNET_GATEWAY);
 
     expect(preRegisterCall.wasCalled).toBeTruthy();
   });
 
   test('PoWeb client should complete registration with given authorisation', async () => {
-    await privateGateway.registerWithPublicGateway(DEFAULT_INTERNET_GATEWAY);
+    await privateGateway.registerWithInternetGateway(DEFAULT_INTERNET_GATEWAY);
 
     expect(registerCall.wasCalled).toBeTruthy();
     const registrationRequest = await PrivateNodeRegistrationRequest.deserialize(
@@ -105,20 +105,20 @@ describe('registerWithPublicGateway', () => {
     expect(registrationRequest.pnraSerialized).toEqual(registrationAuth);
   });
 
-  test('Channel with public gateway should be stored', async () => {
+  test('Channel with Internet gateway should be stored', async () => {
     const saveChannelSpy = jest.spyOn(PrivateGateway.prototype, 'saveInternetGatewayChannel');
 
-    await privateGateway.registerWithPublicGateway(DEFAULT_INTERNET_GATEWAY);
+    await privateGateway.registerWithInternetGateway(DEFAULT_INTERNET_GATEWAY);
 
     expect(saveChannelSpy).toBeCalledWith(
       idCertificate,
       internetGatewayIdCertificate,
-      publicGatewaySessionKey,
+      internetGatewaySessionKey,
     );
   });
 
-  test('Private address of public gateway should be stored in config', async () => {
-    await privateGateway.registerWithPublicGateway(DEFAULT_INTERNET_GATEWAY);
+  test('Private address of Internet gateway should be stored in config', async () => {
+    await privateGateway.registerWithInternetGateway(DEFAULT_INTERNET_GATEWAY);
 
     const config = Container.get(Config);
     await expect(config.get(ConfigKey.INTERNET_GATEWAY_ID)).resolves.toEqual(
@@ -128,7 +128,7 @@ describe('registerWithPublicGateway', () => {
 
   test('Expiry date of private gateway certificate should be returned', async () => {
     await expect(
-      privateGateway.registerWithPublicGateway(DEFAULT_INTERNET_GATEWAY),
+      privateGateway.registerWithInternetGateway(DEFAULT_INTERNET_GATEWAY),
     ).resolves.toEqual(idCertificate.expiryDate);
   });
 
@@ -138,14 +138,14 @@ describe('registerWithPublicGateway', () => {
     mockGSCClient = new MockGSCClient([preRegisterCall, registerCall]);
 
     const error = await getPromiseRejection(
-      privateGateway.registerWithPublicGateway(DEFAULT_INTERNET_GATEWAY),
+      privateGateway.registerWithInternetGateway(DEFAULT_INTERNET_GATEWAY),
       InternetGatewayProtocolError,
     );
-    expect(error.message).toMatch(/^Failed to register with the public gateway:/);
+    expect(error.message).toMatch(/^Failed to register with the Internet gateway:/);
     expect(error.cause()).toBe(originalError);
   });
 
-  test('Error should be thrown if the public gateway session key is missing', async () => {
+  test('Error should be thrown if the Internet gateway session key is missing', async () => {
     registration = new PrivateNodeRegistration(
       idCertificate,
       internetGatewayIdCertificate,
@@ -156,10 +156,10 @@ describe('registerWithPublicGateway', () => {
     const saveChannelSpy = jest.spyOn(PrivateGateway.prototype, 'saveInternetGatewayChannel');
 
     await expect(
-      privateGateway.registerWithPublicGateway(DEFAULT_INTERNET_GATEWAY),
+      privateGateway.registerWithInternetGateway(DEFAULT_INTERNET_GATEWAY),
     ).rejects.toThrowWithMessage(
       InternetGatewayProtocolError,
-      'Registration is missing public gateway session key',
+      'Registration is missing Internet gateway session key',
     );
 
     expect(saveChannelSpy).not.toBeCalled();
@@ -171,18 +171,18 @@ describe('registerWithPublicGateway', () => {
   test('Error should be thrown if the channel creation is rejected', async () => {
     registration = new PrivateNodeRegistration(
       idCertificate,
-      idCertificate, // Invalid public gateway certificate
+      idCertificate, // Invalid Internet gateway certificate
       DEFAULT_INTERNET_GATEWAY,
-      publicGatewaySessionKey,
+      internetGatewaySessionKey,
     );
     registerCall = new RegisterNodeCall(registration);
     mockGSCClient = new MockGSCClient([preRegisterCall, registerCall]);
 
     await expect(
-      privateGateway.registerWithPublicGateway(DEFAULT_INTERNET_GATEWAY),
+      privateGateway.registerWithInternetGateway(DEFAULT_INTERNET_GATEWAY),
     ).rejects.toThrowWithMessage(
       InternetGatewayProtocolError,
-      /^Failed to save channel with public gateway:/,
+      /^Failed to save channel with Internet gateway:/,
     );
 
     const config = Container.get(Config);

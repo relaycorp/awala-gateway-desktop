@@ -11,7 +11,7 @@ import { UnregisteredGatewayError } from '../../errors';
 import { fork } from '../../utils/subprocess/child';
 import { sleepSeconds } from '../../utils/timing';
 import { IPCMessage } from '../ipc';
-import { GatewayRegistrar } from '../publicGateway/GatewayRegistrar';
+import { GatewayRegistrar } from '../internetGateway/GatewayRegistrar';
 import { DisconnectedFromCourierError } from './errors';
 import { CourierSyncStageNotification, ParcelCollectionNotification } from './messaging';
 import { SubprocessExitError } from '../../utils/subprocess/errors';

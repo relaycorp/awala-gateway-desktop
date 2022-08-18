@@ -170,18 +170,18 @@ describe('getVerifier', () => {
     await gatewayManager.createCurrentIfMissing();
   });
 
-  test('Null should be returned if private address of public gateway is unset', async () => {
+  test('Null should be returned if private address of Internet gateway is unset', async () => {
     await expect(gatewayManager.getVerifier(StubVerifier)).resolves.toBeNull();
   });
 
-  test('Verifier should be returned if private address of public gateway is set', async () => {
-    const publicGatewayPrivateAddress = '0deadbeef';
+  test('Verifier should be returned if private address of Internet gateway is set', async () => {
+    const internetGatewayId = '0deadbeef';
     const certificate = await selfIssuedCertificate();
     await Container.get(DBCertificateStore).save(
       new CertificationPath(certificate, []),
-      publicGatewayPrivateAddress,
+      internetGatewayId,
     );
-    await Container.get(Config).set(ConfigKey.INTERNET_GATEWAY_ID, publicGatewayPrivateAddress);
+    await Container.get(Config).set(ConfigKey.INTERNET_GATEWAY_ID, internetGatewayId);
 
     const verifier = await gatewayManager.getVerifier(StubVerifier);
 

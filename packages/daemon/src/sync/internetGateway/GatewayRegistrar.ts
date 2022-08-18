@@ -22,34 +22,34 @@ export class GatewayRegistrar {
   ) {}
 
   /**
-   * Register with the `publicGatewayAddress`.
+   * Register with the `internetGatewayAddress`.
    *
-   * @param publicGatewayAddress
-   * @throws UnreachableResolverError if DNS resolver is unreachable
-   * @throws InternetAddressingError if the DNS lookup or DNSSEC verification failed
-   * @throws NonExistingAddressError if the DNS+DNSSEC lookup succeeded but the address doesn't exist
-   * @throws PublicGatewayProtocolError if the public gateways violates the protocol
+   * @param internetGatewayAddress
+   * @throws {UnreachableResolverError} if DNS resolver is unreachable
+   * @throws {InternetAddressingError} if the DNS lookup or DNSSEC verification failed
+   * @throws {NonExistingAddressError} if the DNS+DNSSEC lookup succeeded but the address doesn't exist
+   * @throws {InternetGatewayProtocolError} if the public gateways violates the protocol
    */
-  public async register(publicGatewayAddress: string): Promise<void> {
-    const currentPublicGatewayAddress = await this.getPublicGatewayAddress();
-    if (currentPublicGatewayAddress === publicGatewayAddress) {
-      this.logger.debug('Skipping registration with public gateway');
+  public async register(internetGatewayAddress: string): Promise<void> {
+    const currentInternetGatewayAddress = await this.getInternetGatewayAddress();
+    if (currentInternetGatewayAddress === internetGatewayAddress) {
+      this.logger.debug('Skipping registration with Internet gateway');
       return;
     }
 
     const privateGateway = await this.gatewayManager.getCurrent();
-    const privateGatewayCertificateExpiryDate = await privateGateway.registerWithPublicGateway(
-      publicGatewayAddress,
+    const privateGatewayCertificateExpiryDate = await privateGateway.registerWithInternetGateway(
+      internetGatewayAddress,
     );
-    await this.config.set(ConfigKey.INTERNET_GATEWAY_ADDRESS, publicGatewayAddress);
+    await this.config.set(ConfigKey.INTERNET_GATEWAY_ADDRESS, internetGatewayAddress);
     this.internalEvents.emit(
       'registration',
-      publicGatewayAddress,
+      internetGatewayAddress,
       privateGatewayCertificateExpiryDate,
     );
     this.logger.info(
-      { privateGatewayCertificateExpiryDate, publicGatewayPublicAddress: publicGatewayAddress },
-      'Successfully registered with public gateway',
+      { privateGatewayCertificateExpiryDate, internetGatewayAddress },
+      'Successfully registered with Internet gateway',
     );
   }
 
@@ -61,11 +61,11 @@ export class GatewayRegistrar {
         if (err instanceof UnreachableResolverError) {
           // The device may be disconnected from the Internet or the DNS resolver may be blocked.
           this.logger.debug(
-            'Failed to register with public gateway because DNS resolver is unreachable',
+            'Failed to register with Internet gateway because DNS resolver is unreachable',
           );
           await sleepSeconds(5);
         } else {
-          this.logger.error({ err }, 'Failed to register with public gateway');
+          this.logger.error({ err }, 'Failed to register with Internet gateway');
           await sleepSeconds(60);
         }
       }
@@ -73,8 +73,8 @@ export class GatewayRegistrar {
   }
 
   public async isRegistered(): Promise<boolean> {
-    const publicGatewayAddress = await this.getPublicGatewayAddress();
-    return publicGatewayAddress !== null;
+    const internetGatewayAddress = await this.getInternetGatewayAddress();
+    return internetGatewayAddress !== null;
   }
 
   public async *continuallyRenewRegistration(): AsyncIterable<void> {
@@ -83,14 +83,14 @@ export class GatewayRegistrar {
     const channel = await this.gatewayManager.getCurrentChannel();
     let internetGatewayAddress = channel.internetGatewayInternetAddress;
     let certificateExpiryDate = channel.nodeDeliveryAuth.expiryDate;
-    const updatePublicGateway = async (
-      newPublicGatewayPublicAddress: string,
+    const updateInternetGateway = async (
+      newInternetGatewayPublicAddress: string,
       newCertificateExpiryDate: Date,
     ) => {
-      internetGatewayAddress = newPublicGatewayPublicAddress;
+      internetGatewayAddress = newInternetGatewayPublicAddress;
       certificateExpiryDate = newCertificateExpiryDate;
     };
-    this.internalEvents.on('registration', updatePublicGateway);
+    this.internalEvents.on('registration', updateInternetGateway);
 
     const logger = this.logger;
 
@@ -117,29 +117,27 @@ export class GatewayRegistrar {
 
     async function* continuouslyRenew(emissions: AsyncIterable<void>): AsyncIterable<void> {
       for await (const _ of emissions) {
-        const publicGatewayAwareLogger = logger.child({
-          publicGatewayPublicAddress: internetGatewayAddress,
-        });
+        const internetGatewayAwareLogger = logger.child({ internetGatewayAddress });
         try {
-          certificateExpiryDate = await privateGateway.registerWithPublicGateway(
+          certificateExpiryDate = await privateGateway.registerWithInternetGateway(
             internetGatewayAddress!,
           );
         } catch (err) {
           if (err instanceof UnreachableResolverError) {
-            publicGatewayAwareLogger.info(
+            internetGatewayAwareLogger.info(
               { err },
               'Could not renew registration; we seem to be disconnected from the Internet',
             );
           } else {
-            publicGatewayAwareLogger.warn({ err }, 'Failed to renew registration');
+            internetGatewayAwareLogger.warn({ err }, 'Failed to renew registration');
           }
           await sleepSeconds(minutesToSeconds(30));
           continue;
         }
 
-        publicGatewayAwareLogger.info(
+        internetGatewayAwareLogger.info(
           { certificateExpiryDate },
-          'Renewed certificate with public gateway',
+          'Renewed certificate with Internet gateway',
         );
         yield;
       }
@@ -148,11 +146,11 @@ export class GatewayRegistrar {
     try {
       yield* await pipeline(emitRenewal, continuouslyRenew);
     } finally {
-      this.internalEvents.removeListener('registration', updatePublicGateway);
+      this.internalEvents.removeListener('registration', updateInternetGateway);
     }
   }
 
-  private getPublicGatewayAddress(): Promise<string | null> {
+  private getInternetGatewayAddress(): Promise<string | null> {
     return this.config.get(ConfigKey.INTERNET_GATEWAY_ADDRESS);
   }
 }

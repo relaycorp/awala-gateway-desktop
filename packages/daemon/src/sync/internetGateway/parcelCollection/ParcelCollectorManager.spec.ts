@@ -9,7 +9,7 @@ import { mockFork } from '../../../testUtils/subprocess';
 import { setImmediateAsync } from '../../../testUtils/timing';
 import { LOGGER } from '../../../tokens';
 import { fork } from '../../../utils/subprocess/child';
-import { PublicGatewayCollectionStatus } from '../PublicGatewayCollectionStatus';
+import { InternetGatewayCollectionStatus } from '../InternetGatewayCollectionStatus';
 import { ParcelCollectionNotification, ParcelCollectorMessage } from './messaging';
 import { ParcelCollectorManager } from './ParcelCollectorManager';
 
@@ -86,7 +86,7 @@ describe('streamStatus', () => {
 
     await expect(
       pipe(manager.streamStatus(), iterableTake(1), asyncIterableToArray),
-    ).resolves.toEqual([PublicGatewayCollectionStatus.DISCONNECTED]);
+    ).resolves.toEqual([InternetGatewayCollectionStatus.DISCONNECTED]);
   });
 
   test('DISCONNECTED should be returned if subprocess reports disconnection', async () => {
@@ -97,7 +97,7 @@ describe('streamStatus', () => {
 
     await expect(
       pipe(manager.streamStatus(), iterableTake(1), asyncIterableToArray),
-    ).resolves.toEqual([PublicGatewayCollectionStatus.DISCONNECTED]);
+    ).resolves.toEqual([InternetGatewayCollectionStatus.DISCONNECTED]);
   });
 
   test('CONNECTED should be returned if subprocess reports connection', async () => {
@@ -108,7 +108,7 @@ describe('streamStatus', () => {
 
     await expect(
       pipe(manager.streamStatus(), iterableTake(1), asyncIterableToArray),
-    ).resolves.toEqual([PublicGatewayCollectionStatus.CONNECTED]);
+    ).resolves.toEqual([InternetGatewayCollectionStatus.CONNECTED]);
   });
 
   test('Subsequent connection changes should be reflected', async () => {
@@ -122,9 +122,9 @@ describe('streamStatus', () => {
     await expect(
       pipe(manager.streamStatus(), iterableTake(3), asyncIterableToArray),
     ).resolves.toEqual([
-      PublicGatewayCollectionStatus.CONNECTED,
-      PublicGatewayCollectionStatus.DISCONNECTED,
-      PublicGatewayCollectionStatus.CONNECTED,
+      InternetGatewayCollectionStatus.CONNECTED,
+      InternetGatewayCollectionStatus.DISCONNECTED,
+      InternetGatewayCollectionStatus.CONNECTED,
     ]);
   });
 
@@ -137,7 +137,7 @@ describe('streamStatus', () => {
 
     await expect(
       pipe(manager.streamStatus(), iterableTake(1), asyncIterableToArray),
-    ).resolves.toEqual([PublicGatewayCollectionStatus.CONNECTED]);
+    ).resolves.toEqual([InternetGatewayCollectionStatus.CONNECTED]);
   });
 
   test('Non-connection messages should be ignored', async () => {
@@ -153,7 +153,7 @@ describe('streamStatus', () => {
 
     await expect(
       pipe(manager.streamStatus(), iterableTake(1), asyncIterableToArray),
-    ).resolves.toEqual([PublicGatewayCollectionStatus.CONNECTED]);
+    ).resolves.toEqual([InternetGatewayCollectionStatus.CONNECTED]);
   });
 
   test('Breaking the iterable should not destroy the underlying stream', async () => {
@@ -184,8 +184,8 @@ describe('streamStatus', () => {
     await expect(
       pipe(manager.streamStatus(), iterableTake(2), asyncIterableToArray),
     ).resolves.toEqual([
-      PublicGatewayCollectionStatus.DISCONNECTED,
-      PublicGatewayCollectionStatus.CONNECTED,
+      InternetGatewayCollectionStatus.DISCONNECTED,
+      InternetGatewayCollectionStatus.CONNECTED,
     ]);
   });
 });

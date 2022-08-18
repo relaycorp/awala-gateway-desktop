@@ -1,11 +1,11 @@
 import fetchMock from 'fetch-mock-jest';
-import { getPublicGatewayAddress, migratePublicGatewayAddress, SettingError } from './settings';
+import { getInternetGatewayAddress, migrateInternetGatewayAddress, SettingError } from './settings';
 
 beforeEach(() => {
   fetchMock.reset();
 });
 
-describe('getPublicGatewayAddress', () => {
+describe('getInternetGatewayAddress', () => {
   const publicAddress = 'braavos.relaycorp.cloud';
   const request = {
     headers: { 'Content-Type': 'application/json; charset=UTF-8' },
@@ -17,8 +17,8 @@ describe('getPublicGatewayAddress', () => {
       status: 200,
     });
 
-    const publicGateway = await getPublicGatewayAddress('TOKEN');
-    expect(publicGateway).toEqual(publicAddress);
+    const internetGateway = await getInternetGatewayAddress('TOKEN');
+    expect(internetGateway).toEqual(publicAddress);
 
     expect(fetchMock.lastUrl()).toEqual('http://127.0.0.1:13276/_control/public-gateway');
   });
@@ -28,7 +28,7 @@ describe('getPublicGatewayAddress', () => {
       status: 500,
     });
     try {
-      await getPublicGatewayAddress('TOKEN');
+      await getInternetGatewayAddress('TOKEN');
     } catch (error: any) {
       expect(error).toBeInstanceOf(SettingError);
       expect(error.message).toEqual('error message');
@@ -40,7 +40,7 @@ describe('getPublicGatewayAddress', () => {
       status: 404,
     });
     try {
-      await getPublicGatewayAddress('TOKEN');
+      await getInternetGatewayAddress('TOKEN');
     } catch (error) {
       expect(error).toBeInstanceOf(SettingError);
       expect(fetchMock.lastUrl()).toEqual('http://127.0.0.1:13276/_control/public-gateway');
@@ -48,7 +48,7 @@ describe('getPublicGatewayAddress', () => {
   });
 });
 
-describe('migratePublicGatewayAddress', () => {
+describe('migrateInternetGatewayAddress', () => {
   const request = {
     headers: { 'Content-Type': 'application/json' },
     url: 'http://127.0.0.1:13276/_control/public-gateway',
@@ -57,7 +57,7 @@ describe('migratePublicGatewayAddress', () => {
     fetchMock.put(request, {
       status: 204,
     });
-    await migratePublicGatewayAddress('kings-landing.relaycorp.cloud', 'TOKEN');
+    await migrateInternetGatewayAddress('kings-landing.relaycorp.cloud', 'TOKEN');
     expect(fetchMock.lastUrl()).toEqual('http://127.0.0.1:13276/_control/public-gateway');
   });
   test('should throw SettingError on a 400 with a code', async () => {
@@ -66,7 +66,7 @@ describe('migratePublicGatewayAddress', () => {
       status: 400,
     });
     try {
-      await migratePublicGatewayAddress('kings-landing.relaycorp.cloud', 'TOKEN');
+      await migrateInternetGatewayAddress('kings-landing.relaycorp.cloud', 'TOKEN');
     } catch (error) {
       expect(error).toBeInstanceOf(SettingError);
       expect(fetchMock.lastUrl()).toEqual('http://127.0.0.1:13276/_control/public-gateway');
@@ -78,7 +78,7 @@ describe('migratePublicGatewayAddress', () => {
       status: 500,
     });
     try {
-      await migratePublicGatewayAddress('kings-landing.relaycorp.cloud', 'TOKEN');
+      await migrateInternetGatewayAddress('kings-landing.relaycorp.cloud', 'TOKEN');
     } catch (error) {
       expect(error).toBeInstanceOf(SettingError);
       expect(fetchMock.lastUrl()).toEqual('http://127.0.0.1:13276/_control/public-gateway');
@@ -90,7 +90,7 @@ describe('migratePublicGatewayAddress', () => {
       status: 400,
     });
     try {
-      await migratePublicGatewayAddress('kings-landing.relaycorp.cloud', 'TOKEN');
+      await migrateInternetGatewayAddress('kings-landing.relaycorp.cloud', 'TOKEN');
     } catch (error) {
       expect(error).toBeInstanceOf(SettingError);
       expect(fetchMock.lastUrl()).toEqual('http://127.0.0.1:13276/_control/public-gateway');
@@ -101,7 +101,7 @@ describe('migratePublicGatewayAddress', () => {
       status: 404,
     });
     try {
-      await migratePublicGatewayAddress('kings-landing.relaycorp.cloud', 'TOKEN');
+      await migrateInternetGatewayAddress('kings-landing.relaycorp.cloud', 'TOKEN');
     } catch (error) {
       expect(error).toBeInstanceOf(SettingError);
       expect(fetchMock.lastUrl()).toEqual('http://127.0.0.1:13276/_control/public-gateway');

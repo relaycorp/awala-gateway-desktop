@@ -52,7 +52,7 @@ test('Subprocess should abort if the gateway is unregistered', async () => {
   expect(mockLogs).toContainEqual(partialPinoLog('fatal', 'Private gateway is not registered'));
 });
 
-test('Client should connect to appropriate public gateway', async () => {
+test('Client should connect to appropriate Internet gateway', async () => {
   setImmediate(endParentStream);
   await runParcelDelivery(parentStream);
 
@@ -166,7 +166,7 @@ describe('Parcel delivery', () => {
       parcelStore.retrieve(parcelKey, MessageDirection.TOWARDS_INTERNET),
     ).resolves.toBeNull();
     expect(mockLogs).toContainEqual(
-      partialPinoLog('info', 'Parcel was refused by the public gateway', { parcelKey }),
+      partialPinoLog('info', 'Parcel was refused by the Internet gateway', { parcelKey }),
     );
   });
 

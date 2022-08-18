@@ -219,7 +219,7 @@ async function processParcelCollectionAck(
 async function processCertificateRotation(
   rotation: CertificateRotation,
   privateGatewayPrivateAddress: string,
-  publicGatewayPrivateAddress: string,
+  internetGatewayId: string,
   certificateStore: DBCertificateStore,
   logger: Logger,
 ): Promise<void> {
@@ -234,9 +234,9 @@ async function processCertificateRotation(
     return;
   }
   const issuerId = newPrivateGatewayCertificate.getIssuerId();
-  if (issuerId !== publicGatewayPrivateAddress) {
+  if (issuerId !== internetGatewayId) {
     logger.warn(
-      { issuerId, publicGatewayPrivateAddress },
+      { issuerId, internetGatewayId },
       'Ignored rotation containing certificate from different Internet gateway',
     );
     return;
@@ -244,7 +244,7 @@ async function processCertificateRotation(
 
   await certificateStore.save(
     new CertificationPath(newPrivateGatewayCertificate, certificationPath.certificateAuthorities),
-    publicGatewayPrivateAddress,
+    internetGatewayId,
   );
   logger.info(
     { certificateExpiryDate: newPrivateGatewayCertificate.expiryDate },

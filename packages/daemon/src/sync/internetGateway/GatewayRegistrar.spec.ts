@@ -29,8 +29,8 @@ beforeEach(() => {
 const pkiFixtureRetriever = generatePKIFixture();
 const { undoGatewayRegistration } = mockGatewayRegistration(pkiFixtureRetriever);
 
-const mockRegisterWithPublicGateway = mockSpy(
-  jest.spyOn(PrivateGateway.prototype, 'registerWithPublicGateway'),
+const mockRegisterWithInternetGateway = mockSpy(
+  jest.spyOn(PrivateGateway.prototype, 'registerWithInternetGateway'),
   async () => {
     const privateGatewayCertificate = pkiFixtureRetriever().pdaCertPath.privateGateway;
     return privateGatewayCertificate.expiryDate;
@@ -48,26 +48,26 @@ describe('register', () => {
 
     await registrar.register(DEFAULT_INTERNET_GATEWAY);
 
-    expect(mockRegisterWithPublicGateway).not.toBeCalled();
+    expect(mockRegisterWithInternetGateway).not.toBeCalled();
     expect(logs).toContainEqual(
-      partialPinoLog('debug', 'Skipping registration with public gateway'),
+      partialPinoLog('debug', 'Skipping registration with Internet gateway'),
     );
   });
 
   test('Registration should be completed if not already registered with peer', async () => {
     await registrar.register(DEFAULT_INTERNET_GATEWAY);
 
-    expect(mockRegisterWithPublicGateway).toBeCalledWith(DEFAULT_INTERNET_GATEWAY);
+    expect(mockRegisterWithInternetGateway).toBeCalledWith(DEFAULT_INTERNET_GATEWAY);
     const privateGatewayCertificate = pkiFixtureRetriever().pdaCertPath.privateGateway;
     expect(logs).toContainEqual(
-      partialPinoLog('info', 'Successfully registered with public gateway', {
+      partialPinoLog('info', 'Successfully registered with Internet gateway', {
         privateGatewayCertificateExpiryDate: privateGatewayCertificate.expiryDate.toISOString(),
-        publicGatewayPublicAddress: DEFAULT_INTERNET_GATEWAY,
+        internetGatewayAddress: DEFAULT_INTERNET_GATEWAY,
       }),
     );
   });
 
-  test('Public address of public gateway should be stored in config', async () => {
+  test('Public address of Internet gateway should be stored in config', async () => {
     await registrar.register(DEFAULT_INTERNET_GATEWAY);
 
     const config = Container.get(Config);
@@ -78,7 +78,7 @@ describe('register', () => {
 
   test('Registration errors should be propagated', async () => {
     const originalError = new Error('oh noes');
-    mockRegisterWithPublicGateway.mockRejectedValue(originalError);
+    mockRegisterWithInternetGateway.mockRejectedValue(originalError);
 
     await expect(registrar.register(DEFAULT_INTERNET_GATEWAY)).rejects.toBe(originalError);
   });
@@ -138,7 +138,7 @@ describe('waitForRegistration', () => {
     expect(logs).toContainEqual(
       partialPinoLog(
         'debug',
-        'Failed to register with public gateway because DNS resolver is unreachable',
+        'Failed to register with Internet gateway because DNS resolver is unreachable',
       ),
     );
   });
@@ -156,7 +156,7 @@ describe('waitForRegistration', () => {
     expect(mockRegister).toBeCalledWith(DEFAULT_INTERNET_GATEWAY);
     expect(sleepSeconds).toBeCalledWith(60);
     expect(logs).toContainEqual(
-      partialPinoLog('error', 'Failed to register with public gateway', {
+      partialPinoLog('error', 'Failed to register with Internet gateway', {
         err: expect.objectContaining({ type: NonExistingAddressError.name }),
       }),
     );
@@ -175,7 +175,7 @@ describe('waitForRegistration', () => {
     expect(mockRegister).toBeCalledWith(DEFAULT_INTERNET_GATEWAY);
     expect(sleepSeconds).toBeCalledWith(60);
     expect(logs).toContainEqual(
-      partialPinoLog('error', 'Failed to register with public gateway', {
+      partialPinoLog('error', 'Failed to register with Internet gateway', {
         err: expect.objectContaining({ type: 'Error' }),
       }),
     );
@@ -192,7 +192,7 @@ describe('continuallyRenewRegistration', () => {
 
     const expectedScheduledDate = subDays(privateGatewayCertificate.expiryDate, 90);
     expect(sleepUntilDateMock).toBeCalledWith(expectedScheduledDate, expect.anything());
-    expect(mockRegisterWithPublicGateway).toBeCalled();
+    expect(mockRegisterWithInternetGateway).toBeCalled();
     expect(logs).toContainEqual(
       partialPinoLog('info', 'Scheduling registration renewal', {
         nextRenewalDate: expectedScheduledDate.toISOString(),
@@ -203,7 +203,7 @@ describe('continuallyRenewRegistration', () => {
   test('Renewals should be repeated indefinitely', async () => {
     const certificate1Date = pkiFixtureRetriever().pdaCertPath.privateGateway.expiryDate;
     const certificate2Date = new Date();
-    mockRegisterWithPublicGateway.mockResolvedValueOnce(certificate2Date);
+    mockRegisterWithInternetGateway.mockResolvedValueOnce(certificate2Date);
 
     await consume(take(2, registrar.continuallyRenewRegistration()));
 
@@ -218,18 +218,18 @@ describe('continuallyRenewRegistration', () => {
       subDays(certificate2Date, 90),
       expect.anything(),
     );
-    expect(mockRegisterWithPublicGateway).toBeCalledTimes(2);
+    expect(mockRegisterWithInternetGateway).toBeCalledTimes(2);
   });
 
-  test('Public gateway migrations should be reflected', async () => {
-    // Migrate to a different public gateway before the first renewal
-    const publicGateway2PublicAddress = `not-${DEFAULT_INTERNET_GATEWAY}`;
+  test('Internet gateway migrations should be reflected', async () => {
+    // Migrate to a different Internet gateway before the first renewal
+    const internetGateway2PublicAddress = `not-${DEFAULT_INTERNET_GATEWAY}`;
     sleepUntilDateMock.mockImplementationOnce(async () => {
-      await registrar.register(publicGateway2PublicAddress);
+      await registrar.register(internetGateway2PublicAddress);
     });
     sleepUntilDateMock.mockResolvedValueOnce(undefined);
     const certificate2Date = addDays(new Date(), 3);
-    mockRegisterWithPublicGateway.mockResolvedValueOnce(certificate2Date);
+    mockRegisterWithInternetGateway.mockResolvedValueOnce(certificate2Date);
 
     await consume(take(1, registrar.continuallyRenewRegistration()));
 
@@ -239,20 +239,20 @@ describe('continuallyRenewRegistration', () => {
       subDays(certificate2Date, 90),
       expect.anything(),
     );
-    expect(mockRegisterWithPublicGateway).toBeCalledTimes(2);
-    expect(mockRegisterWithPublicGateway).toHaveBeenCalledWith(publicGateway2PublicAddress);
-    expect(mockRegisterWithPublicGateway).not.toHaveBeenCalledWith(DEFAULT_INTERNET_GATEWAY);
+    expect(mockRegisterWithInternetGateway).toBeCalledTimes(2);
+    expect(mockRegisterWithInternetGateway).toHaveBeenCalledWith(internetGateway2PublicAddress);
+    expect(mockRegisterWithInternetGateway).not.toHaveBeenCalledWith(DEFAULT_INTERNET_GATEWAY);
   });
 
   test('Renewal should be logged', async () => {
     const certificate2Date = new Date();
-    mockRegisterWithPublicGateway.mockResolvedValueOnce(certificate2Date);
+    mockRegisterWithInternetGateway.mockResolvedValueOnce(certificate2Date);
 
     await consume(take(1, registrar.continuallyRenewRegistration()));
 
     expect(logs).toContainEqual(
-      partialPinoLog('info', 'Renewed certificate with public gateway', {
-        publicGatewayPublicAddress: DEFAULT_INTERNET_GATEWAY,
+      partialPinoLog('info', 'Renewed certificate with Internet gateway', {
+        internetGatewayAddress: DEFAULT_INTERNET_GATEWAY,
         certificateExpiryDate: certificate2Date.toISOString(),
       }),
     );
@@ -261,22 +261,22 @@ describe('continuallyRenewRegistration', () => {
   describe('Registration errors', () => {
     test('Errors should delay next attempt by 30 minutes', async () => {
       const registrationError = new Error('Something went wrong');
-      mockRegisterWithPublicGateway.mockRejectedValueOnce(registrationError);
-      mockRegisterWithPublicGateway.mockResolvedValueOnce(addDays(new Date(), 2));
+      mockRegisterWithInternetGateway.mockRejectedValueOnce(registrationError);
+      mockRegisterWithInternetGateway.mockResolvedValueOnce(addDays(new Date(), 2));
 
       await consume(take(1, registrar.continuallyRenewRegistration()));
 
       expect(sleepSeconds).toHaveBeenCalledWith(minutesToSeconds(30));
-      expect(mockRegisterWithPublicGateway).toBeCalledTimes(2);
+      expect(mockRegisterWithInternetGateway).toBeCalledTimes(2);
       expect(sleepSeconds.mock.invocationCallOrder[0]).toBeLessThan(
-        mockRegisterWithPublicGateway.mock.invocationCallOrder[1],
+        mockRegisterWithInternetGateway.mock.invocationCallOrder[1],
       );
     });
 
     test('UnreachableResolverError should be logged with level=INFO', async () => {
       const registrationError = new UnreachableResolverError('Disconnected from Internet');
-      mockRegisterWithPublicGateway.mockRejectedValueOnce(registrationError);
-      mockRegisterWithPublicGateway.mockResolvedValueOnce(addDays(new Date(), 2));
+      mockRegisterWithInternetGateway.mockRejectedValueOnce(registrationError);
+      mockRegisterWithInternetGateway.mockResolvedValueOnce(addDays(new Date(), 2));
 
       await consume(take(1, registrar.continuallyRenewRegistration()));
 
@@ -289,7 +289,7 @@ describe('continuallyRenewRegistration', () => {
               message: registrationError.message,
               type: UnreachableResolverError.name,
             }),
-            publicGatewayPublicAddress: DEFAULT_INTERNET_GATEWAY,
+            internetGatewayAddress: DEFAULT_INTERNET_GATEWAY,
           },
         ),
       );
@@ -297,8 +297,8 @@ describe('continuallyRenewRegistration', () => {
 
     test('Other errors should be logged with level=WARNING', async () => {
       const registrationError = new Error('Unexpected');
-      mockRegisterWithPublicGateway.mockRejectedValueOnce(registrationError);
-      mockRegisterWithPublicGateway.mockResolvedValueOnce(addDays(new Date(), 2));
+      mockRegisterWithInternetGateway.mockRejectedValueOnce(registrationError);
+      mockRegisterWithInternetGateway.mockResolvedValueOnce(addDays(new Date(), 2));
 
       await consume(take(1, registrar.continuallyRenewRegistration()));
 
@@ -308,7 +308,7 @@ describe('continuallyRenewRegistration', () => {
             message: registrationError.message,
             type: registrationError.name,
           }),
-          publicGatewayPublicAddress: DEFAULT_INTERNET_GATEWAY,
+          internetGatewayAddress: DEFAULT_INTERNET_GATEWAY,
         }),
       );
     });

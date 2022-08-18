@@ -51,7 +51,7 @@ export default async function runParcelCollection(parentStream: Duplex): Promise
 }
 
 async function streamParcelCollections(
-  publicGatewayAddress: string,
+  internetGatewayAddress: string,
   signer: ParcelCollectionHandshakeSigner,
   parentStream: Duplex,
   logger: Logger,
@@ -64,7 +64,7 @@ async function streamParcelCollections(
     let hasCollectionFailed = false;
     do {
       const gscClient = await makeGSCClientAndRetryIfNeeded(
-        publicGatewayAddress,
+        internetGatewayAddress,
         parentStream,
         logger,
       );
@@ -84,14 +84,14 @@ async function streamParcelCollections(
 }
 
 async function makeGSCClientAndRetryIfNeeded(
-  publicGatewayAddress: string,
+  internetGatewayAddress: string,
   parentStream: Duplex,
   logger: Logger,
 ): Promise<GSCClient> {
   let client: GSCClient | null = null;
   while (client === null) {
     try {
-      client = await makeGSCClient(publicGatewayAddress);
+      client = await makeGSCClient(internetGatewayAddress);
     } catch (err) {
       notifyStatusToParent('disconnected', parentStream);
       if (err instanceof UnreachableResolverError) {
@@ -99,10 +99,10 @@ async function makeGSCClientAndRetryIfNeeded(
         logger.debug('DNS resolver is unreachable');
         await sleepSeconds(3);
       } else if (err instanceof InternetAddressingError) {
-        logger.error({ err }, 'Failed to resolve DNS record for public gateway');
+        logger.error({ err }, 'Failed to resolve DNS record for Internet gateway');
         await sleepSeconds(30);
       } else {
-        logger.error({ err, publicGatewayAddress }, 'Public gateway does not appear to exist');
+        logger.error({ err, internetGatewayAddress }, 'Internet gateway does not appear to exist');
         await sleepSeconds(60);
       }
     }

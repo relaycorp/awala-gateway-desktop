@@ -52,13 +52,13 @@ export function generatePKIFixture(
 export interface MockGatewayRegistration {
   readonly undoGatewayRegistration: () => Promise<void>;
   readonly deletePrivateGateway: () => Promise<void>;
-  readonly getPublicGatewaySessionPrivateKey: () => CryptoKey;
+  readonly getInternetGatewaySessionPrivateKey: () => CryptoKey;
 }
 
 export function mockGatewayRegistration(
   pkiFixtureRetriever: PKIFixtureRetriever,
 ): MockGatewayRegistration {
-  let publicGatewaySessionPrivateKey: CryptoKey;
+  let internetGatewaySessionPrivateKey: CryptoKey;
 
   beforeEach(async () => {
     const { pdaCertPath, keyPairSet } = pkiFixtureRetriever();
@@ -71,7 +71,7 @@ export function mockGatewayRegistration(
     const privateGatewayPrivateAddress = await getIdFromIdentityKey(
       keyPairSet.privateGateway.publicKey!,
     );
-    const publicGatewayPrivateAddress = await pdaCertPath.internetGateway.calculateSubjectId();
+    const internetGatewayId = await pdaCertPath.internetGateway.calculateSubjectId();
 
     await privateKeyStore.saveIdentityKey(
       privateGatewayPrivateAddress,
@@ -79,22 +79,22 @@ export function mockGatewayRegistration(
     );
     await certificateStore.save(
       new CertificationPath(pdaCertPath.privateGateway, [pdaCertPath.internetGateway]),
-      publicGatewayPrivateAddress,
+      internetGatewayId,
     );
 
     await config.set(ConfigKey.CURRENT_ID, privateGatewayPrivateAddress);
 
     await config.set(ConfigKey.INTERNET_GATEWAY_ADDRESS, DEFAULT_INTERNET_GATEWAY);
-    await config.set(ConfigKey.INTERNET_GATEWAY_ID, publicGatewayPrivateAddress);
+    await config.set(ConfigKey.INTERNET_GATEWAY_ID, internetGatewayId);
     await publicKeyStore.saveIdentityKey(keyPairSet.internetGateway.publicKey!);
 
-    const publicGatewaySessionKeyPair = await SessionKeyPair.generate();
+    const internetGatewaySessionKeyPair = await SessionKeyPair.generate();
     await publicKeyStore.saveSessionKey(
-      publicGatewaySessionKeyPair.sessionKey,
-      publicGatewayPrivateAddress,
+      internetGatewaySessionKeyPair.sessionKey,
+      internetGatewayId,
       new Date(),
     );
-    publicGatewaySessionPrivateKey = publicGatewaySessionKeyPair.privateKey;
+    internetGatewaySessionPrivateKey = internetGatewaySessionKeyPair.privateKey;
   });
 
   const undoGatewayRegistration = async () => {
@@ -118,7 +118,7 @@ export function mockGatewayRegistration(
 
   return {
     deletePrivateGateway,
-    getPublicGatewaySessionPrivateKey: () => publicGatewaySessionPrivateKey,
+    getInternetGatewaySessionPrivateKey: () => internetGatewaySessionPrivateKey,
     undoGatewayRegistration,
   };
 }

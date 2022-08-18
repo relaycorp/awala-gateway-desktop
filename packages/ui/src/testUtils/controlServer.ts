@@ -1,7 +1,7 @@
 import fetchMock from 'fetch-mock-jest';
 
 export interface ControlServerOutput {
-  readonly publicGatewayAddress: string;
+  readonly internetGatewayAddress: string;
 }
 
 export function mockControlServer(): ControlServerOutput {
@@ -19,5 +19,5 @@ export function mockControlServer(): ControlServerOutput {
     });
   });
 
-  return { publicGatewayAddress: publicAddress };
+  return { internetGatewayAddress: publicAddress };
 }
