@@ -7,7 +7,6 @@
     "start": "ts-node-dev --files src/bin/gateway-daemon.ts",
     "test": "jest --coverage",
     "test:functional": "jest --config jest.config.functional.js --runInBand --detectOpenHandles",
-    "test:ci:unit:jest": "jest --config jest.config.ci.js --coverage",
     "typeorm": "ts-node-dev ./node_modules/typeorm/cli.js"
   },
   "private": "true",
