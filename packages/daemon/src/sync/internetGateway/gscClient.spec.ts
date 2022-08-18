@@ -1,7 +1,7 @@
 import { BindingType, PublicNodeAddress, resolveInternetAddress } from '@relaycorp/relaynet-core';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
 
-import { DEFAULT_INTERNET_GATEWAY } from '../../constants';
+import { DEFAULT_INTERNET_GATEWAY_ADDRESS } from '../../constants';
 import { getMockInstance, mockSpy } from '../../testUtils/jest';
 import { getPromiseRejection } from '../../testUtils/promises';
 import { makeGSCClient } from './gscClient';
@@ -21,11 +21,11 @@ const mockPoWebInitRemote = mockSpy(jest.spyOn(PoWebClient, 'initRemote'), () =>
 describe('makeGSCClient', () => {
   test('NonExistingAddressError should be thrown if address does not exist', async () => {
     const error = await getPromiseRejection(
-      makeGSCClient(DEFAULT_INTERNET_GATEWAY),
+      makeGSCClient(DEFAULT_INTERNET_GATEWAY_ADDRESS),
       NonExistingAddressError,
     );
 
-    expect(error.message).toEqual(`${DEFAULT_INTERNET_GATEWAY} does not have a GSC record`);
+    expect(error.message).toEqual(`${DEFAULT_INTERNET_GATEWAY_ADDRESS} does not have a GSC record`);
     expect(error.cause()).toBeUndefined();
   });
 
@@ -36,9 +36,12 @@ describe('makeGSCClient', () => {
     };
     getMockInstance(resolveInternetAddress).mockResolvedValue(powebAddress);
 
-    const client = await makeGSCClient(DEFAULT_INTERNET_GATEWAY);
+    const client = await makeGSCClient(DEFAULT_INTERNET_GATEWAY_ADDRESS);
 
-    expect(resolveInternetAddress).toBeCalledWith(DEFAULT_INTERNET_GATEWAY, BindingType.GSC);
+    expect(resolveInternetAddress).toBeCalledWith(
+      DEFAULT_INTERNET_GATEWAY_ADDRESS,
+      BindingType.GSC,
+    );
     expect(mockPoWebInitRemote).toBeCalledWith(powebAddress.host, powebAddress.port);
     expect(client).toBe(mockPoWebClient);
   });

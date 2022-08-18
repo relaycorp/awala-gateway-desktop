@@ -11,7 +11,7 @@ import { Container } from 'typedi';
 import { getRepository } from 'typeorm';
 
 import { Config, ConfigKey } from '../Config';
-import { DEFAULT_INTERNET_GATEWAY } from '../constants';
+import { DEFAULT_INTERNET_GATEWAY_ADDRESS } from '../constants';
 import { ConfigItem } from '../entity/ConfigItem';
 import { DBPublicKeyStore } from '../keystores/DBPublicKeyStore';
 import { DBPrivateKeyStore } from '../keystores/DBPrivateKeyStore';
@@ -84,7 +84,7 @@ export function mockGatewayRegistration(
 
     await config.set(ConfigKey.CURRENT_ID, privateGatewayPrivateAddress);
 
-    await config.set(ConfigKey.INTERNET_GATEWAY_ADDRESS, DEFAULT_INTERNET_GATEWAY);
+    await config.set(ConfigKey.INTERNET_GATEWAY_ADDRESS, DEFAULT_INTERNET_GATEWAY_ADDRESS);
     await config.set(ConfigKey.INTERNET_GATEWAY_ID, internetGatewayId);
     await publicKeyStore.saveIdentityKey(keyPairSet.internetGateway.publicKey!);
 

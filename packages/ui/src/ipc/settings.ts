@@ -3,7 +3,7 @@ import PrivateGatewayError from '../PrivateGatewayError';
 export class SettingError extends PrivateGatewayError {}
 
 /**
- * Get the public address of the Internet gateway we're currently paired to.
+ * Get the Internet address of the Internet gateway we're currently paired to.
  */
 export async function getInternetGatewayAddress(token: string): Promise<string> {
   const response = await fetch('http://127.0.0.1:13276/_control/public-gateway', {
@@ -14,7 +14,7 @@ export async function getInternetGatewayAddress(token: string): Promise<string> 
   });
   const json = await response.json();
   if (response.status === 200) {
-    return json.publicAddress;
+    return json.internetAddress;
   } else {
     throw new SettingError(json.message || response.statusText);
   }
@@ -34,7 +34,7 @@ export async function migrateInternetGatewayAddress(
   token: string,
 ): Promise<void> {
   const response = await fetch('http://127.0.0.1:13276/_control/public-gateway', {
-    body: JSON.stringify({ publicAddress: newAddress }),
+    body: JSON.stringify({ internetAddress: newAddress }),
     headers: {
       Authorization: 'Bearer ' + token,
       'Content-Type': 'application/json',

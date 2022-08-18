@@ -4,7 +4,7 @@ import { DeliverParcelCall, MockGSCClient } from '@relaycorp/relaynet-testing';
 import { PassThrough } from 'stream';
 import { Container } from 'typedi';
 
-import { DEFAULT_INTERNET_GATEWAY } from '../../../constants';
+import { DEFAULT_INTERNET_GATEWAY_ADDRESS } from '../../../constants';
 import { ParcelStore } from '../../../parcelStore';
 import { useTemporaryAppDirs } from '../../../testUtils/appDirs';
 import { generatePKIFixture, mockGatewayRegistration } from '../../../testUtils/crypto';
@@ -56,7 +56,7 @@ test('Client should connect to appropriate Internet gateway', async () => {
   setImmediate(endParentStream);
   await runParcelDelivery(parentStream);
 
-  expect(mockMakeGSCClient).toBeCalledWith(DEFAULT_INTERNET_GATEWAY);
+  expect(mockMakeGSCClient).toBeCalledWith(DEFAULT_INTERNET_GATEWAY_ADDRESS);
 });
 
 test('Subprocess should record a log when it is ready', async () => {

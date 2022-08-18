@@ -111,18 +111,18 @@ main();
 
 #### Get current gateway (`GET`)
 
-This can only return a `200` response containing the `publicAddress`. For example:
+This can only return a `200` response containing the `internetAddress`. For example:
 
 ```json
-{"publicAddress": "braavos.relaycorp.cloud"}
+{"internetAddress": "braavos.relaycorp.cloud"}
 ```
 
 #### Migrate Internet gateway (`PUT`)
 
-The request payload MUST include the field `publicAddress` set to the public address of the new gateway. For example:
+The request payload MUST include the field `internetAddress` set to the Internet address of the new gateway. For example:
 
 ```json
-{"publicAddress": "braavos.relaycorp.cloud"}
+{"internetAddress": "braavos.relaycorp.cloud"}
 ```
 
 Possible responses:

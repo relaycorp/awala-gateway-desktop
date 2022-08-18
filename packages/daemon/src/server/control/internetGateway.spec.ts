@@ -3,7 +3,7 @@ import LightMyRequest from 'light-my-request';
 import { Container } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
-import { DEFAULT_INTERNET_GATEWAY } from '../../constants';
+import { DEFAULT_INTERNET_GATEWAY_ADDRESS } from '../../constants';
 import { GatewayRegistrar } from '../../sync/internetGateway/GatewayRegistrar';
 import { ParcelCollectorManager } from '../../sync/internetGateway/parcelCollection/ParcelCollectorManager';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
@@ -21,7 +21,7 @@ const mockLogs = mockLoggerToken();
 
 const mockRegister = mockSpy(jest.spyOn(GatewayRegistrar.prototype, 'register'));
 
-const NEW_PUBLIC_ADDRESS = `new.${DEFAULT_INTERNET_GATEWAY}`;
+const NEW_INTERNET_ADDRESS = `new.${DEFAULT_INTERNET_GATEWAY_ADDRESS}`;
 const ENDPOINT_PATH = `${CONTROL_API_PREFIX}/public-gateway`;
 
 const AUTH_TOKEN = 'the-auth-token';
@@ -30,7 +30,7 @@ const BASE_HEADERS = { authorization: `Bearer ${AUTH_TOKEN}` };
 describe('Get Internet gateway', () => {
   test('The current gateway should be returned if registered', async () => {
     const config = Container.get(Config);
-    await config.set(ConfigKey.INTERNET_GATEWAY_ADDRESS, NEW_PUBLIC_ADDRESS);
+    await config.set(ConfigKey.INTERNET_GATEWAY_ADDRESS, NEW_INTERNET_ADDRESS);
     const fastify = await makeServer(AUTH_TOKEN);
 
     const response = await fastify.inject({
@@ -40,7 +40,7 @@ describe('Get Internet gateway', () => {
     });
 
     expect(response.statusCode).toEqual(200);
-    expect(JSON.parse(response.body)).toHaveProperty('publicAddress', NEW_PUBLIC_ADDRESS);
+    expect(JSON.parse(response.body)).toHaveProperty('internetAddress', NEW_INTERNET_ADDRESS);
   });
 
   test('The default gateway should be returned if unregistered', async () => {
@@ -53,7 +53,10 @@ describe('Get Internet gateway', () => {
     });
 
     expect(response.statusCode).toEqual(200);
-    expect(JSON.parse(response.body)).toHaveProperty('publicAddress', DEFAULT_INTERNET_GATEWAY);
+    expect(JSON.parse(response.body)).toHaveProperty(
+      'internetAddress',
+      DEFAULT_INTERNET_GATEWAY_ADDRESS,
+    );
   });
 
   test('Request should be refused if auth fails', async () => {
@@ -79,7 +82,7 @@ describe('Set Internet gateway', () => {
     const response = await fastify.inject({
       headers: { ...BASE_HEADERS, 'content-type': 'text/plain' },
       method: 'PUT',
-      payload: { publicAddress: NEW_PUBLIC_ADDRESS },
+      payload: { internetAddress: NEW_INTERNET_ADDRESS },
       url: ENDPOINT_PATH,
     });
 
@@ -88,24 +91,26 @@ describe('Set Internet gateway', () => {
   });
 
   test('Request should be refused if address is missing', async () => {
-    const response = await requestPublicAddressChange();
+    const response = await requestInternetAddressChange();
 
     expect(response.statusCode).toEqual(400);
     expect(JSON.parse(response.body)).toHaveProperty('code', 'MALFORMED_ADDRESS');
-    expect(mockLogs).toContainEqual(partialPinoLog('warn', 'Malformed public address'));
+    expect(mockLogs).toContainEqual(partialPinoLog('warn', 'Malformed Internet address'));
     expect(mockRegister).not.toBeCalled();
     expect(mockParcelCollectorManagerRestart).not.toBeCalled();
   });
 
   test('Change should be refused if address is syntactically invalid', async () => {
-    const malformedPublicAddress = '.example.com';
+    const malformedInternetAddress = '.example.com';
 
-    const response = await requestPublicAddressChange(malformedPublicAddress);
+    const response = await requestInternetAddressChange(malformedInternetAddress);
 
     expect(response.statusCode).toEqual(400);
     expect(JSON.parse(response.body)).toHaveProperty('code', 'MALFORMED_ADDRESS');
     expect(mockLogs).toContainEqual(
-      partialPinoLog('warn', 'Malformed public address', { publicAddress: malformedPublicAddress }),
+      partialPinoLog('warn', 'Malformed Internet address', {
+        internetAddress: malformedInternetAddress,
+      }),
     );
     expect(mockRegister).not.toBeCalled();
     expect(mockParcelCollectorManagerRestart).not.toBeCalled();
@@ -115,14 +120,14 @@ describe('Set Internet gateway', () => {
     const error = new NonExistingAddressError('Address does not exist');
     getMockInstance(mockRegister).mockRejectedValue(error);
 
-    const response = await requestPublicAddressChange(NEW_PUBLIC_ADDRESS);
+    const response = await requestInternetAddressChange(NEW_INTERNET_ADDRESS);
 
-    expect(mockRegister).toBeCalledWith(NEW_PUBLIC_ADDRESS);
+    expect(mockRegister).toBeCalledWith(NEW_INTERNET_ADDRESS);
     expect(response.statusCode).toEqual(400);
     expect(JSON.parse(response.body)).toHaveProperty('code', 'INVALID_ADDRESS');
     expect(mockLogs).toContainEqual(
-      partialPinoLog('warn', 'Public address does not exist', {
-        publicAddress: NEW_PUBLIC_ADDRESS,
+      partialPinoLog('warn', 'Internet address does not exist', {
+        internetAddress: NEW_INTERNET_ADDRESS,
       }),
     );
     expect(mockParcelCollectorManagerRestart).not.toBeCalled();
@@ -132,9 +137,9 @@ describe('Set Internet gateway', () => {
     const error = new UnreachableResolverError('Disconnected');
     getMockInstance(mockRegister).mockRejectedValue(error);
 
-    const response = await requestPublicAddressChange(NEW_PUBLIC_ADDRESS);
+    const response = await requestInternetAddressChange(NEW_INTERNET_ADDRESS);
 
-    expect(mockRegister).toBeCalledWith(NEW_PUBLIC_ADDRESS);
+    expect(mockRegister).toBeCalledWith(NEW_INTERNET_ADDRESS);
     expect(response.statusCode).toEqual(500);
     expect(JSON.parse(response.body)).toHaveProperty('code', 'ADDRESS_RESOLUTION_FAILURE');
     expect(mockLogs).toContainEqual(partialPinoLog('warn', 'Failed to reach DNS resolver'));
@@ -145,15 +150,15 @@ describe('Set Internet gateway', () => {
     const error = new InternetAddressingError('Could not resolve address');
     getMockInstance(mockRegister).mockRejectedValue(error);
 
-    const response = await requestPublicAddressChange(NEW_PUBLIC_ADDRESS);
+    const response = await requestInternetAddressChange(NEW_INTERNET_ADDRESS);
 
-    expect(mockRegister).toBeCalledWith(NEW_PUBLIC_ADDRESS);
+    expect(mockRegister).toBeCalledWith(NEW_INTERNET_ADDRESS);
     expect(response.statusCode).toEqual(500);
     expect(JSON.parse(response.body)).toHaveProperty('code', 'ADDRESS_RESOLUTION_FAILURE');
     expect(mockLogs).toContainEqual(
-      partialPinoLog('warn', 'Failed to resolve public address', {
+      partialPinoLog('warn', 'Failed to resolve Internet address', {
         err: expect.objectContaining({ type: error.name, message: error.message }),
-        publicAddress: NEW_PUBLIC_ADDRESS,
+        internetAddress: NEW_INTERNET_ADDRESS,
       }),
     );
     expect(mockParcelCollectorManagerRestart).not.toBeCalled();
@@ -163,43 +168,43 @@ describe('Set Internet gateway', () => {
     const error = new Error('Registration failed');
     getMockInstance(mockRegister).mockRejectedValue(error);
 
-    const response = await requestPublicAddressChange(NEW_PUBLIC_ADDRESS);
+    const response = await requestInternetAddressChange(NEW_INTERNET_ADDRESS);
 
-    expect(mockRegister).toBeCalledWith(NEW_PUBLIC_ADDRESS);
+    expect(mockRegister).toBeCalledWith(NEW_INTERNET_ADDRESS);
     expect(response.statusCode).toEqual(500);
     expect(JSON.parse(response.body)).toHaveProperty('code', 'REGISTRATION_FAILURE');
     expect(mockLogs).toContainEqual(
       partialPinoLog('warn', 'Failed to complete registration', {
         err: expect.objectContaining({ message: error.message }),
-        publicAddress: NEW_PUBLIC_ADDRESS,
+        internetAddress: NEW_INTERNET_ADDRESS,
       }),
     );
     expect(mockParcelCollectorManagerRestart).not.toBeCalled();
   });
 
   test('Change should be accepted if registration succeeds', async () => {
-    const response = await requestPublicAddressChange(NEW_PUBLIC_ADDRESS);
+    const response = await requestInternetAddressChange(NEW_INTERNET_ADDRESS);
 
-    expect(mockRegister).toBeCalledWith(NEW_PUBLIC_ADDRESS);
+    expect(mockRegister).toBeCalledWith(NEW_INTERNET_ADDRESS);
     expect(response.statusCode).toEqual(204);
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Gateway migration completed', {
-        publicAddress: NEW_PUBLIC_ADDRESS,
+        internetAddress: NEW_INTERNET_ADDRESS,
       }),
     );
     expect(mockParcelCollectorManagerRestart).toBeCalled();
   });
 
   test('Trailing dots should be removed from final address', async () => {
-    const addressWithTrailingDot = `${NEW_PUBLIC_ADDRESS}.`;
+    const addressWithTrailingDot = `${NEW_INTERNET_ADDRESS}.`;
 
-    const response = await requestPublicAddressChange(addressWithTrailingDot);
+    const response = await requestInternetAddressChange(addressWithTrailingDot);
 
-    expect(mockRegister).toBeCalledWith(NEW_PUBLIC_ADDRESS);
+    expect(mockRegister).toBeCalledWith(NEW_INTERNET_ADDRESS);
     expect(response.statusCode).toEqual(204);
     expect(mockLogs).toContainEqual(
       partialPinoLog('info', 'Gateway migration completed', {
-        publicAddress: NEW_PUBLIC_ADDRESS,
+        internetAddress: NEW_INTERNET_ADDRESS,
       }),
     );
   });
@@ -209,7 +214,7 @@ describe('Set Internet gateway', () => {
 
     const response = await fastify.inject({
       method: 'PUT',
-      payload: { publicAddress: NEW_PUBLIC_ADDRESS },
+      payload: { internetAddress: NEW_INTERNET_ADDRESS },
       url: ENDPOINT_PATH,
     });
 
@@ -219,14 +224,14 @@ describe('Set Internet gateway', () => {
     expect(mockParcelCollectorManagerRestart).not.toBeCalled();
   });
 
-  async function requestPublicAddressChange(
-    publicAddress?: string,
+  async function requestInternetAddressChange(
+    internetAddress?: string,
   ): Promise<LightMyRequest.Response> {
     const fastify = await makeServer(AUTH_TOKEN);
     return fastify.inject({
       headers: { ...BASE_HEADERS, 'content-type': 'application/json' },
       method: 'PUT',
-      payload: { publicAddress },
+      payload: { internetAddress },
       url: ENDPOINT_PATH,
     });
   }

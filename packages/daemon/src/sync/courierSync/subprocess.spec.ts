@@ -26,7 +26,7 @@ import { getRepository } from 'typeorm';
 import uuid from 'uuid-random';
 
 import { CourierSyncExitCode, CourierSyncStage } from '.';
-import { DEFAULT_INTERNET_GATEWAY } from '../../constants';
+import { DEFAULT_INTERNET_GATEWAY_ADDRESS } from '../../constants';
 import { ParcelCollection } from '../../entity/ParcelCollection';
 import { FileStore } from '../../fileStore';
 import { ParcelStore } from '../../parcelStore';
@@ -183,7 +183,7 @@ describe('Cargo collection', () => {
       await runCourierSync(getParentStream());
 
       const cca = await retrieveCCA();
-      expect(cca.recipient.internetAddress).toEqual(DEFAULT_INTERNET_GATEWAY);
+      expect(cca.recipient.internetAddress).toEqual(DEFAULT_INTERNET_GATEWAY_ADDRESS);
     });
 
     test('Creation date should be 90 minutes in the past to tolerate clock drift', async () => {
@@ -793,7 +793,7 @@ describe('Cargo delivery', () => {
 
     const deliveryRequests = await getCargoDeliveryRequests();
     const cargo = await Cargo.deserialize(bufferToArray(deliveryRequests[0].cargo));
-    expect(cargo.recipient.internetAddress).toEqual(DEFAULT_INTERNET_GATEWAY);
+    expect(cargo.recipient.internetAddress).toEqual(DEFAULT_INTERNET_GATEWAY_ADDRESS);
   });
 
   test('Expiry date should be that of last parcel', async () => {

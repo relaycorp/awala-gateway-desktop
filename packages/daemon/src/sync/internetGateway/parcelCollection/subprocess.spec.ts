@@ -11,7 +11,7 @@ import { CollectParcelsCall, MockGSCClient } from '@relaycorp/relaynet-testing';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { PassThrough } from 'stream';
 
-import { DEFAULT_INTERNET_GATEWAY } from '../../../constants';
+import { DEFAULT_INTERNET_GATEWAY_ADDRESS } from '../../../constants';
 import { ParcelStore } from '../../../parcelStore';
 import { useTemporaryAppDirs } from '../../../testUtils/appDirs';
 import { generatePKIFixture, mockGatewayRegistration } from '../../../testUtils/crypto';
@@ -69,7 +69,7 @@ test('Client should connect to appropriate Internet gateway', async () => {
 
   await runParcelCollection(parentStream);
 
-  expect(mockMakeGSCClient).toBeCalledWith(DEFAULT_INTERNET_GATEWAY);
+  expect(mockMakeGSCClient).toBeCalledWith(DEFAULT_INTERNET_GATEWAY_ADDRESS);
 });
 
 test('Subprocess should record a log when it is ready', async () => {
@@ -294,7 +294,7 @@ describe('Internet gateway resolution failures', () => {
     expect(mockLogs).toContainEqual(
       partialPinoLog('error', 'Internet gateway does not appear to exist', {
         err: expect.objectContaining({ message: error.message }),
-        internetGatewayAddress: DEFAULT_INTERNET_GATEWAY,
+        internetGatewayAddress: DEFAULT_INTERNET_GATEWAY_ADDRESS,
       }),
     );
   });

@@ -17,7 +17,7 @@ import { MissingGatewayError, UnregisteredGatewayError } from './errors';
 import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 import { DBCertificateStore } from './keystores/DBCertificateStore';
 import { generatePKIFixture, mockGatewayRegistration } from './testUtils/crypto';
-import { DEFAULT_INTERNET_GATEWAY } from './constants';
+import { DEFAULT_INTERNET_GATEWAY_ADDRESS } from './constants';
 import { useTemporaryAppDirs } from './testUtils/appDirs';
 import { PrivateGateway } from './PrivateGateway';
 
@@ -134,7 +134,7 @@ describe('getCurrentChannel', () => {
   test('Channel should be returned if gateway is registered', async () => {
     const channel = await gatewayManager.getCurrentChannel();
 
-    expect(channel.internetGatewayInternetAddress).toEqual(DEFAULT_INTERNET_GATEWAY);
+    expect(channel.internetGatewayInternetAddress).toEqual(DEFAULT_INTERNET_GATEWAY_ADDRESS);
   });
 });
 
@@ -152,7 +152,7 @@ describe('getCurrentChannelIfRegistered', () => {
   test('Channel should be returned if private gateway is registered', async () => {
     await expect(gatewayManager.getCurrentChannelIfRegistered()).resolves.toHaveProperty(
       'internetGatewayInternetAddress',
-      DEFAULT_INTERNET_GATEWAY,
+      DEFAULT_INTERNET_GATEWAY_ADDRESS,
     );
   });
 

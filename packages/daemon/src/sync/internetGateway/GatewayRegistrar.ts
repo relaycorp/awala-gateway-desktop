@@ -6,7 +6,7 @@ import { pipeline } from 'streaming-iterables';
 import { Inject, Service } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
-import { DEFAULT_INTERNET_GATEWAY } from '../../constants';
+import { DEFAULT_INTERNET_GATEWAY_ADDRESS } from '../../constants';
 import { sleepSeconds, sleepUntilDate } from '../../utils/timing';
 import { PrivateGatewayManager } from '../../PrivateGatewayManager';
 import { LOGGER } from '../../tokens';
@@ -56,7 +56,7 @@ export class GatewayRegistrar {
   public async waitForRegistration(): Promise<void> {
     while (!(await this.isRegistered())) {
       try {
-        await this.register(DEFAULT_INTERNET_GATEWAY);
+        await this.register(DEFAULT_INTERNET_GATEWAY_ADDRESS);
       } catch (err) {
         if (err instanceof UnreachableResolverError) {
           // The device may be disconnected from the Internet or the DNS resolver may be blocked.
@@ -84,10 +84,10 @@ export class GatewayRegistrar {
     let internetGatewayAddress = channel.internetGatewayInternetAddress;
     let certificateExpiryDate = channel.nodeDeliveryAuth.expiryDate;
     const updateInternetGateway = async (
-      newInternetGatewayPublicAddress: string,
+      newInternetGatewayAddress: string,
       newCertificateExpiryDate: Date,
     ) => {
-      internetGatewayAddress = newInternetGatewayPublicAddress;
+      internetGatewayAddress = newInternetGatewayAddress;
       certificateExpiryDate = newCertificateExpiryDate;
     };
     this.internalEvents.on('registration', updateInternetGateway);

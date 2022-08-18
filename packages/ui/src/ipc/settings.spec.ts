@@ -6,19 +6,19 @@ beforeEach(() => {
 });
 
 describe('getInternetGatewayAddress', () => {
-  const publicAddress = 'braavos.relaycorp.cloud';
+  const internetAddress = 'braavos.relaycorp.cloud';
   const request = {
     headers: { 'Content-Type': 'application/json; charset=UTF-8' },
     url: 'http://127.0.0.1:13276/_control/public-gateway',
   };
-  test('should fetch and return the publicAddress', async () => {
+  test('should fetch and return the internetAddress', async () => {
     fetchMock.get(request, {
-      body: { publicAddress },
+      body: { internetAddress },
       status: 200,
     });
 
     const internetGateway = await getInternetGatewayAddress('TOKEN');
-    expect(internetGateway).toEqual(publicAddress);
+    expect(internetGateway).toEqual(internetAddress);
 
     expect(fetchMock.lastUrl()).toEqual('http://127.0.0.1:13276/_control/public-gateway');
   });
