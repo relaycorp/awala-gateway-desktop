@@ -218,17 +218,17 @@ async function processParcelCollectionAck(
 
 async function processCertificateRotation(
   rotation: CertificateRotation,
-  privateGatewayPrivateAddress: string,
+  privateGatewayId: string,
   internetGatewayId: string,
   certificateStore: DBCertificateStore,
   logger: Logger,
 ): Promise<void> {
   const certificationPath = rotation.certificationPath;
   const newPrivateGatewayCertificate = certificationPath.leafCertificate;
-  const subjectPrivateAddress = await newPrivateGatewayCertificate.calculateSubjectId();
-  if (subjectPrivateAddress !== privateGatewayPrivateAddress) {
+  const subjectId = await newPrivateGatewayCertificate.calculateSubjectId();
+  if (subjectId !== privateGatewayId) {
     logger.warn(
-      { subjectPrivateAddress, privateGatewayPrivateAddress },
+      { subjectId, privateGatewayId },
       'Ignored rotation containing certificate for different private gateway',
     );
     return;

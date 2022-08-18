@@ -68,21 +68,16 @@ export function mockGatewayRegistration(
     const certificateStore = Container.get(DBCertificateStore);
     const config = Container.get(Config);
 
-    const privateGatewayPrivateAddress = await getIdFromIdentityKey(
-      keyPairSet.privateGateway.publicKey!,
-    );
+    const privateGatewayId = await getIdFromIdentityKey(keyPairSet.privateGateway.publicKey!);
     const internetGatewayId = await pdaCertPath.internetGateway.calculateSubjectId();
 
-    await privateKeyStore.saveIdentityKey(
-      privateGatewayPrivateAddress,
-      keyPairSet.privateGateway.privateKey!,
-    );
+    await privateKeyStore.saveIdentityKey(privateGatewayId, keyPairSet.privateGateway.privateKey!);
     await certificateStore.save(
       new CertificationPath(pdaCertPath.privateGateway, [pdaCertPath.internetGateway]),
       internetGatewayId,
     );
 
-    await config.set(ConfigKey.CURRENT_ID, privateGatewayPrivateAddress);
+    await config.set(ConfigKey.CURRENT_ID, privateGatewayId);
 
     await config.set(ConfigKey.INTERNET_GATEWAY_ADDRESS, DEFAULT_INTERNET_GATEWAY_ADDRESS);
     await config.set(ConfigKey.INTERNET_GATEWAY_ID, internetGatewayId);

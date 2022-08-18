@@ -177,14 +177,11 @@ export class ParcelStore {
   }
 
   protected async *listQueuedParcelsBoundForEndpoints(
-    recipientPrivateAddresses: readonly string[],
+    recipientIds: readonly string[],
   ): AsyncIterable<string> {
     const endpointBoundPrefix = getAbsoluteParcelKey(MessageDirection.FROM_INTERNET);
-    for (const recipientPrivateAddress of recipientPrivateAddresses) {
-      const keyPrefix = getAbsoluteParcelKey(
-        MessageDirection.FROM_INTERNET,
-        recipientPrivateAddress,
-      );
+    for (const recipientId of recipientIds) {
+      const keyPrefix = getAbsoluteParcelKey(MessageDirection.FROM_INTERNET, recipientId);
       yield* await pipe(
         this.fileStore.listObjects(keyPrefix),
         this.filterActiveParcels(endpointBoundPrefix, MessageDirection.FROM_INTERNET),
@@ -242,17 +239,12 @@ function sha256Hex(plaintext: string): string {
 }
 
 async function getRelativeParcelKey(parcel: Parcel, direction: MessageDirection): Promise<string> {
-  const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectId();
-  return getRelativeParcelKeyFromParts(
-    senderPrivateAddress,
-    parcel.recipient.id,
-    parcel.id,
-    direction,
-  );
+  const senderId = await parcel.senderCertificate.calculateSubjectId();
+  return getRelativeParcelKeyFromParts(senderId, parcel.recipient.id, parcel.id, direction);
 }
 
 async function getRelativeParcelKeyFromParts(
-  senderPrivateAddress: string,
+  senderId: string,
   recipientAddress: string,
   parcelId: string,
   direction: MessageDirection,
@@ -260,8 +252,8 @@ async function getRelativeParcelKeyFromParts(
   // Hash some components together to avoid exceeding Windows' 260-char limit for paths
   const keyComponents =
     direction === MessageDirection.TOWARDS_INTERNET
-      ? [senderPrivateAddress, sha256Hex(recipientAddress + parcelId)]
-      : [recipientAddress, sha256Hex(senderPrivateAddress + parcelId)];
+      ? [senderId, sha256Hex(recipientAddress + parcelId)]
+      : [recipientAddress, sha256Hex(senderId + parcelId)];
   return join(...keyComponents);
 }
 

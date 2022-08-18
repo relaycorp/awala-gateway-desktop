@@ -59,13 +59,13 @@ setUpTestDBConnection();
 useTemporaryAppDirs();
 const mockLogs = mockLoggerToken();
 
-let privateGatewayPrivateAddress: string;
+let privateGatewayId: string;
 let privateGatewayPDACertificate: Certificate;
 let internetGatewayId: string;
 let internetGatewayPrivateKey: CryptoKey;
 let internetGatewayPDACertificate: Certificate;
 const pkiFixtureRetriever = generatePKIFixture(async (keyPairSet, pdaCertPath) => {
-  privateGatewayPrivateAddress = await getIdFromIdentityKey(keyPairSet.privateGateway.publicKey!);
+  privateGatewayId = await getIdFromIdentityKey(keyPairSet.privateGateway.publicKey!);
   privateGatewayPDACertificate = pdaCertPath.privateGateway;
 
   internetGatewayId = await getIdFromIdentityKey(keyPairSet.internetGateway.publicKey!);
@@ -246,8 +246,8 @@ describe('Cargo collection', () => {
         const cca = await retrieveCCA();
         const cargoDeliveryAuthorization = await extractCDA(cca);
         const cdaIssuerPaths = await certificateStore.retrieveAll(
-          privateGatewayPrivateAddress,
-          privateGatewayPrivateAddress,
+          privateGatewayId,
+          privateGatewayId,
         );
         await expect(
           cargoDeliveryAuthorization.getCertificationPath(
@@ -518,7 +518,7 @@ describe('Cargo collection', () => {
     test('Certificate for different private gateway should be ignored', async () => {
       const certificateRotation = new CertificateRotation(
         new CertificationPath(
-          internetGatewayPDACertificate, // Invalid certificate: wrong subject private address
+          internetGatewayPDACertificate, // Invalid certificate: wrong subject id
           [],
         ),
       );
@@ -528,16 +528,13 @@ describe('Cargo collection', () => {
       await runCourierSync(getParentStream());
 
       await expect(
-        certificateStore.retrieveLatest(privateGatewayPrivateAddress, internetGatewayId),
+        certificateStore.retrieveLatest(privateGatewayId, internetGatewayId),
       ).resolves.toSatisfy((p) => p.leafCertificate.isEqual(privateGatewayPDACertificate));
       expect(mockLogs).toContainEqual(
         partialPinoLog(
           'warn',
           'Ignored rotation containing certificate for different private gateway',
-          {
-            privateGatewayPrivateAddress,
-            subjectPrivateAddress: internetGatewayId,
-          },
+          { privateGatewayId, subjectId: internetGatewayId },
         ),
       );
     });
@@ -564,7 +561,7 @@ describe('Cargo collection', () => {
       await runCourierSync(getParentStream());
 
       await expect(
-        certificateStore.retrieveLatest(privateGatewayPrivateAddress, internetGatewayId),
+        certificateStore.retrieveLatest(privateGatewayId, internetGatewayId),
       ).resolves.toSatisfy((p) => p.leafCertificate.isEqual(privateGatewayPDACertificate));
       expect(mockLogs).toContainEqual(
         partialPinoLog(
@@ -599,7 +596,7 @@ describe('Cargo collection', () => {
       await runCourierSync(getParentStream());
 
       const latestCertificatePath = await certificateStore.retrieveLatest(
-        privateGatewayPrivateAddress,
+        privateGatewayId,
         internetGatewayId,
       );
       await expect(

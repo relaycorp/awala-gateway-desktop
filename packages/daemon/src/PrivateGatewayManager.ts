@@ -32,24 +32,22 @@ export class PrivateGatewayManager extends BasePrivateGatewayManager {
    * @throws {MissingGatewayError}
    */
   public async getCurrent(): Promise<PrivateGateway> {
-    const privateAddress = await this.config.get(ConfigKey.CURRENT_ID);
-    if (!privateAddress) {
-      throw new MissingGatewayError('Config does not contain current private address');
+    const id = await this.config.get(ConfigKey.CURRENT_ID);
+    if (!id) {
+      throw new MissingGatewayError('Config does not contain current id');
     }
-    const existingGateway = await this.get(privateAddress, PrivateGateway);
+    const existingGateway = await this.get(id, PrivateGateway);
     if (!existingGateway) {
-      throw new MissingGatewayError(`Private key (${privateAddress}) is missing`);
+      throw new MissingGatewayError(`Private key (${id}) is missing`);
     }
     return existingGateway;
   }
 
   public async createCurrentIfMissing(): Promise<void> {
-    const currentNodePrivateAddress = await this.config.get(ConfigKey.CURRENT_ID);
+    const currentNodeId = await this.config.get(ConfigKey.CURRENT_ID);
 
-    if (currentNodePrivateAddress) {
-      const privateKey = await this.keyStores.privateKeyStore.retrieveIdentityKey(
-        currentNodePrivateAddress,
-      );
+    if (currentNodeId) {
+      const privateKey = await this.keyStores.privateKeyStore.retrieveIdentityKey(currentNodeId);
       if (privateKey) {
         return;
       }

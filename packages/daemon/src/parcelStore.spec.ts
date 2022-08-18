@@ -735,8 +735,8 @@ async function computeEndpointBoundParcelPath(parcel: Parcel): Promise<string> {
 }
 
 async function computeEndpointBoundParcelKey(parcel: Parcel): Promise<string> {
-  const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectId();
-  return join(parcel.recipient.id, sha256Hex(senderPrivateAddress + parcel.id));
+  const senderId = await parcel.senderCertificate.calculateSubjectId();
+  return join(parcel.recipient.id, sha256Hex(senderId + parcel.id));
 }
 
 async function overrideMetadataFile(

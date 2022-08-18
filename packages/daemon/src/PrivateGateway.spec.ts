@@ -117,7 +117,7 @@ describe('registerWithInternetGateway', () => {
     );
   });
 
-  test('Private address of Internet gateway should be stored in config', async () => {
+  test('Id of Internet gateway should be stored in config', async () => {
     await privateGateway.registerWithInternetGateway(DEFAULT_INTERNET_GATEWAY_ADDRESS);
 
     const config = Container.get(Config);
