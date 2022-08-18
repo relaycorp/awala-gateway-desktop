@@ -1,10 +1,10 @@
-import { PublicAddressingError, UnreachableResolverError } from '@relaycorp/relaynet-core';
+import { InternetAddressingError, UnreachableResolverError } from '@relaycorp/relaynet-core';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import isValidDomain from 'is-valid-domain';
 import { Container } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
-import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
+import { DEFAULT_INTERNET_GATEWAY } from '../../constants';
 import { GatewayRegistrar } from '../../sync/publicGateway/GatewayRegistrar';
 import { ParcelCollectorManager } from '../../sync/publicGateway/parcelCollection/ParcelCollectorManager';
 import { getBearerTokenFromAuthHeader } from '../../utils/auth';
@@ -33,8 +33,8 @@ export default async function registerRoutes(
     onRequest: makeAuthEnforcementHook(options.controlAuthToken),
     url: ENDPOINT_PATH,
     async handler(_request, reply): Promise<FastifyReply<any>> {
-      const registeredAddress = await config.get(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS);
-      const publicAddress = registeredAddress ?? DEFAULT_PUBLIC_GATEWAY;
+      const registeredAddress = await config.get(ConfigKey.INTERNET_GATEWAY_ADDRESS);
+      const publicAddress = registeredAddress ?? DEFAULT_INTERNET_GATEWAY;
       return reply.header('Content-Type', 'application/json').code(200).send({ publicAddress });
     },
   });
@@ -85,7 +85,7 @@ function abortFailedMigration(
   } else if (err instanceof UnreachableResolverError) {
     request.log.warn('Failed to reach DNS resolver');
     return baseResponse.send({ code: ErrorCode.ADDRESS_RESOLUTION_FAILURE });
-  } else if (err instanceof PublicAddressingError) {
+  } else if (err instanceof InternetAddressingError) {
     request.log.warn({ err, publicAddress }, 'Failed to resolve public address');
     return baseResponse.send({ code: ErrorCode.ADDRESS_RESOLUTION_FAILURE });
   }

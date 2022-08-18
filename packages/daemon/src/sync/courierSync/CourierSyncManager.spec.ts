@@ -350,7 +350,7 @@ describe('streamCollectedParcelKeys', () => {
   function notifyParcelCollection(parcelKey: string, recipientAddress: string): void {
     const notification: ParcelCollectionNotification = {
       parcelKey,
-      recipientAddress,
+      recipientId: recipientAddress,
       type: 'parcelCollection',
     };
     const subprocess = getSubprocess();

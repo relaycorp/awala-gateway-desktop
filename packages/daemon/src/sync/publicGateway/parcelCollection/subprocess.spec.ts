@@ -2,7 +2,7 @@ import {
   Certificate,
   InvalidMessageError,
   ParcelCollection,
-  PublicAddressingError,
+  InternetAddressingError,
   RAMFSyntaxError,
   StreamingMode,
   UnreachableResolverError,
@@ -11,7 +11,7 @@ import { CollectParcelsCall, MockGSCClient } from '@relaycorp/relaynet-testing';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { PassThrough } from 'stream';
 
-import { DEFAULT_PUBLIC_GATEWAY } from '../../../constants';
+import { DEFAULT_INTERNET_GATEWAY } from '../../../constants';
 import { ParcelStore } from '../../../parcelStore';
 import { useTemporaryAppDirs } from '../../../testUtils/appDirs';
 import { generatePKIFixture, mockGatewayRegistration } from '../../../testUtils/crypto';
@@ -69,7 +69,7 @@ test('Client should connect to appropriate public gateway', async () => {
 
   await runParcelCollection(parentStream);
 
-  expect(mockMakeGSCClient).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
+  expect(mockMakeGSCClient).toBeCalledWith(DEFAULT_INTERNET_GATEWAY);
 });
 
 test('Subprocess should record a log when it is ready', async () => {
@@ -183,7 +183,7 @@ describe('Parcel collection', () => {
         parcel: expect.objectContaining({
           id: parcel.id,
           key: parcelKey,
-          recipientAddress: parcel.recipientAddress,
+          recipientAddress: parcel.recipient.id,
         }),
       }),
     );
@@ -201,7 +201,7 @@ describe('Parcel collection', () => {
     expect(mockParcelStore).toBeCalled();
     expect(getParentMessages()).toContainEqual<ParcelCollectionNotification>({
       parcelKey,
-      recipientAddress: parcel.recipientAddress,
+      recipientAddress: parcel.recipient.id,
       type: 'parcelCollection',
     });
   });
@@ -267,7 +267,7 @@ describe('Public gateway resolution failures', () => {
   });
 
   test('Reconnection should be attempted after 30 seconds if DNS lookup failed', async () => {
-    const error = new PublicAddressingError('Invalid DNS record');
+    const error = new InternetAddressingError('Invalid DNS record');
     mockMakeGSCClient.mockRejectedValueOnce(error);
     addEmptyParcelCollectionCall();
 
@@ -294,7 +294,7 @@ describe('Public gateway resolution failures', () => {
     expect(mockLogs).toContainEqual(
       partialPinoLog('error', 'Public gateway does not appear to exist', {
         err: expect.objectContaining({ message: error.message }),
-        publicGatewayAddress: DEFAULT_PUBLIC_GATEWAY,
+        publicGatewayAddress: DEFAULT_INTERNET_GATEWAY,
       }),
     );
   });

@@ -17,7 +17,7 @@ import { MissingGatewayError, UnregisteredGatewayError } from './errors';
 import { DBPrivateKeyStore } from './keystores/DBPrivateKeyStore';
 import { DBCertificateStore } from './keystores/DBCertificateStore';
 import { generatePKIFixture, mockGatewayRegistration } from './testUtils/crypto';
-import { DEFAULT_PUBLIC_GATEWAY } from './constants';
+import { DEFAULT_INTERNET_GATEWAY } from './constants';
 import { useTemporaryAppDirs } from './testUtils/appDirs';
 import { PrivateGateway } from './PrivateGateway';
 
@@ -32,33 +32,33 @@ beforeEach(() => {
 describe('createCurrentIfMissing', () => {
   test('Node should be created if private address is absent', async () => {
     const config = Container.get(Config);
-    await expect(config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS)).resolves.toBeNull();
+    await expect(config.get(ConfigKey.CURRENT_ID)).resolves.toBeNull();
 
     await gatewayManager.createCurrentIfMissing();
 
-    const privateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
+    const privateAddress = await config.get(ConfigKey.CURRENT_ID);
     expect(privateAddress).toBeTruthy();
     await expect(gatewayManager.get(privateAddress!)).resolves.not.toBeNull();
   });
 
   test('Node should be created if private key does not', async () => {
     const config = Container.get(Config);
-    await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, '0deadbeef');
+    await config.set(ConfigKey.CURRENT_ID, '0deadbeef');
 
     await gatewayManager.createCurrentIfMissing();
 
-    const privateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
+    const privateAddress = await config.get(ConfigKey.CURRENT_ID);
     await expect(gatewayManager.get(privateAddress!)).resolves.not.toBeNull();
   });
 
   test('Node should be reused if it already exists', async () => {
     await gatewayManager.createCurrentIfMissing();
     const config = Container.get(Config);
-    const originalPrivateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
+    const originalPrivateAddress = await config.get(ConfigKey.CURRENT_ID);
 
     await gatewayManager.createCurrentIfMissing();
 
-    const newPrivateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
+    const newPrivateAddress = await config.get(ConfigKey.CURRENT_ID);
     expect(newPrivateAddress).toBeTruthy();
     expect(newPrivateAddress).toEqual(originalPrivateAddress);
   });
@@ -67,7 +67,7 @@ describe('createCurrentIfMissing', () => {
 describe('getCurrent', () => {
   test('Error should be thrown if private address is absent', async () => {
     const config = Container.get(Config);
-    await expect(config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS)).resolves.toBeNull();
+    await expect(config.get(ConfigKey.CURRENT_ID)).resolves.toBeNull();
 
     await expect(gatewayManager.getCurrent()).rejects.toThrowWithMessage(
       MissingGatewayError,
@@ -77,7 +77,7 @@ describe('getCurrent', () => {
 
   test('Error should be thrown if private key is absent', async () => {
     const privateAddress = '0deadbeef';
-    await Container.get(Config).set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
+    await Container.get(Config).set(ConfigKey.CURRENT_ID, privateAddress);
 
     await expect(gatewayManager.getCurrent()).rejects.toThrowWithMessage(
       MissingGatewayError,
@@ -90,9 +90,7 @@ describe('getCurrent', () => {
 
     const gateway = await gatewayManager.getCurrent();
 
-    await expect(Container.get(Config).get(ConfigKey.CURRENT_PRIVATE_ADDRESS)).resolves.toEqual(
-      gateway.privateAddress,
-    );
+    await expect(Container.get(Config).get(ConfigKey.CURRENT_ID)).resolves.toEqual(gateway.id);
   });
 
   test('Custom gateway class should be returned', async () => {
@@ -136,7 +134,7 @@ describe('getCurrentChannel', () => {
   test('Channel should be returned if gateway is registered', async () => {
     const channel = await gatewayManager.getCurrentChannel();
 
-    expect(channel.publicGatewayPublicAddress).toEqual(DEFAULT_PUBLIC_GATEWAY);
+    expect(channel.internetGatewayInternetAddress).toEqual(DEFAULT_INTERNET_GATEWAY);
   });
 });
 
@@ -153,8 +151,8 @@ describe('getCurrentChannelIfRegistered', () => {
 
   test('Channel should be returned if private gateway is registered', async () => {
     await expect(gatewayManager.getCurrentChannelIfRegistered()).resolves.toHaveProperty(
-      'publicGatewayPublicAddress',
-      DEFAULT_PUBLIC_GATEWAY,
+      'internetGatewayInternetAddress',
+      DEFAULT_INTERNET_GATEWAY,
     );
   });
 
@@ -183,10 +181,7 @@ describe('getVerifier', () => {
       new CertificationPath(certificate, []),
       publicGatewayPrivateAddress,
     );
-    await Container.get(Config).set(
-      ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS,
-      publicGatewayPrivateAddress,
-    );
+    await Container.get(Config).set(ConfigKey.INTERNET_GATEWAY_ID, publicGatewayPrivateAddress);
 
     const verifier = await gatewayManager.getVerifier(StubVerifier);
 
@@ -196,7 +191,7 @@ describe('getVerifier', () => {
   });
 
   async function selfIssuedCertificate(): Promise<Certificate> {
-    const privateAddress = await Container.get(Config).get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
+    const privateAddress = await Container.get(Config).get(ConfigKey.CURRENT_ID);
     const privateKey = await Container.get(DBPrivateKeyStore).retrieveIdentityKey(privateAddress!);
     return issueGatewayCertificate({
       issuerPrivateKey: privateKey!,

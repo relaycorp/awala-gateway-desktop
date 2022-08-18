@@ -4,7 +4,7 @@ import { consume, take } from 'streaming-iterables';
 import { Container } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
-import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
+import { DEFAULT_INTERNET_GATEWAY } from '../../constants';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { mockLoggerToken, partialPinoLog } from '../../testUtils/logging';
@@ -44,9 +44,9 @@ describe('register', () => {
 
   test('Registration should be skipped if already registered with new gateway', async () => {
     const config = Container.get(Config);
-    await config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
+    await config.set(ConfigKey.INTERNET_GATEWAY_ADDRESS, DEFAULT_INTERNET_GATEWAY);
 
-    await registrar.register(DEFAULT_PUBLIC_GATEWAY);
+    await registrar.register(DEFAULT_INTERNET_GATEWAY);
 
     expect(mockRegisterWithPublicGateway).not.toBeCalled();
     expect(logs).toContainEqual(
@@ -55,24 +55,24 @@ describe('register', () => {
   });
 
   test('Registration should be completed if not already registered with peer', async () => {
-    await registrar.register(DEFAULT_PUBLIC_GATEWAY);
+    await registrar.register(DEFAULT_INTERNET_GATEWAY);
 
-    expect(mockRegisterWithPublicGateway).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
+    expect(mockRegisterWithPublicGateway).toBeCalledWith(DEFAULT_INTERNET_GATEWAY);
     const privateGatewayCertificate = pkiFixtureRetriever().pdaCertPath.privateGateway;
     expect(logs).toContainEqual(
       partialPinoLog('info', 'Successfully registered with public gateway', {
         privateGatewayCertificateExpiryDate: privateGatewayCertificate.expiryDate.toISOString(),
-        publicGatewayPublicAddress: DEFAULT_PUBLIC_GATEWAY,
+        publicGatewayPublicAddress: DEFAULT_INTERNET_GATEWAY,
       }),
     );
   });
 
   test('Public address of public gateway should be stored in config', async () => {
-    await registrar.register(DEFAULT_PUBLIC_GATEWAY);
+    await registrar.register(DEFAULT_INTERNET_GATEWAY);
 
     const config = Container.get(Config);
-    await expect(config.get(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS)).resolves.toEqual(
-      DEFAULT_PUBLIC_GATEWAY,
+    await expect(config.get(ConfigKey.INTERNET_GATEWAY_ADDRESS)).resolves.toEqual(
+      DEFAULT_INTERNET_GATEWAY,
     );
   });
 
@@ -80,7 +80,7 @@ describe('register', () => {
     const originalError = new Error('oh noes');
     mockRegisterWithPublicGateway.mockRejectedValue(originalError);
 
-    await expect(registrar.register(DEFAULT_PUBLIC_GATEWAY)).rejects.toBe(originalError);
+    await expect(registrar.register(DEFAULT_INTERNET_GATEWAY)).rejects.toBe(originalError);
   });
 });
 
@@ -109,7 +109,7 @@ describe('waitForRegistration', () => {
     await registrar.waitForRegistration();
 
     expect(mockRegister).toBeCalledTimes(1);
-    expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
+    expect(mockRegister).toBeCalledWith(DEFAULT_INTERNET_GATEWAY);
     expect(sleepSeconds).not.toBeCalled();
   });
 
@@ -133,7 +133,7 @@ describe('waitForRegistration', () => {
     await registrar.waitForRegistration();
 
     expect(mockRegister).toBeCalledTimes(2);
-    expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
+    expect(mockRegister).toBeCalledWith(DEFAULT_INTERNET_GATEWAY);
     expect(sleepSeconds).toBeCalledWith(5);
     expect(logs).toContainEqual(
       partialPinoLog(
@@ -153,7 +153,7 @@ describe('waitForRegistration', () => {
     await registrar.waitForRegistration();
 
     expect(mockRegister).toBeCalledTimes(2);
-    expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
+    expect(mockRegister).toBeCalledWith(DEFAULT_INTERNET_GATEWAY);
     expect(sleepSeconds).toBeCalledWith(60);
     expect(logs).toContainEqual(
       partialPinoLog('error', 'Failed to register with public gateway', {
@@ -172,7 +172,7 @@ describe('waitForRegistration', () => {
     await registrar.waitForRegistration();
 
     expect(mockRegister).toBeCalledTimes(2);
-    expect(mockRegister).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
+    expect(mockRegister).toBeCalledWith(DEFAULT_INTERNET_GATEWAY);
     expect(sleepSeconds).toBeCalledWith(60);
     expect(logs).toContainEqual(
       partialPinoLog('error', 'Failed to register with public gateway', {
@@ -223,7 +223,7 @@ describe('continuallyRenewRegistration', () => {
 
   test('Public gateway migrations should be reflected', async () => {
     // Migrate to a different public gateway before the first renewal
-    const publicGateway2PublicAddress = `not-${DEFAULT_PUBLIC_GATEWAY}`;
+    const publicGateway2PublicAddress = `not-${DEFAULT_INTERNET_GATEWAY}`;
     sleepUntilDateMock.mockImplementationOnce(async () => {
       await registrar.register(publicGateway2PublicAddress);
     });
@@ -241,7 +241,7 @@ describe('continuallyRenewRegistration', () => {
     );
     expect(mockRegisterWithPublicGateway).toBeCalledTimes(2);
     expect(mockRegisterWithPublicGateway).toHaveBeenCalledWith(publicGateway2PublicAddress);
-    expect(mockRegisterWithPublicGateway).not.toHaveBeenCalledWith(DEFAULT_PUBLIC_GATEWAY);
+    expect(mockRegisterWithPublicGateway).not.toHaveBeenCalledWith(DEFAULT_INTERNET_GATEWAY);
   });
 
   test('Renewal should be logged', async () => {
@@ -252,7 +252,7 @@ describe('continuallyRenewRegistration', () => {
 
     expect(logs).toContainEqual(
       partialPinoLog('info', 'Renewed certificate with public gateway', {
-        publicGatewayPublicAddress: DEFAULT_PUBLIC_GATEWAY,
+        publicGatewayPublicAddress: DEFAULT_INTERNET_GATEWAY,
         certificateExpiryDate: certificate2Date.toISOString(),
       }),
     );
@@ -289,7 +289,7 @@ describe('continuallyRenewRegistration', () => {
               message: registrationError.message,
               type: UnreachableResolverError.name,
             }),
-            publicGatewayPublicAddress: DEFAULT_PUBLIC_GATEWAY,
+            publicGatewayPublicAddress: DEFAULT_INTERNET_GATEWAY,
           },
         ),
       );
@@ -308,7 +308,7 @@ describe('continuallyRenewRegistration', () => {
             message: registrationError.message,
             type: registrationError.name,
           }),
-          publicGatewayPublicAddress: DEFAULT_PUBLIC_GATEWAY,
+          publicGatewayPublicAddress: DEFAULT_INTERNET_GATEWAY,
         }),
       );
     });
@@ -320,7 +320,7 @@ describe('isRegistered', () => {
 
   test('True should be returned if gateway is registered', async () => {
     const config = Container.get(Config);
-    await config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
+    await config.set(ConfigKey.INTERNET_GATEWAY_ADDRESS, DEFAULT_INTERNET_GATEWAY);
 
     await expect(registrar.isRegistered()).resolves.toBeTrue();
   });

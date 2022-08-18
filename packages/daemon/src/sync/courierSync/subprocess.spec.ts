@@ -10,7 +10,7 @@ import {
   CMSError,
   derSerializePublicKey,
   generateRSAKeyPair,
-  getPrivateAddressFromIdentityKey,
+  getIdFromIdentityKey,
   InvalidMessageError,
   issueGatewayCertificate,
   ParcelCollectionAck,
@@ -26,7 +26,7 @@ import { getRepository } from 'typeorm';
 import uuid from 'uuid-random';
 
 import { CourierSyncExitCode, CourierSyncStage } from '.';
-import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
+import { DEFAULT_INTERNET_GATEWAY } from '../../constants';
 import { ParcelCollection } from '../../entity/ParcelCollection';
 import { FileStore } from '../../fileStore';
 import { ParcelStore } from '../../parcelStore';
@@ -53,7 +53,7 @@ beforeEach(() => {
   getMockInstance(v4).mockResolvedValue({ gateway: mockGatewayIPAddress });
 });
 
-jest.mock('@relaycorp/cogrpc', () => ({ CogRPCClient: { init: jest.fn() } }));
+jest.mock('@relaycorp/cogrpc', () => ({ CogRPCClient: { initLan: jest.fn() } }));
 
 setUpTestDBConnection();
 useTemporaryAppDirs();
@@ -65,16 +65,12 @@ let publicGatewayPrivateAddress: string;
 let publicGatewayPrivateKey: CryptoKey;
 let publicGatewayPDACertificate: Certificate;
 const pkiFixtureRetriever = generatePKIFixture(async (keyPairSet, pdaCertPath) => {
-  privateGatewayPrivateAddress = await getPrivateAddressFromIdentityKey(
-    keyPairSet.privateGateway.publicKey!,
-  );
+  privateGatewayPrivateAddress = await getIdFromIdentityKey(keyPairSet.privateGateway.publicKey!);
   privateGatewayPDACertificate = pdaCertPath.privateGateway;
 
-  publicGatewayPrivateAddress = await getPrivateAddressFromIdentityKey(
-    keyPairSet.publicGateway.publicKey!,
-  );
-  publicGatewayPrivateKey = keyPairSet.publicGateway.privateKey!;
-  publicGatewayPDACertificate = pdaCertPath.publicGateway;
+  publicGatewayPrivateAddress = await getIdFromIdentityKey(keyPairSet.internetGateway.publicKey!);
+  publicGatewayPrivateKey = keyPairSet.internetGateway.privateKey!;
+  publicGatewayPDACertificate = pdaCertPath.internetGateway;
 });
 const { undoGatewayRegistration, getPublicGatewaySessionPrivateKey } =
   mockGatewayRegistration(pkiFixtureRetriever);
@@ -83,8 +79,8 @@ const mockCollectCargo = mockSpy(jest.fn(), () => arrayToAsyncIterable([]));
 const mockDeliverCargo = mockSpy(jest.fn(), () => arrayToAsyncIterable([]));
 const mockCogRPCClose = mockSpy(jest.fn());
 beforeEach(() => {
-  getMockInstance(CogRPCClient.init).mockRestore();
-  getMockInstance(CogRPCClient.init).mockReturnValue({
+  getMockInstance(CogRPCClient.initLan).mockRestore();
+  getMockInstance(CogRPCClient.initLan).mockReturnValue({
     close: mockCogRPCClose,
     collectCargo: mockCollectCargo,
     deliverCargo: mockDeliverCargo,
@@ -128,12 +124,12 @@ test('Subprocess should error out if default gateway could not be found', async 
 test('Client should connect to port 21473 on the default gateway', async () => {
   await runCourierSync(getParentStream());
 
-  expect(CogRPCClient.init).toBeCalledWith(`https://${mockGatewayIPAddress}:21473`);
+  expect(CogRPCClient.initLan).toBeCalledWith(`${mockGatewayIPAddress}:21473`);
 });
 
 test('Subprocess should error out if the CogRPC client cannot be initialised', async () => {
   const gatewayError = new Error('TLS connection failure');
-  getMockInstance(CogRPCClient.init).mockRejectedValue(gatewayError);
+  getMockInstance(CogRPCClient.initLan).mockRejectedValue(gatewayError);
 
   await expect(runCourierSync(getParentStream())).resolves.toEqual(CourierSyncExitCode.FAILED_SYNC);
 
@@ -183,11 +179,11 @@ describe('Cargo collection', () => {
   });
 
   describe('Cargo Collection Authorization', () => {
-    test('Recipient should be public gateway', async () => {
+    test('Recipient should include Internet gateway', async () => {
       await runCourierSync(getParentStream());
 
       const cca = await retrieveCCA();
-      expect(cca.recipientAddress).toEqual(`https://${DEFAULT_PUBLIC_GATEWAY}`);
+      expect(cca.recipient.internetAddress).toEqual(DEFAULT_INTERNET_GATEWAY);
     });
 
     test('Creation date should be 90 minutes in the past to tolerate clock drift', async () => {
@@ -278,8 +274,8 @@ describe('Cargo collection', () => {
           await expect(runCourierSync(sync2ParentStream)).resolves.toEqual(CourierSyncExitCode.OK);
 
           expect(getParentProcessMessages()).toContainEqual<ParcelCollectionNotification>({
-            parcelKey: expect.stringContaining(parcel.recipientAddress),
-            recipientAddress: parcel.recipientAddress,
+            parcelKey: expect.stringContaining(parcel.recipient.id),
+            recipientId: parcel.recipient.id,
             type: 'parcelCollection',
           });
         } finally {
@@ -316,7 +312,7 @@ describe('Cargo collection', () => {
   test('Cargo by unauthorized sender should be logged and ignored', async () => {
     const { parcelSerialized } = await makeDummyParcel();
     const cargo = new Cargo(
-      await privateGatewayPDACertificate.calculateSubjectPrivateAddress(),
+      { id: await privateGatewayPDACertificate.calculateSubjectId() },
       publicGatewayPDACertificate, // Sent by the public gateway, but using wrong certificate
       Buffer.from(await makeCargoPayloadFromMessages([parcelSerialized])),
     );
@@ -379,8 +375,8 @@ describe('Cargo collection', () => {
       const { pdaCertPath, keyPairSet } = pkiFixtureRetriever();
       const { parcelSerialized: invalidParcelSerialized } = await makeParcel(
         MessageDirection.FROM_INTERNET,
-        { ...pdaCertPath, pdaGrantee: pdaCertPath.publicGateway },
-        { ...keyPairSet, pdaGrantee: keyPairSet.publicGateway },
+        { ...pdaCertPath, pdaGrantee: pdaCertPath.internetGateway },
+        { ...keyPairSet, pdaGrantee: keyPairSet.internetGateway },
       );
       const { cargo, cargoSerialized } = await makeCargoFromMessages([invalidParcelSerialized]);
       mockCollectCargo.mockReturnValueOnce(arrayToAsyncIterable([cargoSerialized]));
@@ -404,7 +400,7 @@ describe('Cargo collection', () => {
       await runCourierSync(getParentStream());
 
       const parcelKeys = await asyncIterableToArray(
-        parcelStore.streamEndpointBound([parcel.recipientAddress], false),
+        parcelStore.streamEndpointBound([parcel.recipient.id], false),
       );
       expect(parcelKeys).toHaveLength(1);
       await expect(
@@ -413,7 +409,7 @@ describe('Cargo collection', () => {
       expect(mockLogs).toContainEqual(
         partialPinoLog('info', 'Stored parcel', {
           cargo: { id: cargo.id },
-          parcel: { id: parcel.id, recipientAddress: parcel.recipientAddress, key: parcelKeys[0] },
+          parcel: { id: parcel.id, recipientId: parcel.recipient.id, key: parcelKeys[0] },
         }),
       );
     });
@@ -428,9 +424,8 @@ describe('Cargo collection', () => {
       const parcelCollectionRepo = getRepository(ParcelCollection);
       const collection = await parcelCollectionRepo.findOneBy({
         parcelId: parcel.id,
-        recipientEndpointAddress: parcel.recipientAddress,
-        senderEndpointPrivateAddress:
-          await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+        recipientEndpointId: parcel.recipient.id,
+        senderEndpointId: await parcel.senderCertificate.calculateSubjectId(),
       });
       expect(collection!.parcelExpiryDate).toEqual(parcel.expiryDate);
     });
@@ -445,8 +440,8 @@ describe('Cargo collection', () => {
       await runCourierSync(parentStream);
 
       expect(getParentProcessMessages()).toContainEqual<ParcelCollectionNotification>({
-        parcelKey: expect.stringContaining(parcel.recipientAddress),
-        recipientAddress: parcel.recipientAddress,
+        parcelKey: expect.stringContaining(parcel.recipient.id),
+        recipientId: parcel.recipient.id,
         type: 'parcelCollection',
       });
     });
@@ -458,9 +453,8 @@ describe('Cargo collection', () => {
         parcelCollectionRepo.create({
           parcelExpiryDate: parcel.expiryDate,
           parcelId: parcel.id,
-          recipientEndpointAddress: parcel.recipientAddress,
-          senderEndpointPrivateAddress:
-            await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+          recipientEndpointId: parcel.recipient.id,
+          senderEndpointId: await parcel.senderCertificate.calculateSubjectId(),
         }),
       );
       const { cargoSerialized } = await makeCargoFromMessages([parcelSerialized]);
@@ -488,8 +482,8 @@ describe('Cargo collection', () => {
       );
       await parcelStore.storeInternetBound(parcelSerialized, parcel);
       const ackSerialized = makeParcelCollectionAck(
-        await parcel.senderCertificate.calculateSubjectPrivateAddress(),
-        parcel.recipientAddress,
+        await parcel.senderCertificate.calculateSubjectId(),
+        parcel.recipient.id,
         parcel.id,
       );
       const { cargo, cargoSerialized } = await makeCargoFromMessages([ackSerialized]);
@@ -503,23 +497,19 @@ describe('Cargo collection', () => {
           cargo: { id: cargo.id },
           parcel: {
             id: parcel.id,
-            recipientAddress: parcel.recipientAddress,
-            senderAddress: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+            recipientId: parcel.recipient.id,
+            senderAddress: await parcel.senderCertificate.calculateSubjectId(),
           },
         }),
       );
     });
 
     function makeParcelCollectionAck(
-      senderEndpointPrivateAddress: string,
-      recipientEndpointAddress: string,
+      senderEndpointId: string,
+      recipientEndpointId: string,
       parcelId: string,
     ): ArrayBuffer {
-      const ack = new ParcelCollectionAck(
-        senderEndpointPrivateAddress,
-        recipientEndpointAddress,
-        parcelId,
-      );
+      const ack = new ParcelCollectionAck(senderEndpointId, recipientEndpointId, parcelId);
       return ack.serialize();
     }
   });
@@ -579,11 +569,9 @@ describe('Cargo collection', () => {
       expect(mockLogs).toContainEqual(
         partialPinoLog(
           'warn',
-          'Ignored rotation containing certificate from different public gateway',
+          'Ignored rotation containing certificate from different Internet gateway',
           {
-            issuerPrivateAddress: await getPrivateAddressFromIdentityKey(
-              differentPublicGatewayKeyPair.publicKey!,
-            ),
+            issuerId: await getIdFromIdentityKey(differentPublicGatewayKeyPair.publicKey!),
             publicGatewayPrivateAddress,
           },
         ),
@@ -643,7 +631,7 @@ describe('Cargo collection', () => {
     const { pdaCertPath } = pkiFixtureRetriever();
     const parcelKeys = await asyncIterableToArray(
       parcelStore.streamEndpointBound(
-        [await pdaCertPath.privateEndpoint.calculateSubjectPrivateAddress()],
+        [await pdaCertPath.privateEndpoint.calculateSubjectId()],
         false,
       ),
     );
@@ -674,17 +662,17 @@ describe('Cargo collection', () => {
       finalCDA = await issueGatewayCertificate({
         issuerCertificate: cdaIssuer,
         issuerPrivateKey: keyPairSet.privateGateway.privateKey!,
-        subjectPublicKey: keyPairSet.publicGateway.publicKey!,
+        subjectPublicKey: keyPairSet.internetGateway.publicKey!,
         validityEndDate: cdaIssuer.expiryDate,
       });
     }
     const cargo = new Cargo(
-      await getPrivateAddressFromIdentityKey(keyPairSet.privateGateway.publicKey!),
+      { id: await getIdFromIdentityKey(keyPairSet.privateGateway.publicKey!) },
       finalCDA,
       Buffer.from(payloadSerialized),
     );
     const cargoSerialized = Buffer.from(
-      await cargo.serialize(keyPairSet.publicGateway.privateKey!),
+      await cargo.serialize(keyPairSet.internetGateway.privateKey!),
     );
     return { cargo, cargoSerialized };
   }
@@ -807,7 +795,7 @@ describe('Cargo delivery', () => {
 
     const deliveryRequests = await getCargoDeliveryRequests();
     const cargo = await Cargo.deserialize(bufferToArray(deliveryRequests[0].cargo));
-    expect(cargo.recipientAddress).toEqual(`https://${DEFAULT_PUBLIC_GATEWAY}`);
+    expect(cargo.recipient.internetAddress).toEqual(DEFAULT_INTERNET_GATEWAY);
   });
 
   test('Expiry date should be that of last parcel', async () => {
@@ -943,12 +931,10 @@ describe('Cargo delivery', () => {
         bufferToArray(cargoMessages[0]),
       );
       expect(collectionACKDeserialized.parcelId).toEqual(collectionACK.parcelId);
-      expect(collectionACKDeserialized.recipientEndpointAddress).toEqual(
-        collectionACK.recipientEndpointAddress,
+      expect(collectionACKDeserialized.recipientEndpointId).toEqual(
+        collectionACK.recipientEndpointId,
       );
-      expect(collectionACKDeserialized.senderEndpointPrivateAddress).toEqual(
-        collectionACK.senderEndpointPrivateAddress,
-      );
+      expect(collectionACKDeserialized.senderEndpointId).toEqual(collectionACK.senderEndpointId);
     });
 
     test('Encapsulation of parcel collection acknowledgement should be logged', async () => {
@@ -962,8 +948,8 @@ describe('Cargo delivery', () => {
           parcelCollectionAck: {
             parcelExpiryDate: collectionACK.parcelExpiryDate.toISOString(),
             parcelId: collectionACK.parcelId,
-            recipientEndpointAddress: collectionACK.recipientEndpointAddress,
-            senderEndpointPrivateAddress: collectionACK.senderEndpointPrivateAddress,
+            recipientEndpointId: collectionACK.recipientEndpointId,
+            senderEndpointId: collectionACK.senderEndpointId,
           },
         }),
       );
@@ -1021,8 +1007,8 @@ describe('Cargo delivery', () => {
     const ack = collectionACKRepo.create({
       parcelExpiryDate,
       parcelId: randomString,
-      recipientEndpointAddress: randomString,
-      senderEndpointPrivateAddress: randomString,
+      recipientEndpointId: randomString,
+      senderEndpointId: randomString,
     });
     await collectionACKRepo.save(ack);
     return ack;

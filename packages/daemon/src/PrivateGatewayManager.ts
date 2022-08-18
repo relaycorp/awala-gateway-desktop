@@ -2,7 +2,7 @@ import {
   ParcelCollectionHandshakeVerifier,
   ParcelDeliveryVerifier,
   PrivateGatewayManager as BasePrivateGatewayManager,
-  PrivatePublicGatewayChannel,
+  PrivateInternetGatewayChannel,
 } from '@relaycorp/relaynet-core';
 import { Inject, Service } from 'typedi';
 
@@ -32,7 +32,7 @@ export class PrivateGatewayManager extends BasePrivateGatewayManager {
    * @throws {MissingGatewayError}
    */
   public async getCurrent(): Promise<PrivateGateway> {
-    const privateAddress = await this.config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
+    const privateAddress = await this.config.get(ConfigKey.CURRENT_ID);
     if (!privateAddress) {
       throw new MissingGatewayError('Config does not contain current private address');
     }
@@ -44,7 +44,7 @@ export class PrivateGatewayManager extends BasePrivateGatewayManager {
   }
 
   public async createCurrentIfMissing(): Promise<void> {
-    const currentNodePrivateAddress = await this.config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
+    const currentNodePrivateAddress = await this.config.get(ConfigKey.CURRENT_ID);
 
     if (currentNodePrivateAddress) {
       const privateKey = await this.keyStores.privateKeyStore.retrieveIdentityKey(
@@ -55,8 +55,8 @@ export class PrivateGatewayManager extends BasePrivateGatewayManager {
       }
     }
 
-    const { privateAddress } = await this.keyStores.privateKeyStore.generateIdentityKeyPair();
-    await this.config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
+    const { id } = await this.keyStores.privateKeyStore.generateIdentityKeyPair();
+    await this.config.set(ConfigKey.CURRENT_ID, id);
   }
 
   /**
@@ -65,20 +65,16 @@ export class PrivateGatewayManager extends BasePrivateGatewayManager {
    * @throws {MissingGatewayError} if the private gateway isn't initialised
    * @throws {UnregisteredGatewayError} if the private gateway isn't registered with public gateway
    */
-  public async getCurrentChannel(): Promise<PrivatePublicGatewayChannel> {
+  public async getCurrentChannel(): Promise<PrivateInternetGatewayChannel> {
     const privateGateway = await this.getCurrent();
 
-    const publicGatewayPrivateAddress = await this.config.get(
-      ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS,
-    );
+    const publicGatewayPrivateAddress = await this.config.get(ConfigKey.INTERNET_GATEWAY_ID);
     if (!publicGatewayPrivateAddress) {
       throw new UnregisteredGatewayError('Private gateway is unregistered');
     }
 
-    const publicGatewayPublicAddress = await this.config.get(
-      ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS,
-    );
-    const channel = await privateGateway.retrievePublicGatewayChannel(
+    const publicGatewayPublicAddress = await this.config.get(ConfigKey.INTERNET_GATEWAY_ADDRESS);
+    const channel = await privateGateway.retrieveInternetGatewayChannel(
       publicGatewayPrivateAddress,
       publicGatewayPublicAddress!,
     );
@@ -94,7 +90,7 @@ export class PrivateGatewayManager extends BasePrivateGatewayManager {
    *
    * @throws {MissingGatewayError} if the private gateway isn't initialised
    */
-  public async getCurrentChannelIfRegistered(): Promise<PrivatePublicGatewayChannel | null> {
+  public async getCurrentChannelIfRegistered(): Promise<PrivateInternetGatewayChannel | null> {
     try {
       return await this.getCurrentChannel();
     } catch (err) {
@@ -108,9 +104,7 @@ export class PrivateGatewayManager extends BasePrivateGatewayManager {
   public async getVerifier<V extends Verifier>(
     verifierClass: new (...args: readonly any[]) => V,
   ): Promise<V | null> {
-    const publicGatewayPrivateAddress = await this.config.get(
-      ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS,
-    );
+    const publicGatewayPrivateAddress = await this.config.get(ConfigKey.INTERNET_GATEWAY_ID);
     if (!publicGatewayPrivateAddress) {
       return null;
     }

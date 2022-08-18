@@ -64,7 +64,7 @@ beforeEach(() => {
   );
 });
 
-const PUBLIC_ENDPOINT_ADDRESS = 'https://endpoint.com';
+const PUBLIC_ENDPOINT_ADDRESS = 'endpoint.com';
 
 describe('storeInternetBound', () => {
   test('Parcel should be stored', async () => {
@@ -115,9 +115,8 @@ describe('storeEndpointBound', () => {
       collectionRepo.create({
         parcelExpiryDate: parcel.expiryDate,
         parcelId: parcel.id,
-        recipientEndpointAddress: parcel.recipientAddress,
-        senderEndpointPrivateAddress:
-          await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+        recipientEndpointId: parcel.recipient.id,
+        senderEndpointId: await parcel.senderCertificate.calculateSubjectId(),
       }),
     );
     const parcelV2Serialized = Buffer.from('Version 2');
@@ -135,9 +134,8 @@ describe('storeEndpointBound', () => {
       collectionRepo.create({
         parcelExpiryDate: parcel.expiryDate,
         parcelId: parcel.id,
-        recipientEndpointAddress: parcel.recipientAddress,
-        senderEndpointPrivateAddress:
-          await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+        recipientEndpointId: parcel.recipient.id,
+        senderEndpointId: await parcel.senderCertificate.calculateSubjectId(),
       }),
     );
 
@@ -302,7 +300,7 @@ describe('streamEndpointBound', () => {
   let localEndpoint2Certificate: Certificate;
   let remoteEndpointPDA2: Certificate;
   beforeEach(async () => {
-    localEndpoint1Address = await localEndpointCertificate.calculateSubjectPrivateAddress();
+    localEndpoint1Address = await localEndpointCertificate.calculateSubjectId();
 
     const localEndpoint2KeyPair = await generateRSAKeyPair();
     localEndpoint2Certificate = await issueEndpointCertificate({
@@ -378,7 +376,7 @@ describe('streamEndpointBound', () => {
 
     const parcelObjects = await asyncIterableToArray(
       parcelStore.streamEndpointBound(
-        [localEndpoint1Address, await localEndpoint2Certificate.calculateSubjectPrivateAddress()],
+        [localEndpoint1Address, await localEndpoint2Certificate.calculateSubjectId()],
         true,
       ),
     );
@@ -647,8 +645,8 @@ describe('deleteInternetBoundFromACK', () => {
     const { parcel, parcelSerialized } = await makeInternetBoundParcel();
     const parcelKey = await parcelStore.storeInternetBound(parcelSerialized, parcel);
     const ack = new ParcelCollectionAck(
-      await parcel.senderCertificate.calculateSubjectPrivateAddress(),
-      parcel.recipientAddress,
+      await parcel.senderCertificate.calculateSubjectId(),
+      parcel.recipient.id,
       parcel.id,
     );
 
@@ -659,7 +657,7 @@ describe('deleteInternetBoundFromACK', () => {
 
   test('ACK should be ignored if sender address is malformed', async () => {
     const { parcel } = await makeInternetBoundParcel();
-    const ack = new ParcelCollectionAck('..', parcel.recipientAddress, parcel.id);
+    const ack = new ParcelCollectionAck('..', parcel.recipient.id, parcel.id);
 
     await parcelStore.deleteInternetBoundFromACK(ack);
 
@@ -669,8 +667,8 @@ describe('deleteInternetBoundFromACK', () => {
   test('ACK should be ignored if parcel id is malformed', async () => {
     const { parcel } = await makeInternetBoundParcel();
     const ack = new ParcelCollectionAck(
-      await parcel.senderCertificate.calculateSubjectPrivateAddress(),
-      parcel.recipientAddress,
+      await parcel.senderCertificate.calculateSubjectId(),
+      parcel.recipient.id,
       '..',
     );
 
@@ -681,7 +679,14 @@ describe('deleteInternetBoundFromACK', () => {
 });
 
 async function makeInternetBoundParcel(): Promise<GeneratedParcel> {
-  const parcel = new Parcel(PUBLIC_ENDPOINT_ADDRESS, localEndpointCertificate, Buffer.from([]));
+  const parcel = new Parcel(
+    {
+      id: await remoteEndpointCertificate.calculateSubjectId(),
+      internetAddress: PUBLIC_ENDPOINT_ADDRESS,
+    },
+    localEndpointCertificate,
+    Buffer.from([]),
+  );
   const parcelSerialized = Buffer.from(await parcel.serialize(localEndpointPrivateKey));
   return { parcel, parcelSerialized };
 }
@@ -693,7 +698,7 @@ async function makeEndpointBoundParcel(
 ): Promise<GeneratedParcel> {
   const finalRecipientCertificate = recipientCertificate ?? localEndpointCertificate;
   const parcel = new Parcel(
-    await finalRecipientCertificate.calculateSubjectPrivateAddress(),
+    { id: await finalRecipientCertificate.calculateSubjectId() },
     senderCertificate ?? remoteEndpointCertificate,
     Buffer.from([]),
     { senderCaCertificateChain: [gatewayCertificate, finalRecipientCertificate] },
@@ -715,8 +720,8 @@ async function computeInternetBoundParcelPath(parcel: Parcel): Promise<string> {
 
 async function computeInternetBoundParcelKey(parcel: Parcel): Promise<string> {
   return join(
-    await parcel.senderCertificate.calculateSubjectPrivateAddress(),
-    sha256Hex(parcel.recipientAddress + parcel.id),
+    await parcel.senderCertificate.calculateSubjectId(),
+    sha256Hex(parcel.recipient.id + parcel.id),
   );
 }
 
@@ -730,8 +735,8 @@ async function computeEndpointBoundParcelPath(parcel: Parcel): Promise<string> {
 }
 
 async function computeEndpointBoundParcelKey(parcel: Parcel): Promise<string> {
-  const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectPrivateAddress();
-  return join(parcel.recipientAddress, sha256Hex(senderPrivateAddress + parcel.id));
+  const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectId();
+  return join(parcel.recipient.id, sha256Hex(senderPrivateAddress + parcel.id));
 }
 
 async function overrideMetadataFile(

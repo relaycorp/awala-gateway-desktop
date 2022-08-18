@@ -55,7 +55,7 @@ export class CourierSyncManager {
           messages: AsyncIterable<ParcelCollectionNotification>,
         ): AsyncIterable<string> {
           for await (const message of messages) {
-            if (recipientAddresses.includes(message.recipientAddress)) {
+            if (recipientAddresses.includes(message.recipientId)) {
               yield message.parcelKey;
             }
           }

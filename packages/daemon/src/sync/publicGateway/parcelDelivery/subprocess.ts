@@ -31,14 +31,11 @@ export default async function runParcelDelivery(parentStream: Duplex): Promise<n
   }
 
   const privateGateway = await gatewayManager.getCurrent();
-  const signer = await privateGateway.getGSCSigner(
-    channel.peerPrivateAddress,
-    ParcelDeliverySigner,
-  );
+  const signer = await privateGateway.getGSCSigner(channel.peerId, ParcelDeliverySigner);
   logger.info('Ready to deliver parcels');
   await pipe(
     streamParcels,
-    await deliverParcels(channel.publicGatewayPublicAddress, signer!, parcelStore, logger),
+    await deliverParcels(channel.internetGatewayInternetAddress, signer!, parcelStore, logger),
   );
 
   // This should never end, so ending "normally" should actually be an error

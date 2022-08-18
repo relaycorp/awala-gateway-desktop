@@ -10,8 +10,7 @@ import {
   Parcel,
   ParcelCollectionAck,
   PrivateGateway,
-  PrivatePublicGatewayChannel,
-  RecipientAddressType,
+  PrivateInternetGatewayChannel,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { v4 as getDefaultGateway } from 'default-gateway';
@@ -57,7 +56,7 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
   const privateGateway = await gatewayManager.getCurrent();
   let client: CogRPCClient | null = null;
   try {
-    client = await CogRPCClient.init(`https://${defaultGatewayIPAddress}:${COURIER_PORT}`);
+    client = await CogRPCClient.initLan(`${defaultGatewayIPAddress}:${COURIER_PORT}`);
 
     await collectCargo(channel, privateGateway, client, parcelStore, parentStream, logger);
     await waitBeforeDelivery(parentStream, logger);
@@ -74,7 +73,7 @@ export default async function runCourierSync(parentStream: Duplex): Promise<numb
 }
 
 async function collectCargo(
-  channel: PrivatePublicGatewayChannel,
+  channel: PrivateInternetGatewayChannel,
   privateGateway: PrivateGateway,
   client: CogRPCClient,
   parcelStore: ParcelStore,
@@ -91,10 +90,7 @@ async function collectCargo(
     client.collectCargo(ccaSerialized),
     async (cargoesSerialized: AsyncIterable<Buffer>) => {
       const ownPDCCertificates = (
-        await certificateStore.retrieveAll(
-          privateGateway.privateAddress,
-          channel.peerPrivateAddress,
-        )
+        await certificateStore.retrieveAll(privateGateway.id, channel.peerId)
       ).map((p) => p.leafCertificate);
       const ownCDAIssuers = await channel.getCDAIssuers();
 
@@ -111,7 +107,7 @@ async function collectCargo(
         const cargoAwareLogger = logger.child({ cargo: { id: cargo.id } });
 
         try {
-          await cargo.validate(RecipientAddressType.PRIVATE, ownCDAIssuers);
+          await cargo.validate(ownCDAIssuers);
         } catch (err) {
           cargoAwareLogger.warn({ err }, 'Ignoring cargo by unauthorized sender');
           continue;
@@ -150,8 +146,8 @@ async function collectCargo(
           } else {
             await processCertificateRotation(
               item,
-              privateGateway.privateAddress,
-              channel.peerPrivateAddress,
+              privateGateway.id,
+              channel.peerId,
               certificateStore,
               cargoAwareLogger,
             );
@@ -172,7 +168,7 @@ async function processParcel(
   logger: Logger,
 ): Promise<void> {
   try {
-    await parcel.validate(RecipientAddressType.PRIVATE, ownCertificates);
+    await parcel.validate(ownCertificates);
   } catch (err) {
     logger.warn({ err }, 'Ignoring invalid parcel');
     return;
@@ -182,22 +178,22 @@ async function processParcel(
   const collection = parcelCollectionRepo.create({
     parcelExpiryDate: parcel.expiryDate,
     parcelId: parcel.id,
-    recipientEndpointAddress: parcel.recipientAddress,
-    senderEndpointPrivateAddress: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+    recipientEndpointId: parcel.recipient.id,
+    senderEndpointId: await parcel.senderCertificate.calculateSubjectId(),
   });
   await parcelCollectionRepo.save(collection);
 
   if (parcelKey) {
     const notification: ParcelCollectionNotification = {
       parcelKey,
-      recipientAddress: parcel.recipientAddress,
+      recipientId: parcel.recipient.id,
       type: 'parcelCollection',
     };
     parentStream.write(notification);
   }
 
   logger.info(
-    { parcel: { id: parcel.id, key: parcelKey, recipientAddress: parcel.recipientAddress } },
+    { parcel: { id: parcel.id, key: parcelKey, recipientId: parcel.recipient.id } },
     'Stored parcel',
   );
 }
@@ -211,8 +207,8 @@ async function processParcelCollectionAck(
     {
       parcel: {
         id: ack.parcelId,
-        recipientAddress: ack.recipientEndpointAddress,
-        senderAddress: ack.senderEndpointPrivateAddress,
+        recipientId: ack.recipientEndpointId,
+        senderAddress: ack.senderEndpointId,
       },
     },
     'Deleting ACKed parcel',
@@ -229,7 +225,7 @@ async function processCertificateRotation(
 ): Promise<void> {
   const certificationPath = rotation.certificationPath;
   const newPrivateGatewayCertificate = certificationPath.leafCertificate;
-  const subjectPrivateAddress = await newPrivateGatewayCertificate.calculateSubjectPrivateAddress();
+  const subjectPrivateAddress = await newPrivateGatewayCertificate.calculateSubjectId();
   if (subjectPrivateAddress !== privateGatewayPrivateAddress) {
     logger.warn(
       { subjectPrivateAddress, privateGatewayPrivateAddress },
@@ -237,11 +233,11 @@ async function processCertificateRotation(
     );
     return;
   }
-  const issuerPrivateAddress = newPrivateGatewayCertificate.getIssuerPrivateAddress();
-  if (issuerPrivateAddress !== publicGatewayPrivateAddress) {
+  const issuerId = newPrivateGatewayCertificate.getIssuerId();
+  if (issuerId !== publicGatewayPrivateAddress) {
     logger.warn(
-      { issuerPrivateAddress, publicGatewayPrivateAddress },
-      'Ignored rotation containing certificate from different public gateway',
+      { issuerId, publicGatewayPrivateAddress },
+      'Ignored rotation containing certificate from different Internet gateway',
     );
     return;
   }
@@ -263,7 +259,7 @@ async function waitBeforeDelivery(parentStream: Duplex, logger: Logger): Promise
 }
 
 async function deliverCargo(
-  channel: PrivatePublicGatewayChannel,
+  channel: PrivateInternetGatewayChannel,
   client: CogRPCClient,
   parcelStore: ParcelStore,
   parentStream: Duplex,
@@ -287,7 +283,7 @@ async function deliverCargo(
 }
 
 async function* makeCargoDeliveryStream(
-  channel: PrivatePublicGatewayChannel,
+  channel: PrivateInternetGatewayChannel,
   parcelStore: ParcelStore,
   logger: Logger,
 ): AsyncIterable<CargoDeliveryRequest> {
@@ -317,8 +313,8 @@ async function* makeCargoMessageStream(
   const pendingACKs = await collectionRepo.find();
   for (const pendingACK of pendingACKs) {
     const ack = new ParcelCollectionAck(
-      pendingACK.senderEndpointPrivateAddress,
-      pendingACK.recipientEndpointAddress,
+      pendingACK.senderEndpointId,
+      pendingACK.recipientEndpointId,
       pendingACK.parcelId,
     );
     logger.debug(
@@ -326,8 +322,8 @@ async function* makeCargoMessageStream(
         parcelCollectionAck: {
           parcelExpiryDate: pendingACK.parcelExpiryDate,
           parcelId: pendingACK.parcelId,
-          recipientEndpointAddress: pendingACK.recipientEndpointAddress,
-          senderEndpointPrivateAddress: pendingACK.senderEndpointPrivateAddress,
+          recipientEndpointId: pendingACK.recipientEndpointId,
+          senderEndpointId: pendingACK.senderEndpointId,
         },
       },
       'Adding parcel collection acknowledgement to cargo',

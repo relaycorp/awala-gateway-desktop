@@ -64,27 +64,27 @@ export class ParcelStore {
   /**
    * Yield keys for parcels bound for the specified endpoints.
    *
-   * @param recipientPrivateAddresses
+   * @param recipientIds
    * @param keepAlive Whether to watch for incoming parcels in real time
    *
    * If `keepAlive` is enabled, the iterable won't end unless it's ended by the consumer.
    *
    */
   public async *streamEndpointBound(
-    recipientPrivateAddresses: readonly string[],
+    recipientIds: readonly string[],
     keepAlive: boolean,
   ): AsyncIterable<string> {
-    const uniqueRecipientAddresses = Array.from(new Set(recipientPrivateAddresses));
+    const uniqueRecipientIds = Array.from(new Set(recipientIds));
 
-    yield* await this.listQueuedParcelsBoundForEndpoints(uniqueRecipientAddresses);
+    yield* await this.listQueuedParcelsBoundForEndpoints(uniqueRecipientIds);
 
     if (keepAlive) {
       // TODO: Find way not to miss newly-collected parcels between listing queued ones and watching
       const parcelCollectorManager = Container.get(ParcelCollectorManager);
       const courierSyncManager = Container.get(CourierSyncManager);
       yield* await parallelMerge(
-        parcelCollectorManager.watchCollectionsForRecipients(uniqueRecipientAddresses),
-        courierSyncManager.streamCollectedParcelKeys(uniqueRecipientAddresses),
+        parcelCollectorManager.watchCollectionsForRecipients(uniqueRecipientIds),
+        courierSyncManager.streamCollectedParcelKeys(uniqueRecipientIds),
       );
     }
   }
@@ -117,14 +117,13 @@ export class ParcelStore {
   }
 
   public async deleteInternetBoundFromACK(ack: ParcelCollectionAck): Promise<void> {
-    const isAckValid =
-      isAlphaNumeric(ack.senderEndpointPrivateAddress) && isAlphaNumeric(ack.parcelId);
+    const isAckValid = isAlphaNumeric(ack.senderEndpointId) && isAlphaNumeric(ack.parcelId);
     if (!isAckValid) {
       return;
     }
     const relativeKey = await getRelativeParcelKeyFromParts(
-      ack.senderEndpointPrivateAddress,
-      ack.recipientEndpointAddress,
+      ack.senderEndpointId,
+      ack.recipientEndpointId,
       ack.parcelId,
       MessageDirection.TOWARDS_INTERNET,
     );
@@ -243,10 +242,10 @@ function sha256Hex(plaintext: string): string {
 }
 
 async function getRelativeParcelKey(parcel: Parcel, direction: MessageDirection): Promise<string> {
-  const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectPrivateAddress();
+  const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectId();
   return getRelativeParcelKeyFromParts(
     senderPrivateAddress,
-    parcel.recipientAddress,
+    parcel.recipient.id,
     parcel.id,
     direction,
   );
@@ -261,8 +260,8 @@ async function getRelativeParcelKeyFromParts(
   // Hash some components together to avoid exceeding Windows' 260-char limit for paths
   const keyComponents =
     direction === MessageDirection.TOWARDS_INTERNET
-      ? [senderPrivateAddress, await sha256Hex(recipientAddress + parcelId)]
-      : [recipientAddress, await sha256Hex(senderPrivateAddress + parcelId)];
+      ? [senderPrivateAddress, sha256Hex(recipientAddress + parcelId)]
+      : [recipientAddress, sha256Hex(senderPrivateAddress + parcelId)];
   return join(...keyComponents);
 }
 
@@ -279,8 +278,8 @@ async function wasEndpointBoundParcelCollected(
 ): Promise<boolean> {
   const parcelCollectionsCount = await collectionRepo.countBy({
     parcelId: parcel.id,
-    recipientEndpointAddress: parcel.recipientAddress,
-    senderEndpointPrivateAddress: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+    recipientEndpointId: parcel.recipient.id,
+    senderEndpointId: await parcel.senderCertificate.calculateSubjectId(),
   });
   return 0 < parcelCollectionsCount;
 }

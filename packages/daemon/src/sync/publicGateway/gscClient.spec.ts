@@ -1,7 +1,7 @@
-import { BindingType, PublicNodeAddress, resolvePublicAddress } from '@relaycorp/relaynet-core';
+import { BindingType, PublicNodeAddress, resolveInternetAddress } from '@relaycorp/relaynet-core';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
 
-import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
+import { DEFAULT_INTERNET_GATEWAY } from '../../constants';
 import { getMockInstance, mockSpy } from '../../testUtils/jest';
 import { getPromiseRejection } from '../../testUtils/promises';
 import { makeGSCClient } from './gscClient';
@@ -11,7 +11,7 @@ jest.mock('@relaycorp/relaynet-core', () => {
   const actualModule = jest.requireActual('@relaycorp/relaynet-core');
   return {
     ...actualModule,
-    resolvePublicAddress: jest.fn(),
+    resolveInternetAddress: jest.fn(),
   };
 });
 
@@ -19,13 +19,13 @@ const mockPoWebClient = {};
 const mockPoWebInitRemote = mockSpy(jest.spyOn(PoWebClient, 'initRemote'), () => mockPoWebClient);
 
 describe('makeGSCClient', () => {
-  test('PublicAddressingError should be thrown if address does not exist', async () => {
+  test('InternetAddressingError should be thrown if address does not exist', async () => {
     const error = await getPromiseRejection(
-      makeGSCClient(DEFAULT_PUBLIC_GATEWAY),
+      makeGSCClient(DEFAULT_INTERNET_GATEWAY),
       NonExistingAddressError,
     );
 
-    expect(error.message).toEqual(`${DEFAULT_PUBLIC_GATEWAY} does not have a GSC record`);
+    expect(error.message).toEqual(`${DEFAULT_INTERNET_GATEWAY} does not have a GSC record`);
     expect(error.cause()).toBeUndefined();
   });
 
@@ -34,11 +34,11 @@ describe('makeGSCClient', () => {
       host: 'poweb.example.com',
       port: 123,
     };
-    getMockInstance(resolvePublicAddress).mockResolvedValue(powebAddress);
+    getMockInstance(resolveInternetAddress).mockResolvedValue(powebAddress);
 
-    const client = await makeGSCClient(DEFAULT_PUBLIC_GATEWAY);
+    const client = await makeGSCClient(DEFAULT_INTERNET_GATEWAY);
 
-    expect(resolvePublicAddress).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY, BindingType.GSC);
+    expect(resolveInternetAddress).toBeCalledWith(DEFAULT_INTERNET_GATEWAY, BindingType.GSC);
     expect(mockPoWebInitRemote).toBeCalledWith(powebAddress.host, powebAddress.port);
     expect(client).toBe(mockPoWebClient);
   });

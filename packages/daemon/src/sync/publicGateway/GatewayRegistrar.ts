@@ -6,7 +6,7 @@ import { pipeline } from 'streaming-iterables';
 import { Inject, Service } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
-import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
+import { DEFAULT_INTERNET_GATEWAY } from '../../constants';
 import { sleepSeconds, sleepUntilDate } from '../../utils/timing';
 import { PrivateGatewayManager } from '../../PrivateGatewayManager';
 import { LOGGER } from '../../tokens';
@@ -26,7 +26,7 @@ export class GatewayRegistrar {
    *
    * @param publicGatewayAddress
    * @throws UnreachableResolverError if DNS resolver is unreachable
-   * @throws PublicAddressingError if the DNS lookup or DNSSEC verification failed
+   * @throws InternetAddressingError if the DNS lookup or DNSSEC verification failed
    * @throws NonExistingAddressError if the DNS+DNSSEC lookup succeeded but the address doesn't exist
    * @throws PublicGatewayProtocolError if the public gateways violates the protocol
    */
@@ -41,7 +41,7 @@ export class GatewayRegistrar {
     const privateGatewayCertificateExpiryDate = await privateGateway.registerWithPublicGateway(
       publicGatewayAddress,
     );
-    await this.config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, publicGatewayAddress);
+    await this.config.set(ConfigKey.INTERNET_GATEWAY_ADDRESS, publicGatewayAddress);
     this.internalEvents.emit(
       'registration',
       publicGatewayAddress,
@@ -56,7 +56,7 @@ export class GatewayRegistrar {
   public async waitForRegistration(): Promise<void> {
     while (!(await this.isRegistered())) {
       try {
-        await this.register(DEFAULT_PUBLIC_GATEWAY);
+        await this.register(DEFAULT_INTERNET_GATEWAY);
       } catch (err) {
         if (err instanceof UnreachableResolverError) {
           // The device may be disconnected from the Internet or the DNS resolver may be blocked.
@@ -81,13 +81,13 @@ export class GatewayRegistrar {
     const privateGateway = await this.gatewayManager.getCurrent();
 
     const channel = await this.gatewayManager.getCurrentChannel();
-    let publicGatewayPublicAddress = channel.publicGatewayPublicAddress;
+    let internetGatewayAddress = channel.internetGatewayInternetAddress;
     let certificateExpiryDate = channel.nodeDeliveryAuth.expiryDate;
     const updatePublicGateway = async (
       newPublicGatewayPublicAddress: string,
       newCertificateExpiryDate: Date,
     ) => {
-      publicGatewayPublicAddress = newPublicGatewayPublicAddress;
+      internetGatewayAddress = newPublicGatewayPublicAddress;
       certificateExpiryDate = newCertificateExpiryDate;
     };
     this.internalEvents.on('registration', updatePublicGateway);
@@ -117,10 +117,12 @@ export class GatewayRegistrar {
 
     async function* continuouslyRenew(emissions: AsyncIterable<void>): AsyncIterable<void> {
       for await (const _ of emissions) {
-        const publicGatewayAwareLogger = logger.child({ publicGatewayPublicAddress });
+        const publicGatewayAwareLogger = logger.child({
+          publicGatewayPublicAddress: internetGatewayAddress,
+        });
         try {
           certificateExpiryDate = await privateGateway.registerWithPublicGateway(
-            publicGatewayPublicAddress!,
+            internetGatewayAddress!,
           );
         } catch (err) {
           if (err instanceof UnreachableResolverError) {
@@ -151,6 +153,6 @@ export class GatewayRegistrar {
   }
 
   private getPublicGatewayAddress(): Promise<string | null> {
-    return this.config.get(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS);
+    return this.config.get(ConfigKey.INTERNET_GATEWAY_ADDRESS);
   }
 }

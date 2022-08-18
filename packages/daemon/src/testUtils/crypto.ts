@@ -1,9 +1,5 @@
 import { Certificate, IdentityPublicKey, IdentityPrivateKey } from '@relaycorp/keystore-db';
-import {
-  CertificationPath,
-  getPrivateAddressFromIdentityKey,
-  SessionKeyPair,
-} from '@relaycorp/relaynet-core';
+import { CertificationPath, getIdFromIdentityKey, SessionKeyPair } from '@relaycorp/relaynet-core';
 import {
   generateIdentityKeyPairSet,
   generatePDACertificationPath,
@@ -15,7 +11,7 @@ import { Container } from 'typedi';
 import { getRepository } from 'typeorm';
 
 import { Config, ConfigKey } from '../Config';
-import { DEFAULT_PUBLIC_GATEWAY } from '../constants';
+import { DEFAULT_INTERNET_GATEWAY } from '../constants';
 import { ConfigItem } from '../entity/ConfigItem';
 import { DBPublicKeyStore } from '../keystores/DBPublicKeyStore';
 import { DBPrivateKeyStore } from '../keystores/DBPrivateKeyStore';
@@ -72,26 +68,25 @@ export function mockGatewayRegistration(
     const certificateStore = Container.get(DBCertificateStore);
     const config = Container.get(Config);
 
-    const privateGatewayPrivateAddress = await getPrivateAddressFromIdentityKey(
+    const privateGatewayPrivateAddress = await getIdFromIdentityKey(
       keyPairSet.privateGateway.publicKey!,
     );
-    const publicGatewayPrivateAddress =
-      await pdaCertPath.publicGateway.calculateSubjectPrivateAddress();
+    const publicGatewayPrivateAddress = await pdaCertPath.internetGateway.calculateSubjectId();
 
     await privateKeyStore.saveIdentityKey(
       privateGatewayPrivateAddress,
       keyPairSet.privateGateway.privateKey!,
     );
     await certificateStore.save(
-      new CertificationPath(pdaCertPath.privateGateway, [pdaCertPath.publicGateway]),
+      new CertificationPath(pdaCertPath.privateGateway, [pdaCertPath.internetGateway]),
       publicGatewayPrivateAddress,
     );
 
-    await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateGatewayPrivateAddress);
+    await config.set(ConfigKey.CURRENT_ID, privateGatewayPrivateAddress);
 
-    await config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
-    await config.set(ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS, publicGatewayPrivateAddress);
-    await publicKeyStore.saveIdentityKey(keyPairSet.publicGateway.publicKey!);
+    await config.set(ConfigKey.INTERNET_GATEWAY_ADDRESS, DEFAULT_INTERNET_GATEWAY);
+    await config.set(ConfigKey.INTERNET_GATEWAY_ID, publicGatewayPrivateAddress);
+    await publicKeyStore.saveIdentityKey(keyPairSet.internetGateway.publicKey!);
 
     const publicGatewaySessionKeyPair = await SessionKeyPair.generate();
     await publicKeyStore.saveSessionKey(
@@ -104,8 +99,8 @@ export function mockGatewayRegistration(
 
   const undoGatewayRegistration = async () => {
     const configItemRepo = getRepository(ConfigItem);
-    await configItemRepo.delete({ key: ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS });
-    await configItemRepo.delete({ key: ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS });
+    await configItemRepo.delete({ key: ConfigKey.INTERNET_GATEWAY_ID });
+    await configItemRepo.delete({ key: ConfigKey.INTERNET_GATEWAY_ADDRESS });
 
     const identityPublicKeyRepository = getRepository(IdentityPublicKey);
     await identityPublicKeyRepository.clear();

@@ -1,9 +1,9 @@
-import { PublicAddressingError, UnreachableResolverError } from '@relaycorp/relaynet-core';
+import { InternetAddressingError, UnreachableResolverError } from '@relaycorp/relaynet-core';
 import LightMyRequest from 'light-my-request';
 import { Container } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
-import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
+import { DEFAULT_INTERNET_GATEWAY } from '../../constants';
 import { GatewayRegistrar } from '../../sync/publicGateway/GatewayRegistrar';
 import { ParcelCollectorManager } from '../../sync/publicGateway/parcelCollection/ParcelCollectorManager';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
@@ -21,7 +21,7 @@ const mockLogs = mockLoggerToken();
 
 const mockRegister = mockSpy(jest.spyOn(GatewayRegistrar.prototype, 'register'));
 
-const NEW_PUBLIC_ADDRESS = `new.${DEFAULT_PUBLIC_GATEWAY}`;
+const NEW_PUBLIC_ADDRESS = `new.${DEFAULT_INTERNET_GATEWAY}`;
 const ENDPOINT_PATH = `${CONTROL_API_PREFIX}/public-gateway`;
 
 const AUTH_TOKEN = 'the-auth-token';
@@ -30,7 +30,7 @@ const BASE_HEADERS = { authorization: `Bearer ${AUTH_TOKEN}` };
 describe('Get public gateway', () => {
   test('The current gateway should be returned if registered', async () => {
     const config = Container.get(Config);
-    await config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, NEW_PUBLIC_ADDRESS);
+    await config.set(ConfigKey.INTERNET_GATEWAY_ADDRESS, NEW_PUBLIC_ADDRESS);
     const fastify = await makeServer(AUTH_TOKEN);
 
     const response = await fastify.inject({
@@ -53,7 +53,7 @@ describe('Get public gateway', () => {
     });
 
     expect(response.statusCode).toEqual(200);
-    expect(JSON.parse(response.body)).toHaveProperty('publicAddress', DEFAULT_PUBLIC_GATEWAY);
+    expect(JSON.parse(response.body)).toHaveProperty('publicAddress', DEFAULT_INTERNET_GATEWAY);
   });
 
   test('Request should be refused if auth fails', async () => {
@@ -142,7 +142,7 @@ describe('Set public gateway', () => {
   });
 
   test('Change should be refused if DNS lookup or DNSSEC verification failed', async () => {
-    const error = new PublicAddressingError('Could not resolve address');
+    const error = new InternetAddressingError('Could not resolve address');
     getMockInstance(mockRegister).mockRejectedValue(error);
 
     const response = await requestPublicAddressChange(NEW_PUBLIC_ADDRESS);

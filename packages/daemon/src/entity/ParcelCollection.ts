@@ -6,10 +6,10 @@ import { Column, Entity, PrimaryColumn } from 'typeorm';
 @Entity()
 export class ParcelCollection {
   @PrimaryColumn()
-  public readonly senderEndpointPrivateAddress!: string;
+  public readonly senderEndpointId!: string;
 
   @PrimaryColumn()
-  public readonly recipientEndpointAddress!: string;
+  public readonly recipientEndpointId!: string;
 
   @PrimaryColumn()
   public readonly parcelId!: string;

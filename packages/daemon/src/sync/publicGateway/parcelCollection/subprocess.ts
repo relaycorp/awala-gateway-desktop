@@ -3,7 +3,7 @@ import {
   Parcel,
   ParcelCollection,
   ParcelCollectionHandshakeSigner,
-  PublicAddressingError,
+  InternetAddressingError,
   StreamingMode,
   UnreachableResolverError,
 } from '@relaycorp/relaynet-core';
@@ -34,13 +34,10 @@ export default async function runParcelCollection(parentStream: Duplex): Promise
   logger.info('Ready to collect parcels');
 
   const privateGateway = await gatewayManager.getCurrent();
-  const signer = await privateGateway.getGSCSigner(
-    channel.peerPrivateAddress,
-    ParcelCollectionHandshakeSigner,
-  );
+  const signer = await privateGateway.getGSCSigner(channel.peerId, ParcelCollectionHandshakeSigner);
   await pipe(
     await streamParcelCollections(
-      channel.publicGatewayPublicAddress,
+      channel.internetGatewayInternetAddress,
       signer!,
       parentStream,
       logger,
@@ -101,7 +98,7 @@ async function makeGSCClientAndRetryIfNeeded(
         // Don't log the actual error because it'll waste disk space and won't add anything
         logger.debug('DNS resolver is unreachable');
         await sleepSeconds(3);
-      } else if (err instanceof PublicAddressingError) {
+      } else if (err instanceof InternetAddressingError) {
         logger.error({ err }, 'Failed to resolve DNS record for public gateway');
         await sleepSeconds(30);
       } else {
@@ -141,13 +138,13 @@ function processParcels(
       if (parcelKey) {
         const collectionMessage: ParcelCollectionNotification = {
           parcelKey,
-          recipientAddress: parcel.recipientAddress,
+          recipientAddress: parcel.recipient.id,
           type: 'parcelCollection',
         };
         parentStream.write(collectionMessage);
       }
       logger.info(
-        { parcel: { id: parcel.id, key: parcelKey, recipientAddress: parcel.recipientAddress } },
+        { parcel: { id: parcel.id, key: parcelKey, recipientAddress: parcel.recipient.id } },
         'Saved new parcel',
       );
     }

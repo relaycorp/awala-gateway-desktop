@@ -50,14 +50,14 @@ test('Expired parcel collections should be removed', async () => {
   const expiredACK = parcelCollectionACKRepo.create({
     parcelExpiryDate: now,
     parcelId: 'foo',
-    recipientEndpointAddress: 'foo',
-    senderEndpointPrivateAddress: 'foo',
+    recipientEndpointId: 'foo',
+    senderEndpointId: 'foo',
   });
   const validACK = parcelCollectionACKRepo.create({
     parcelExpiryDate: addSeconds(now, 5),
     parcelId: 'bar',
-    recipientEndpointAddress: 'bar',
-    senderEndpointPrivateAddress: 'bar',
+    recipientEndpointId: 'bar',
+    senderEndpointId: 'bar',
   });
   await parcelCollectionACKRepo.save([expiredACK, validACK]);
   await expect(parcelCollectionACKRepo.count()).resolves.toEqual(2);

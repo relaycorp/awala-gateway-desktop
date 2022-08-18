@@ -5,9 +5,9 @@ import { InjectRepository } from 'typeorm-typedi-extensions';
 import { ConfigItem } from './entity/ConfigItem';
 
 export enum ConfigKey {
-  CURRENT_PRIVATE_ADDRESS = 'current_private_address',
-  PUBLIC_GATEWAY_PRIVATE_ADDRESS = 'public_address_private_address',
-  PUBLIC_GATEWAY_PUBLIC_ADDRESS = 'public_gateway_public_address',
+  CURRENT_ID = 'current_id',
+  INTERNET_GATEWAY_ID = 'internet_address_id',
+  INTERNET_GATEWAY_ADDRESS = 'internet_gateway_address',
 }
 
 @Service()
