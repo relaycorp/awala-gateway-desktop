@@ -6,7 +6,7 @@ import { ConfigItem } from './entity/ConfigItem';
 
 export enum ConfigKey {
   CURRENT_ID = 'current_id',
-  INTERNET_GATEWAY_ID = 'internet_address_id',
+  INTERNET_GATEWAY_ID = 'internet_gateway_id',
   INTERNET_GATEWAY_ADDRESS = 'internet_gateway_address',
 }
 
