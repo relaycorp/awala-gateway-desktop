@@ -55,9 +55,12 @@ jobs:
       - run: ../../node_modules/.bin/npm ci
         working-directory: packages/ui
 
-      - run: npm run build
-        timeout-minutes: 5
-      - run: npm run test:ci
+      - run: npm test
+
+      - name: Build
+        shell: bash
+        run: .github/scripts/build.sh
+
       - run: npm run dist
         working-directory: packages/ui
 
@@ -150,8 +153,11 @@ jobs:
         if: ${{ steps.version-artefact.outcome == 'success' }}
         working-directory: packages/ui
 
-      - run: npm run build
+      - name: Build
         if: ${{ steps.version-artefact.outcome == 'success' }}
+        shell: bash
+        run: .github/scripts/build.sh
+
       - name: Set version in app
         if: ${{ steps.version-artefact.outcome == 'success' }}
         run: npm version ${{ steps.set-version.outputs.content }}
