@@ -81,6 +81,8 @@ module.exports = [
                 '**/README.md',
                 '**/jest.*.js',
                 '**/tsconfig.json',
+                '**/*.d.ts',
+                '**/*.map.js',
               ],
             },
           },
