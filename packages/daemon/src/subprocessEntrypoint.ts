@@ -3,8 +3,8 @@ import { Container } from 'typedi';
 
 import runStartup from './startup';
 import runCourierSync from './sync/courierSync/subprocess';
-import runParcelCollection from './sync/publicGateway/parcelCollection/subprocess';
-import runParcelDelivery from './sync/publicGateway/parcelDelivery/subprocess';
+import runParcelCollection from './sync/internetGateway/parcelCollection/subprocess';
+import runParcelDelivery from './sync/internetGateway/parcelDelivery/subprocess';
 import { LOGGER } from './tokens';
 import { makeParentStream } from './utils/subprocess/parent';
 

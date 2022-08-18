@@ -43,7 +43,7 @@ export default function buildMenu(
         {
           accelerator: isMac ? 'Cmd+,' : undefined,
           click: showSettings,
-          label: 'Public Gateway...',
+          label: 'Internet gateway...',
         },
       ],
     },

@@ -9,9 +9,9 @@ import { mockLoggerToken } from '../testUtils/logging';
 import { setImmediateAsync } from '../testUtils/timing';
 import { CourierConnectionStatus } from './courierSync';
 import { CourierSyncManager } from './courierSync/CourierSyncManager';
-import { GatewayRegistrar } from './publicGateway/GatewayRegistrar';
-import { ParcelCollectorManager } from './publicGateway/parcelCollection/ParcelCollectorManager';
-import { PublicGatewayCollectionStatus } from './publicGateway/PublicGatewayCollectionStatus';
+import { GatewayRegistrar } from './internetGateway/GatewayRegistrar';
+import { ParcelCollectorManager } from './internetGateway/parcelCollection/ParcelCollectorManager';
+import { InternetGatewayCollectionStatus } from './internetGateway/InternetGatewayCollectionStatus';
 import { ConnectionStatus, StatusMonitor } from './StatusMonitor';
 
 setUpTestDBConnection();
@@ -52,13 +52,13 @@ describe('start', () => {
   describe('Initial status', () => {
     test('No initial status should be assumed if registered', async () => {
       mockPubGatewayStatusStream.mockReturnValue(
-        arrayToAsyncIterable([PublicGatewayCollectionStatus.CONNECTED]),
+        arrayToAsyncIterable([InternetGatewayCollectionStatus.CONNECTED]),
       );
 
       await monitor.start();
 
       const statuses = await pipe(monitor.streamStatus(), iterableTake(1), asyncIterableToArray);
-      expect(statuses).toEqual([ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY]);
+      expect(statuses).toEqual([ConnectionStatus.CONNECTED_TO_INTERNET_GATEWAY]);
     });
 
     test('Status should be UNREGISTERED if unregistered', async () => {
@@ -71,10 +71,10 @@ describe('start', () => {
     });
   });
 
-  describe('Public gateway connection changes', () => {
-    test('Status should change to CONNECTED_TO_PUBLIC_GATEWAY if connected to peer', async () => {
+  describe('Internet gateway connection changes', () => {
+    test('Status should change to CONNECTED_TO_INTERNET_GATEWAY if connected to peer', async () => {
       mockPubGatewayStatusStream.mockReturnValue(
-        arrayToAsyncIterable([PublicGatewayCollectionStatus.CONNECTED]),
+        arrayToAsyncIterable([InternetGatewayCollectionStatus.CONNECTED]),
       );
 
       setImmediate(() => {
@@ -82,14 +82,14 @@ describe('start', () => {
       });
 
       const statuses = await pipe(monitor.streamStatus(), iterableTake(1), asyncIterableToArray);
-      expect(statuses).toEqual([ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY]);
+      expect(statuses).toEqual([ConnectionStatus.CONNECTED_TO_INTERNET_GATEWAY]);
     });
 
     test('Status should change to DISCONNECTED if disconnected but registered', async () => {
       mockPubGatewayStatusStream.mockReturnValue(
         arrayToAsyncIterable([
-          PublicGatewayCollectionStatus.CONNECTED,
-          PublicGatewayCollectionStatus.DISCONNECTED,
+          InternetGatewayCollectionStatus.CONNECTED,
+          InternetGatewayCollectionStatus.DISCONNECTED,
         ]),
       );
 
@@ -105,8 +105,8 @@ describe('start', () => {
       mockRegistrarIsRegistered.mockResolvedValue(false);
       mockPubGatewayStatusStream.mockReturnValue(
         arrayToAsyncIterable([
-          PublicGatewayCollectionStatus.CONNECTED,
-          PublicGatewayCollectionStatus.DISCONNECTED,
+          InternetGatewayCollectionStatus.CONNECTED,
+          InternetGatewayCollectionStatus.DISCONNECTED,
         ]),
       );
 
@@ -125,8 +125,8 @@ describe('start', () => {
     test('Subsequent changes should be reflected', async () => {
       mockPubGatewayStatusStream.mockReturnValue(
         arrayToAsyncIterable([
-          PublicGatewayCollectionStatus.CONNECTED,
-          PublicGatewayCollectionStatus.DISCONNECTED,
+          InternetGatewayCollectionStatus.CONNECTED,
+          InternetGatewayCollectionStatus.DISCONNECTED,
         ]),
       );
 
@@ -136,7 +136,7 @@ describe('start', () => {
 
       const statuses = await pipe(monitor.streamStatus(), iterableTake(2), asyncIterableToArray);
       expect(statuses).toEqual([
-        ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY,
+        ConnectionStatus.CONNECTED_TO_INTERNET_GATEWAY,
         ConnectionStatus.DISCONNECTED,
       ]);
     });
@@ -194,12 +194,12 @@ describe('start', () => {
       await monitor.start();
 
       setImmediate(() => {
-        monitor.setLastStatus(ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY);
+        monitor.setLastStatus(ConnectionStatus.CONNECTED_TO_INTERNET_GATEWAY);
       });
       const statuses = await pipe(monitor.streamStatus(), iterableTake(2), asyncIterableToArray);
       expect(statuses).toEqual([
         ConnectionStatus.UNREGISTERED,
-        ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY,
+        ConnectionStatus.CONNECTED_TO_INTERNET_GATEWAY,
       ]);
     });
   });
@@ -216,12 +216,12 @@ describe('streamStatus', () => {
 
   test('No initial status should be output if there is none', async () => {
     setImmediate(() => {
-      monitor.setLastStatus(ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY);
+      monitor.setLastStatus(ConnectionStatus.CONNECTED_TO_INTERNET_GATEWAY);
     });
     const stream = await pipe(monitor.streamStatus(), iterableTake(1));
 
     await expect(asyncIterableToArray(stream)).resolves.toEqual([
-      ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY,
+      ConnectionStatus.CONNECTED_TO_INTERNET_GATEWAY,
     ]);
   });
 
@@ -231,34 +231,34 @@ describe('streamStatus', () => {
 
     setImmediate(() => {
       monitor.setLastStatus(ConnectionStatus.DISCONNECTED);
-      monitor.setLastStatus(ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY);
+      monitor.setLastStatus(ConnectionStatus.CONNECTED_TO_INTERNET_GATEWAY);
     });
     const stream = await pipe(monitor.streamStatus(), iterableTake(3));
 
     await expect(asyncIterableToArray(stream)).resolves.toEqual([
       ConnectionStatus.CONNECTED_TO_COURIER,
       ConnectionStatus.DISCONNECTED,
-      ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY,
+      ConnectionStatus.CONNECTED_TO_INTERNET_GATEWAY,
     ]);
   });
 
   test('Consecutive, duplicated statuses should be ignored', async () => {
     setImmediate(() => {
-      monitor.setLastStatus(ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY);
-      monitor.setLastStatus(ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY);
+      monitor.setLastStatus(ConnectionStatus.CONNECTED_TO_INTERNET_GATEWAY);
+      monitor.setLastStatus(ConnectionStatus.CONNECTED_TO_INTERNET_GATEWAY);
       monitor.setLastStatus(ConnectionStatus.CONNECTED_TO_COURIER);
     });
     const stream = await pipe(monitor.streamStatus(), iterableTake(2));
 
     await expect(asyncIterableToArray(stream)).resolves.toEqual([
-      ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY,
+      ConnectionStatus.CONNECTED_TO_INTERNET_GATEWAY,
       ConnectionStatus.CONNECTED_TO_COURIER,
     ]);
   });
 
   test('Previous statuses should be ignored', async () => {
     monitor.setLastStatus(ConnectionStatus.CONNECTED_TO_COURIER);
-    monitor.setLastStatus(ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY);
+    monitor.setLastStatus(ConnectionStatus.CONNECTED_TO_INTERNET_GATEWAY);
 
     setImmediate(() => {
       monitor.setLastStatus(ConnectionStatus.DISCONNECTED);
@@ -267,7 +267,7 @@ describe('streamStatus', () => {
     const stream = await monitor.streamStatus();
 
     await expect(pipe(stream, iterableTake(3), asyncIterableToArray)).resolves.toEqual([
-      ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY,
+      ConnectionStatus.CONNECTED_TO_INTERNET_GATEWAY,
       ConnectionStatus.DISCONNECTED,
       ConnectionStatus.CONNECTED_TO_COURIER,
     ]);

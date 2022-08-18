@@ -157,7 +157,7 @@ describe('EndpointRegistration', () => {
       await PrivateNodeRegistration.deserialize(bufferToArray(registrationSerialized));
     });
 
-    test('Endpoint certificate should be issued by public gateway', async () => {
+    test('Endpoint certificate should be issued by Internet gateway', async () => {
       const registrar = Container.get(EndpointRegistrar);
       const requestSerialized = await makeRegistrationRequest(registrar);
 

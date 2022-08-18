@@ -4,29 +4,29 @@ import {
 } from '@relaycorp/relaynet-core';
 import { Container } from 'typedi';
 
-import { makeGSCClient } from './sync/publicGateway/gscClient';
-import { PublicGatewayProtocolError } from './sync/publicGateway/errors';
+import { makeGSCClient } from './sync/internetGateway/gscClient';
+import { InternetGatewayProtocolError } from './sync/internetGateway/errors';
 import { Config, ConfigKey } from './Config';
 
 export class PrivateGateway extends BasePrivateGateway {
   /**
-   * Register with public gateway and return the expiry date of the private gateway's certificate.
+   * Register with Internet gateway and return the expiry date of the private gateway's certificate.
    *
-   * @param publicGatewayAddress
+   * @param internetGatewayAddress
    */
-  public async registerWithPublicGateway(publicGatewayAddress: string): Promise<Date> {
-    const client = await makeGSCClient(publicGatewayAddress);
+  public async registerWithInternetGateway(internetGatewayAddress: string): Promise<Date> {
+    const client = await makeGSCClient(internetGatewayAddress);
 
     const registrationAuth = await client.preRegisterNode(await this.getIdentityPublicKey());
-    const registrationRequest = await this.requestPublicGatewayRegistration(registrationAuth);
+    const registrationRequest = await this.requestInternetGatewayRegistration(registrationAuth);
 
     let registration: PrivateNodeRegistration;
     try {
       registration = await client.registerNode(registrationRequest);
     } catch (err) {
-      throw new PublicGatewayProtocolError(
+      throw new InternetGatewayProtocolError(
         err as Error,
-        'Failed to register with the public gateway',
+        'Failed to register with the Internet gateway',
       );
     }
 
@@ -38,26 +38,28 @@ export class PrivateGateway extends BasePrivateGateway {
   private async saveRegistration(registration: PrivateNodeRegistration): Promise<void> {
     const sessionKey = registration.sessionKey;
     if (!sessionKey) {
-      throw new PublicGatewayProtocolError('Registration is missing public gateway session key');
+      throw new InternetGatewayProtocolError(
+        'Registration is missing Internet gateway session key',
+      );
     }
 
     try {
-      await this.savePublicGatewayChannel(
+      await this.saveInternetGatewayChannel(
         registration.privateNodeCertificate,
         registration.gatewayCertificate,
         sessionKey,
       );
     } catch (err) {
-      throw new PublicGatewayProtocolError(
+      throw new InternetGatewayProtocolError(
         err as Error,
-        'Failed to save channel with public gateway',
+        'Failed to save channel with Internet gateway',
       );
     }
 
     const config = Container.get(Config);
     await config.set(
-      ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS,
-      await registration.gatewayCertificate.calculateSubjectPrivateAddress(),
+      ConfigKey.INTERNET_GATEWAY_ID,
+      await registration.gatewayCertificate.calculateSubjectId(),
     );
   }
 }

@@ -27,9 +27,9 @@ class GatewayEditor extends Component<Props, State> {
     const canMigrate = this.state.valid && this.state.confirmed;
     return (
       <div className="gatewayEditor">
-        <h3>Public gateway</h3>
+        <h3>Internet gateway</h3>
         <p>
-          Your computer needs to be paired to an <em>Awala public gateway</em> on the Internet, and
+          Your computer needs to be paired to an <em>Awala Internet gateway</em> on the Internet, and
           by default it will use one run by Relaycorp.
         </p>
         <p>
@@ -43,7 +43,7 @@ class GatewayEditor extends Component<Props, State> {
             censor our users. If you switch to another provider, make sure they don’t either.
           </li>
         </ul>
-        <h4>Public gateway address</h4>
+        <h4>Internet gateway address</h4>
         <input
           name="gateway"
           type="text"
@@ -66,7 +66,7 @@ class GatewayEditor extends Component<Props, State> {
     if (this.props.gatewayError) {
       return (
         <p className="error">
-          Could not resolve public gateway address. Please confirm it is correct.
+          Could not resolve Internet gateway address. Please confirm it is correct.
         </p>
       );
     } else if (this.state.valid) {

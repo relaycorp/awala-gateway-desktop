@@ -1,4 +1,4 @@
-import { Certificate, Parcel } from '@relaycorp/relaynet-core';
+import { Certificate, Parcel, Recipient } from '@relaycorp/relaynet-core';
 import { NodeKeyPairSet, PDACertPath } from '@relaycorp/relaynet-testing';
 
 import { MessageDirection } from '../utils/MessageDirection';
@@ -13,22 +13,23 @@ export async function makeParcel(
   certPath: PDACertPath,
   keyPairSet: NodeKeyPairSet,
 ): Promise<GeneratedParcel> {
-  let recipientAddress: string;
+  let recipient: Recipient;
   let senderCertificate: Certificate;
   let senderPrivateKey: CryptoKey;
   let senderCaCertificateChain: readonly Certificate[];
+  const recipientId = await certPath.privateEndpoint.calculateSubjectId();
   if (direction === MessageDirection.TOWARDS_INTERNET) {
-    recipientAddress = 'https://example.com';
+    recipient = { id: recipientId, internetAddress: 'example.com' };
     senderCertificate = certPath.privateEndpoint;
     senderPrivateKey = keyPairSet.privateEndpoint.privateKey!;
     senderCaCertificateChain = [];
   } else {
-    recipientAddress = await certPath.privateEndpoint.calculateSubjectPrivateAddress();
+    recipient = { id: recipientId };
     senderCertificate = certPath.pdaGrantee;
     senderPrivateKey = keyPairSet.pdaGrantee.privateKey!;
     senderCaCertificateChain = [certPath.privateGateway, certPath.privateEndpoint];
   }
-  const parcel = new Parcel(recipientAddress, senderCertificate, Buffer.from([]), {
+  const parcel = new Parcel(recipient, senderCertificate, Buffer.from([]), {
     senderCaCertificateChain,
   });
   const parcelSerialized = Buffer.from(await parcel.serialize(senderPrivateKey));

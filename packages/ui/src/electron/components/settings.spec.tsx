@@ -9,7 +9,7 @@ describe('Settings', () => {
   test('shows editor by default', async () => {
     const onComplete = jest.fn();
     render(<Settings token={'TOKEN'} onComplete={onComplete} />);
-    expect(screen.getByText('Public gateway')).toBeInTheDocument();
+    expect(screen.getByText('Internet gateway')).toBeInTheDocument();
   });
   test('closes', async () => {
     const onComplete = jest.fn();

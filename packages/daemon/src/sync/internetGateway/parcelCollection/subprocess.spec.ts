@@ -2,7 +2,7 @@ import {
   Certificate,
   InvalidMessageError,
   ParcelCollection,
-  PublicAddressingError,
+  InternetAddressingError,
   RAMFSyntaxError,
   StreamingMode,
   UnreachableResolverError,
@@ -11,7 +11,7 @@ import { CollectParcelsCall, MockGSCClient } from '@relaycorp/relaynet-testing';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { PassThrough } from 'stream';
 
-import { DEFAULT_PUBLIC_GATEWAY } from '../../../constants';
+import { DEFAULT_INTERNET_GATEWAY_ADDRESS } from '../../../constants';
 import { ParcelStore } from '../../../parcelStore';
 import { useTemporaryAppDirs } from '../../../testUtils/appDirs';
 import { generatePKIFixture, mockGatewayRegistration } from '../../../testUtils/crypto';
@@ -64,12 +64,12 @@ test('Subprocess should abort if the gateway is unregistered', async () => {
   expect(mockLogs).toContainEqual(partialPinoLog('fatal', 'Private gateway is not registered'));
 });
 
-test('Client should connect to appropriate public gateway', async () => {
+test('Client should connect to appropriate Internet gateway', async () => {
   addEmptyParcelCollectionCall();
 
   await runParcelCollection(parentStream);
 
-  expect(mockMakeGSCClient).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
+  expect(mockMakeGSCClient).toBeCalledWith(DEFAULT_INTERNET_GATEWAY_ADDRESS);
 });
 
 test('Subprocess should record a log when it is ready', async () => {
@@ -183,7 +183,7 @@ describe('Parcel collection', () => {
         parcel: expect.objectContaining({
           id: parcel.id,
           key: parcelKey,
-          recipientAddress: parcel.recipientAddress,
+          recipientAddress: parcel.recipient.id,
         }),
       }),
     );
@@ -201,7 +201,7 @@ describe('Parcel collection', () => {
     expect(mockParcelStore).toBeCalled();
     expect(getParentMessages()).toContainEqual<ParcelCollectionNotification>({
       parcelKey,
-      recipientAddress: parcel.recipientAddress,
+      recipientAddress: parcel.recipient.id,
       type: 'parcelCollection',
     });
   });
@@ -226,7 +226,7 @@ describe('Parcel collection', () => {
   });
 });
 
-describe('Public gateway resolution failures', () => {
+describe('Internet gateway resolution failures', () => {
   const sleepSeconds = mockSleepSeconds();
 
   test('Parent process should be notified about failure', (cb) => {
@@ -267,7 +267,7 @@ describe('Public gateway resolution failures', () => {
   });
 
   test('Reconnection should be attempted after 30 seconds if DNS lookup failed', async () => {
-    const error = new PublicAddressingError('Invalid DNS record');
+    const error = new InternetAddressingError('Invalid DNS record');
     mockMakeGSCClient.mockRejectedValueOnce(error);
     addEmptyParcelCollectionCall();
 
@@ -276,7 +276,7 @@ describe('Public gateway resolution failures', () => {
     expect(sleepSeconds).toBeCalledWith(30);
     expect(mockMakeGSCClient).toBeCalledTimes(2);
     expect(mockLogs).toContainEqual(
-      partialPinoLog('error', 'Failed to resolve DNS record for public gateway', {
+      partialPinoLog('error', 'Failed to resolve DNS record for Internet gateway', {
         err: expect.objectContaining({ message: error.message }),
       }),
     );
@@ -292,9 +292,9 @@ describe('Public gateway resolution failures', () => {
     expect(sleepSeconds).toBeCalledWith(60);
     expect(mockMakeGSCClient).toBeCalledTimes(2);
     expect(mockLogs).toContainEqual(
-      partialPinoLog('error', 'Public gateway does not appear to exist', {
+      partialPinoLog('error', 'Internet gateway does not appear to exist', {
         err: expect.objectContaining({ message: error.message }),
-        publicGatewayAddress: DEFAULT_PUBLIC_GATEWAY,
+        internetGatewayAddress: DEFAULT_INTERNET_GATEWAY_ADDRESS,
       }),
     );
   });

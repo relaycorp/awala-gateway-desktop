@@ -1,9 +1,5 @@
 import { Certificate, IdentityPublicKey, IdentityPrivateKey } from '@relaycorp/keystore-db';
-import {
-  CertificationPath,
-  getPrivateAddressFromIdentityKey,
-  SessionKeyPair,
-} from '@relaycorp/relaynet-core';
+import { CertificationPath, getIdFromIdentityKey, SessionKeyPair } from '@relaycorp/relaynet-core';
 import {
   generateIdentityKeyPairSet,
   generatePDACertificationPath,
@@ -15,7 +11,7 @@ import { Container } from 'typedi';
 import { getRepository } from 'typeorm';
 
 import { Config, ConfigKey } from '../Config';
-import { DEFAULT_PUBLIC_GATEWAY } from '../constants';
+import { DEFAULT_INTERNET_GATEWAY_ADDRESS } from '../constants';
 import { ConfigItem } from '../entity/ConfigItem';
 import { DBPublicKeyStore } from '../keystores/DBPublicKeyStore';
 import { DBPrivateKeyStore } from '../keystores/DBPrivateKeyStore';
@@ -56,13 +52,13 @@ export function generatePKIFixture(
 export interface MockGatewayRegistration {
   readonly undoGatewayRegistration: () => Promise<void>;
   readonly deletePrivateGateway: () => Promise<void>;
-  readonly getPublicGatewaySessionPrivateKey: () => CryptoKey;
+  readonly getInternetGatewaySessionPrivateKey: () => CryptoKey;
 }
 
 export function mockGatewayRegistration(
   pkiFixtureRetriever: PKIFixtureRetriever,
 ): MockGatewayRegistration {
-  let publicGatewaySessionPrivateKey: CryptoKey;
+  let internetGatewaySessionPrivateKey: CryptoKey;
 
   beforeEach(async () => {
     const { pdaCertPath, keyPairSet } = pkiFixtureRetriever();
@@ -72,40 +68,34 @@ export function mockGatewayRegistration(
     const certificateStore = Container.get(DBCertificateStore);
     const config = Container.get(Config);
 
-    const privateGatewayPrivateAddress = await getPrivateAddressFromIdentityKey(
-      keyPairSet.privateGateway.publicKey!,
-    );
-    const publicGatewayPrivateAddress =
-      await pdaCertPath.publicGateway.calculateSubjectPrivateAddress();
+    const privateGatewayId = await getIdFromIdentityKey(keyPairSet.privateGateway.publicKey!);
+    const internetGatewayId = await pdaCertPath.internetGateway.calculateSubjectId();
 
-    await privateKeyStore.saveIdentityKey(
-      privateGatewayPrivateAddress,
-      keyPairSet.privateGateway.privateKey!,
-    );
+    await privateKeyStore.saveIdentityKey(privateGatewayId, keyPairSet.privateGateway.privateKey!);
     await certificateStore.save(
-      new CertificationPath(pdaCertPath.privateGateway, [pdaCertPath.publicGateway]),
-      publicGatewayPrivateAddress,
+      new CertificationPath(pdaCertPath.privateGateway, [pdaCertPath.internetGateway]),
+      internetGatewayId,
     );
 
-    await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateGatewayPrivateAddress);
+    await config.set(ConfigKey.CURRENT_ID, privateGatewayId);
 
-    await config.set(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS, DEFAULT_PUBLIC_GATEWAY);
-    await config.set(ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS, publicGatewayPrivateAddress);
-    await publicKeyStore.saveIdentityKey(keyPairSet.publicGateway.publicKey!);
+    await config.set(ConfigKey.INTERNET_GATEWAY_ADDRESS, DEFAULT_INTERNET_GATEWAY_ADDRESS);
+    await config.set(ConfigKey.INTERNET_GATEWAY_ID, internetGatewayId);
+    await publicKeyStore.saveIdentityKey(keyPairSet.internetGateway.publicKey!);
 
-    const publicGatewaySessionKeyPair = await SessionKeyPair.generate();
+    const internetGatewaySessionKeyPair = await SessionKeyPair.generate();
     await publicKeyStore.saveSessionKey(
-      publicGatewaySessionKeyPair.sessionKey,
-      publicGatewayPrivateAddress,
+      internetGatewaySessionKeyPair.sessionKey,
+      internetGatewayId,
       new Date(),
     );
-    publicGatewaySessionPrivateKey = publicGatewaySessionKeyPair.privateKey;
+    internetGatewaySessionPrivateKey = internetGatewaySessionKeyPair.privateKey;
   });
 
   const undoGatewayRegistration = async () => {
     const configItemRepo = getRepository(ConfigItem);
-    await configItemRepo.delete({ key: ConfigKey.PUBLIC_GATEWAY_PRIVATE_ADDRESS });
-    await configItemRepo.delete({ key: ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS });
+    await configItemRepo.delete({ key: ConfigKey.INTERNET_GATEWAY_ID });
+    await configItemRepo.delete({ key: ConfigKey.INTERNET_GATEWAY_ADDRESS });
 
     const identityPublicKeyRepository = getRepository(IdentityPublicKey);
     await identityPublicKeyRepository.clear();
@@ -123,7 +113,7 @@ export function mockGatewayRegistration(
 
   return {
     deletePrivateGateway,
-    getPublicGatewaySessionPrivateKey: () => publicGatewaySessionPrivateKey,
+    getInternetGatewaySessionPrivateKey: () => internetGatewaySessionPrivateKey,
     undoGatewayRegistration,
   };
 }

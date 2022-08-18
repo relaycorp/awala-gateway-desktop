@@ -31,10 +31,10 @@ When authentication fails, HTTP requests would result in `401` responses and Web
 
 This is a WebSocket endpoint. It doesn't take any input, and it outputs one of the following string frames which correspond to the new status as soon as it changes:
 
-- `CONNECTED_TO_PUBLIC_GATEWAY`: The device is connected to the Internet and we can communicate with the public gateway.
-- `CONNECTED_TO_COURIER`: The device is connected to the WiFi hotspot of a courier. The device may or may not have a sync in progress.
-- `DISCONNECTED`: The device is not connected to the public gateway via the Internet or a courier. This status is also used if the device is connected to the Internet but the public gateway is unreachable (e.g., it's been blocked using DPI).
-- `UNREGISTERED`: This gateway hasn't yet registered with its public gateway. This typically means that the device has never connected to the Internet since the app was installed.
+- `CONNECTED_TO_INTERNET_GATEWAY`: The device is connected to the Internet and we can communicate with the Internet gateway.
+- `CONNECTED_TO_COURIER`: The device is connected to the Wi-Fi hotspot of a courier. The device may or may not have a sync in progress.
+- `DISCONNECTED`: The device is not connected to the Internet gateway via the Internet or a courier. This status is also used if the device is connected to the Internet but the Internet gateway is unreachable (e.g., it's been blocked using DPI).
+- `UNREGISTERED`: This gateway hasn't yet registered with its Internet gateway. This typically means that the device has never connected to the Internet since the app was installed.
 
 As soon as the connection is established, it outputs the last known status.
 
@@ -76,7 +76,7 @@ The server will close the connection as soon as the sync completes. The followin
 
 - `1000` if the sync completed normally.
 - `1011` if there was an internal server error.
-- `4000` if this private gateway isn't yet registered with a public gateway. This is likely an error in the UI app, as it shouldn't have attempted a sync in this state.
+- `4000` if this private gateway isn't yet registered with a Internet gateway. This is likely an error in the UI app, as it shouldn't have attempted a sync in this state.
 - `4001` if the device isn't connected to the WiFi network of a courier.
 
 This endpoint can be tested with the following client:
@@ -107,22 +107,22 @@ async function* streamStatuses(): AsyncIterable<string> {
 main();
 ```
 
-### Public gateway (`/public-gateway`)
+### Internet gateway (`/public-gateway`)
 
 #### Get current gateway (`GET`)
 
-This can only return a `200` response containing the `publicAddress`. For example:
+This can only return a `200` response containing the `internetAddress`. For example:
 
 ```json
-{"publicAddress": "braavos.relaycorp.cloud"}
+{"internetAddress": "braavos.relaycorp.cloud"}
 ```
 
-#### Migrate public gateway (`PUT`)
+#### Migrate Internet gateway (`PUT`)
 
-The request payload MUST include the field `publicGateway` set to the public address of the new gateway. For example:
+The request payload MUST include the field `internetAddress` set to the Internet address of the new gateway. For example:
 
 ```json
-{"publicAddress": "braavos.relaycorp.cloud"}
+{"internetAddress": "braavos.relaycorp.cloud"}
 ```
 
 Possible responses:
@@ -133,4 +133,4 @@ Possible responses:
   - `INVALID_ADDRESS` if the DNS lookup and DNSSEC verification succeeded, but the address doesn't actually exist.
 - `500` with one of the following `code`s:
   - `ADDRESS_RESOLUTION_FAILURE` if the DNS lookup or DNSSEC verification failed. **This would also happen if the device is disconnected from the Internet**.
-  - `REGISTRATION_FAILURE` the address was valid, but the new public gateway failed to complete the registration. Retrying later might work.
+  - `REGISTRATION_FAILURE` the address was valid, but the new Internet gateway failed to complete the registration. Retrying later might work.

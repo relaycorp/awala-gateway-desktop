@@ -14,7 +14,7 @@ beforeEach(() => {
   config = new Config(configRepository);
 });
 
-const TOKEN = ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS;
+const TOKEN = ConfigKey.INTERNET_GATEWAY_ADDRESS;
 const VALUE = 'foo';
 
 describe('get', () => {
