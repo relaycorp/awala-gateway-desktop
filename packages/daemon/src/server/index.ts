@@ -69,11 +69,12 @@ function registerWebsocketEndpoints(
 
   server.server.on('upgrade', (request, socket, headers) => {
     let url: URL;
+    const urlString = `https://127.0.0.0.1${request.url!}`;
     try {
       // Can't pass the base as a second argument to `URL` because it breaks on macOS (Node.js 6).
-      url = new URL(`https://127.0.0.0.1${request.url!}`);
+      url = new URL(urlString);
     } catch (err) {
-      throw new UnregisteredGatewayError(err as Error, `Failed to parse ${request.url}`);
+      throw new UnregisteredGatewayError(err as Error, `Failed to parse ${urlString}`);
     }
     const wsServer: WSServer | undefined = serversByPath[url.pathname];
     if (wsServer) {
