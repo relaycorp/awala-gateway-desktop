@@ -18,6 +18,7 @@ import makeParcelCollectionServer, {
 } from './poweb/parcelCollection';
 import RouteOptions from './RouteOptions';
 import { WebsocketServerFactory } from './websocket';
+import { UnregisteredGatewayError } from '../errors';
 
 const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [controlRoutes, poWebRoutes];
 
@@ -67,7 +68,12 @@ function registerWebsocketEndpoints(
   ).reduce((acc, [path, factory]) => ({ ...acc, [path]: factory(controlAuthToken) }), {});
 
   server.server.on('upgrade', (request, socket, headers) => {
-    const url = new URL(request.url!, 'https://127.0.0.0.1');
+    let url: URL;
+    try {
+      url = new URL(request.url!, 'https://127.0.0.0.1');
+    } catch (err) {
+      throw new UnregisteredGatewayError(err as Error, `Failed to parse ${request.url}`);
+    }
     const wsServer: WSServer | undefined = serversByPath[url.pathname];
     if (wsServer) {
       wsServer.handleUpgrade(request, socket, headers, (websocket) => {
