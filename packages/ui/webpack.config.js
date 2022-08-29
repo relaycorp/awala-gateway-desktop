@@ -83,6 +83,7 @@ module.exports = [
                 'jest.*.js',
                 'tsconfig.json',
                 'build/**/*.d.ts',
+                'build/**/*.spec.js',
                 'build/**/*.map.js',
               ].map(path => `**/daemon/${path}`),
             },
