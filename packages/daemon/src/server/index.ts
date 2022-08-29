@@ -2,6 +2,7 @@ import { MAX_RAMF_MESSAGE_LENGTH } from '@relaycorp/relaynet-core';
 import { fastify, FastifyInstance, FastifyPluginCallback } from 'fastify';
 import { Server } from 'http';
 import { Container } from 'typedi';
+import { URL } from 'url';
 import uuid from 'uuid-random';
 import { Server as WSServer } from 'ws';
 
