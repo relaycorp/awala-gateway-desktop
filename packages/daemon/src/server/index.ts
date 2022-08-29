@@ -70,7 +70,7 @@ function registerWebsocketEndpoints(
   server.server.on('upgrade', (request, socket, headers) => {
     let url: URL;
     try {
-      url = new URL(request.url!, 'https://127.0.0.0.1');
+      url = new URL(request.url!, 'https://127.0.0.0.1/');
     } catch (err) {
       throw new UnregisteredGatewayError(err as Error, `Failed to parse ${request.url}`);
     }
