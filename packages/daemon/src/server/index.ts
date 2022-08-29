@@ -2,7 +2,6 @@ import { MAX_RAMF_MESSAGE_LENGTH } from '@relaycorp/relaynet-core';
 import { fastify, FastifyInstance, FastifyPluginCallback } from 'fastify';
 import { Server } from 'http';
 import { Container } from 'typedi';
-import { URL } from 'url';
 import uuid from 'uuid-random';
 import { Server as WSServer } from 'ws';
 
@@ -19,7 +18,6 @@ import makeParcelCollectionServer, {
 } from './poweb/parcelCollection';
 import RouteOptions from './RouteOptions';
 import { WebsocketServerFactory } from './websocket';
-import { UnregisteredGatewayError } from '../errors';
 
 const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [controlRoutes, poWebRoutes];
 
@@ -69,15 +67,8 @@ function registerWebsocketEndpoints(
   ).reduce((acc, [path, factory]) => ({ ...acc, [path]: factory(controlAuthToken) }), {});
 
   server.server.on('upgrade', (request, socket, headers) => {
-    let url: URL;
-    const urlString = `https://127.0.0.0.1${request.url!}`;
-    try {
-      // Can't pass the base as a second argument to `URL` because it breaks on macOS (Node.js 6).
-      url = new URL(urlString);
-    } catch (err) {
-      throw new UnregisteredGatewayError(err as Error, `Failed to parse ${urlString}`);
-    }
-    const wsServer: WSServer | undefined = serversByPath[url.pathname];
+    const path = cleanPath(request.url!);
+    const wsServer: WSServer | undefined = serversByPath[path];
     if (wsServer) {
       wsServer.handleUpgrade(request, socket, headers, (websocket) => {
         wsServer.emit('connection', websocket, request);
@@ -86,4 +77,10 @@ function registerWebsocketEndpoints(
       socket.destroy();
     }
   });
+}
+
+function cleanPath(path: string): string {
+  // Suddenly `new URL(path, base).pathname` no longer works on macOS, so we have to manually
+  // remove the query string and fragment.
+  return path.split('?')[0].split('#')[0];
 }
