@@ -1,44 +1,46 @@
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-const CopyPlugin = require("copy-webpack-plugin");
+const CopyPlugin = require('copy-webpack-plugin');
 
 const rendererBaseConfig = {
   mode: 'development',
   target: 'electron-renderer',
   devtool: 'source-map',
-  module: { rules: [
-    {
-      test: /\.ts(x?)$/,
-      include: /src/,
-      use: [{ loader: 'ts-loader' }]
-    },
-    {
-      test: /\.css$/i,
-      use: [ MiniCssExtractPlugin.loader, 'css-loader' ],
-    },
-    {
-      test: /\.(svg|png)$/i,
-      type: 'asset/resource'
-    },
-    {
-      test: /\.(woff|woff2|eot|ttf|otf)$/i,
-      type: 'asset/resource',
-    },
-  ] },
+  module: {
+    rules: [
+      {
+        test: /\.ts(x?)$/,
+        include: /src/,
+        use: [{ loader: 'ts-loader' }],
+      },
+      {
+        test: /\.css$/i,
+        use: [MiniCssExtractPlugin.loader, 'css-loader'],
+      },
+      {
+        test: /\.(svg|png)$/i,
+        type: 'asset/resource',
+      },
+      {
+        test: /\.(woff|woff2|eot|ttf|otf)$/i,
+        type: 'asset/resource',
+      },
+    ],
+  },
   resolve: {
-    extensions: ['.js', '.jsx', '.ts', '.tsx']
+    extensions: ['.js', '.jsx', '.ts', '.tsx'],
   },
   output: {
     path: __dirname + '/app',
-    filename: '[name].js'
+    filename: '[name].js',
   },
   plugins: [
     new HtmlWebpackPlugin({
       template: './src/electron/index.html',
-      filename: '[name].html'
+      filename: '[name].html',
     }),
-    new MiniCssExtractPlugin({filename: "styles.[hash].css"})
-  ]
+    new MiniCssExtractPlugin({ filename: 'styles.[hash].css' }),
+  ],
 };
 
 module.exports = [
@@ -51,16 +53,16 @@ module.exports = [
         {
           test: /\.ts$/,
           include: /src/,
-          use: [{ loader: 'ts-loader' }]
+          use: [{ loader: 'ts-loader' }],
         },
         {
           test: /\.(png)$/i,
-          type: 'asset/resource'
+          type: 'asset/resource',
         },
-      ]
+      ],
     },
     resolve: {
-      extensions: ['.js', '.ts']
+      extensions: ['.js', '.ts'],
     },
     output: {
       path: __dirname + '/app',
@@ -74,34 +76,33 @@ module.exports = [
             from: './node_modules/daemon/**/*',
             to: '.',
             globOptions: {
-              gitignore: true,
               ignore: [
-                '**/coverage/**',
-                '**/src/**',
-                '**/README.md',
-                '**/jest.*.js',
-                '**/tsconfig.json',
+                'coverage/**',
+                'src/**',
+                'README.md',
+                'jest.*.js',
+                'tsconfig.json',
+                'build/**/*.spec.js',
                 '**/*.d.ts',
                 '**/*.map.js',
-              ],
+              ].map(path => `**/daemon/${path}`),
             },
           },
-          { from: './node_modules/daemon/ormconfig.json', to: '.' }
+          { from: './node_modules/daemon/ormconfig.json', to: '.' },
         ],
       }),
-    ]
+    ],
   },
   {
     ...rendererBaseConfig,
-    entry: { app: './src/electron/app.tsx', },
+    entry: { app: './src/electron/app.tsx' },
   },
   {
     ...rendererBaseConfig,
-    entry: { about: './src/electron/about.tsx', },
+    entry: { about: './src/electron/about.tsx' },
   },
   {
     ...rendererBaseConfig,
-    entry: { libraries: './src/electron/libraries.tsx', },
-  }
+    entry: { libraries: './src/electron/libraries.tsx' },
+  },
 ];
-
