@@ -2,8 +2,8 @@ appId: tech.relaycorp.gateway
 directories:
   buildResources: "./buildResources"
 extraResources:
-  - from: app/daemon/node_modules
-    to: app/daemon/node_modules/
+  - from: app/node_modules/daemon
+    to: app/node_modules/daemon/
     filter:
       - "**/*"
 linux:

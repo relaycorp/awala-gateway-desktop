@@ -67,8 +67,8 @@ function registerWebsocketEndpoints(
   ).reduce((acc, [path, factory]) => ({ ...acc, [path]: factory(controlAuthToken) }), {});
 
   server.server.on('upgrade', (request, socket, headers) => {
-    const url = new URL(request.url!, 'https://127.0.0.0.1');
-    const wsServer: WSServer | undefined = serversByPath[url.pathname];
+    const path = cleanPath(request.url!);
+    const wsServer: WSServer | undefined = serversByPath[path];
     if (wsServer) {
       wsServer.handleUpgrade(request, socket, headers, (websocket) => {
         wsServer.emit('connection', websocket, request);
@@ -77,4 +77,10 @@ function registerWebsocketEndpoints(
       socket.destroy();
     }
   });
+}
+
+function cleanPath(path: string): string {
+  // Suddenly `new URL(path, base).pathname` no longer works on macOS, so we have to manually
+  // remove the query string and fragment.
+  return path.split('?')[0].split('#')[0];
 }
