@@ -138,13 +138,13 @@ function processParcels(
       if (parcelKey) {
         const collectionMessage: ParcelCollectionNotification = {
           parcelKey,
-          recipientAddress: parcel.recipient.id,
+          recipientId: parcel.recipient.id,
           type: 'parcelCollection',
         };
         parentStream.write(collectionMessage);
       }
       logger.info(
-        { parcel: { id: parcel.id, key: parcelKey, recipientAddress: parcel.recipient.id } },
+        { parcel: { id: parcel.id, key: parcelKey, recipientId: parcel.recipient.id } },
         'Saved new parcel',
       );
     }

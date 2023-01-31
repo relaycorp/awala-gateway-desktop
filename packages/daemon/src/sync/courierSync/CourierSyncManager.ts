@@ -40,9 +40,7 @@ export class CourierSyncManager {
     }
   }
 
-  public async *streamCollectedParcelKeys(
-    recipientAddresses: readonly string[],
-  ): AsyncIterable<string> {
+  public async *streamCollectedParcelKeys(recipientIds: readonly string[]): AsyncIterable<string> {
     const collectionStream = new PassThrough({ objectMode: true });
     const writeCollection = (collection: ParcelCollectionNotification) => {
       collectionStream.write(collection);
@@ -55,7 +53,7 @@ export class CourierSyncManager {
           messages: AsyncIterable<ParcelCollectionNotification>,
         ): AsyncIterable<string> {
           for await (const message of messages) {
-            if (recipientAddresses.includes(message.recipientId)) {
+            if (recipientIds.includes(message.recipientId)) {
               yield message.parcelKey;
             }
           }

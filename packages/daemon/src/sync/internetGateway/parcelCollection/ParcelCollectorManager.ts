@@ -63,16 +63,13 @@ export class ParcelCollectorManager {
   }
 
   public async *watchCollectionsForRecipients(
-    recipientAddresses: readonly string[],
+    recipientIds: readonly string[],
   ): AsyncIterable<string> {
     yield* await pipe(
       this.streamMessages(),
       async function* (messages: AsyncIterable<ParcelCollectorMessage>): AsyncIterable<string> {
         for await (const message of messages) {
-          if (
-            message.type === 'parcelCollection' &&
-            recipientAddresses.includes(message.recipientAddress)
-          ) {
+          if (message.type === 'parcelCollection' && recipientIds.includes(message.recipientId)) {
             yield message.parcelKey;
           }
         }
