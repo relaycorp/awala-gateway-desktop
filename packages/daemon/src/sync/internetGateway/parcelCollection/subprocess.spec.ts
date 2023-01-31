@@ -183,7 +183,7 @@ describe('Parcel collection', () => {
         parcel: expect.objectContaining({
           id: parcel.id,
           key: parcelKey,
-          recipientAddress: parcel.recipient.id,
+          recipientId: parcel.recipient.id,
         }),
       }),
     );
@@ -201,7 +201,7 @@ describe('Parcel collection', () => {
     expect(mockParcelStore).toBeCalled();
     expect(getParentMessages()).toContainEqual<ParcelCollectionNotification>({
       parcelKey,
-      recipientAddress: parcel.recipient.id,
+      recipientId: parcel.recipient.id,
       type: 'parcelCollection',
     });
   });

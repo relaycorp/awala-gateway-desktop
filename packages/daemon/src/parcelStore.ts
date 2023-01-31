@@ -245,15 +245,15 @@ async function getRelativeParcelKey(parcel: Parcel, direction: MessageDirection)
 
 async function getRelativeParcelKeyFromParts(
   senderId: string,
-  recipientAddress: string,
+  recipientId: string,
   parcelId: string,
   direction: MessageDirection,
 ): Promise<string> {
   // Hash some components together to avoid exceeding Windows' 260-char limit for paths
   const keyComponents =
     direction === MessageDirection.TOWARDS_INTERNET
-      ? [senderId, sha256Hex(recipientAddress + parcelId)]
-      : [recipientAddress, sha256Hex(senderId + parcelId)];
+      ? [senderId, sha256Hex(recipientId + parcelId)]
+      : [recipientId, sha256Hex(senderId + parcelId)];
   return join(...keyComponents);
 }
 

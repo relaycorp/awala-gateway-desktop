@@ -145,7 +145,7 @@ describe('streamStatus', () => {
     setImmediate(() => {
       emitValidSubprocessMessage({
         parcelKey: 'key',
-        recipientAddress: 'recipient',
+        recipientId: 'recipient',
         type: 'parcelCollection',
       });
       emitValidSubprocessMessage({ type: 'status', status: 'connected' });
@@ -200,7 +200,7 @@ describe('watchCollectionsForRecipients', () => {
       await manager.start();
       const status: ParcelCollectionNotification = {
         parcelKey: PARCEL_KEY,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       };
       emitValidSubprocessMessage(status);
@@ -220,7 +220,7 @@ describe('watchCollectionsForRecipients', () => {
     setImmediate(async () => {
       emitValidSubprocessMessage({
         parcelKey: PARCEL_KEY,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       });
     });
@@ -241,12 +241,12 @@ describe('watchCollectionsForRecipients', () => {
     setImmediate(async () => {
       emitValidSubprocessMessage({
         parcelKey: PARCEL_KEY,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       });
       emitValidSubprocessMessage({
         parcelKey: parcel2Key,
-        recipientAddress: recipient2Address,
+        recipientId: recipient2Address,
         type: 'parcelCollection',
       });
     });
@@ -265,12 +265,12 @@ describe('watchCollectionsForRecipients', () => {
     setImmediate(async () => {
       emitValidSubprocessMessage({
         parcelKey: 'the parcel key',
-        recipientAddress: 'invalid recipient',
+        recipientId: 'invalid recipient',
         type: 'parcelCollection',
       });
       emitValidSubprocessMessage({
         parcelKey: PARCEL_KEY,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       });
     });
@@ -290,7 +290,7 @@ describe('watchCollectionsForRecipients', () => {
       getSubprocess().write({ foo: 'bar' });
       emitValidSubprocessMessage({
         parcelKey: PARCEL_KEY,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       });
     });
@@ -310,7 +310,7 @@ describe('watchCollectionsForRecipients', () => {
       emitValidSubprocessMessage({ type: 'status', status: 'connected' });
       emitValidSubprocessMessage({
         parcelKey: PARCEL_KEY,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       });
     });
@@ -329,7 +329,7 @@ describe('watchCollectionsForRecipients', () => {
     setImmediate(() => {
       emitValidSubprocessMessage({
         parcelKey: PARCEL_KEY,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       });
     });
@@ -355,13 +355,13 @@ describe('watchCollectionsForRecipients', () => {
     setImmediate(async () => {
       subprocess1.write({
         parcelKey: PARCEL_KEY,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       });
       await manager.restart();
       subprocess2.write({
         parcelKey: parcel2Key,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       });
     });
