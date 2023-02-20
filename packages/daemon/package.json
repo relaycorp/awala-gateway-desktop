@@ -46,7 +46,7 @@
   },
   "devDependencies": {
     "@relaycorp/relaynet-testing": "^2.2.26",
-    "@relaycorp/ws-mock": "^2.4.1",
+    "@relaycorp/ws-mock": "^5.2.4",
     "@types/default-gateway": "^3.0.1",
     "@types/is-valid-domain": "0.0.1",
     "@types/jest": "^27.0.3",
