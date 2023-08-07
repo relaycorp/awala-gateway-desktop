@@ -28,7 +28,7 @@
     "is-valid-domain": "0.1.6",
     "it-pipe": "^1.1.0",
     "make-promises-safe": "^5.1.0",
-    "pino": "^7.6.0",
+    "pino": "^8.15.0",
     "pino-pretty": "^8.1.0",
     "reflect-metadata": "^0.1.13",
     "split2": "^4.1.0",
