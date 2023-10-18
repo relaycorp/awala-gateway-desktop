@@ -4,7 +4,7 @@ import { Inject, Service } from 'typedi';
 
 import { fork } from '../../../utils/subprocess/child';
 import { ParcelCollectorManager } from '../parcelCollection/ParcelCollectorManager';
-import { PublicGatewayCollectionStatus } from '../PublicGatewayCollectionStatus';
+import { InternetGatewayCollectionStatus } from '../InternetGatewayCollectionStatus';
 
 @Service()
 export class ParcelDeliveryManager {
@@ -16,7 +16,7 @@ export class ParcelDeliveryManager {
   public async deliverWhileConnected(): Promise<void> {
     await pipe(this.parcelCollectorManager.streamStatus(), async (statuses) => {
       for await (const status of statuses) {
-        if (status === PublicGatewayCollectionStatus.DISCONNECTED) {
+        if (status === InternetGatewayCollectionStatus.DISCONNECTED) {
           this.subprocess?.destroy();
           // tslint:disable-next-line:no-object-mutation
           this.subprocess = null;

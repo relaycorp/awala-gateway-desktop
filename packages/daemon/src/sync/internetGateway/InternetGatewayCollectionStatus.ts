@@ -1,4 +1,4 @@
-export enum PublicGatewayCollectionStatus {
+export enum InternetGatewayCollectionStatus {
   CONNECTED = 'CONNECTED',
   DISCONNECTED = 'DISCONNECTED',
 }

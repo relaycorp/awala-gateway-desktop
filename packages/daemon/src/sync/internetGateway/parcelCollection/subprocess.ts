@@ -3,7 +3,7 @@ import {
   Parcel,
   ParcelCollection,
   ParcelCollectionHandshakeSigner,
-  PublicAddressingError,
+  InternetAddressingError,
   StreamingMode,
   UnreachableResolverError,
 } from '@relaycorp/relaynet-core';
@@ -34,13 +34,10 @@ export default async function runParcelCollection(parentStream: Duplex): Promise
   logger.info('Ready to collect parcels');
 
   const privateGateway = await gatewayManager.getCurrent();
-  const signer = await privateGateway.getGSCSigner(
-    channel.peerPrivateAddress,
-    ParcelCollectionHandshakeSigner,
-  );
+  const signer = await privateGateway.getGSCSigner(channel.peerId, ParcelCollectionHandshakeSigner);
   await pipe(
     await streamParcelCollections(
-      channel.publicGatewayPublicAddress,
+      channel.internetGatewayInternetAddress,
       signer!,
       parentStream,
       logger,
@@ -54,7 +51,7 @@ export default async function runParcelCollection(parentStream: Duplex): Promise
 }
 
 async function streamParcelCollections(
-  publicGatewayAddress: string,
+  internetGatewayAddress: string,
   signer: ParcelCollectionHandshakeSigner,
   parentStream: Duplex,
   logger: Logger,
@@ -67,7 +64,7 @@ async function streamParcelCollections(
     let hasCollectionFailed = false;
     do {
       const gscClient = await makeGSCClientAndRetryIfNeeded(
-        publicGatewayAddress,
+        internetGatewayAddress,
         parentStream,
         logger,
       );
@@ -87,25 +84,25 @@ async function streamParcelCollections(
 }
 
 async function makeGSCClientAndRetryIfNeeded(
-  publicGatewayAddress: string,
+  internetGatewayAddress: string,
   parentStream: Duplex,
   logger: Logger,
 ): Promise<GSCClient> {
   let client: GSCClient | null = null;
   while (client === null) {
     try {
-      client = await makeGSCClient(publicGatewayAddress);
+      client = await makeGSCClient(internetGatewayAddress);
     } catch (err) {
       notifyStatusToParent('disconnected', parentStream);
       if (err instanceof UnreachableResolverError) {
         // Don't log the actual error because it'll waste disk space and won't add anything
         logger.debug('DNS resolver is unreachable');
         await sleepSeconds(3);
-      } else if (err instanceof PublicAddressingError) {
-        logger.error({ err }, 'Failed to resolve DNS record for public gateway');
+      } else if (err instanceof InternetAddressingError) {
+        logger.error({ err }, 'Failed to resolve DNS record for Internet gateway');
         await sleepSeconds(30);
       } else {
-        logger.error({ err, publicGatewayAddress }, 'Public gateway does not appear to exist');
+        logger.error({ err, internetGatewayAddress }, 'Internet gateway does not appear to exist');
         await sleepSeconds(60);
       }
     }
@@ -141,13 +138,13 @@ function processParcels(
       if (parcelKey) {
         const collectionMessage: ParcelCollectionNotification = {
           parcelKey,
-          recipientAddress: parcel.recipientAddress,
+          recipientId: parcel.recipient.id,
           type: 'parcelCollection',
         };
         parentStream.write(collectionMessage);
       }
       logger.info(
-        { parcel: { id: parcel.id, key: parcelKey, recipientAddress: parcel.recipientAddress } },
+        { parcel: { id: parcel.id, key: parcelKey, recipientId: parcel.recipient.id } },
         'Saved new parcel',
       );
     }

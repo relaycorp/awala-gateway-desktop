@@ -1,5 +1,6 @@
 import {
   Certificate,
+  getIdFromIdentityKey,
   InvalidMessageError,
   Parcel,
   ParcelDeliverySigner,
@@ -10,7 +11,7 @@ import { FastifyInstance } from 'fastify';
 import { Response as LightMyRequestResponse } from 'light-my-request';
 
 import { ParcelStore } from '../../parcelStore';
-import { ParcelDeliveryManager } from '../../sync/publicGateway/parcelDelivery/ParcelDeliveryManager';
+import { ParcelDeliveryManager } from '../../sync/internetGateway/parcelDelivery/ParcelDeliveryManager';
 import { useTemporaryAppDirs } from '../../testUtils/appDirs';
 import { arrayBufferFrom } from '../../testUtils/buffer';
 import { generatePKIFixture, mockGatewayRegistration } from '../../testUtils/crypto';
@@ -35,13 +36,20 @@ const mockParcelDeliveryManagerNotifier = mockSpy(
 );
 
 let gatewayCertificate: Certificate;
-let endpointPrivateKey: CryptoKey;
-let endpointCertificate: Certificate;
-const pkiFixtureRetriever = generatePKIFixture((keyPairSet, certPath) => {
+let recipientEndpointPrivateKey: CryptoKey;
+let recipientEndpointCertificate: Certificate;
+let recipientEndpointId: string;
+let senderEndpointPrivateKey: CryptoKey;
+let senderEndpointCertificate: Certificate;
+const pkiFixtureRetriever = generatePKIFixture(async (keyPairSet, certPath) => {
   gatewayCertificate = certPath.privateGateway;
 
-  endpointPrivateKey = keyPairSet.privateEndpoint.privateKey!;
-  endpointCertificate = certPath.privateEndpoint;
+  recipientEndpointPrivateKey = keyPairSet.privateEndpoint.privateKey;
+  recipientEndpointCertificate = certPath.privateEndpoint;
+  recipientEndpointId = await getIdFromIdentityKey(keyPairSet.privateEndpoint.publicKey);
+
+  senderEndpointPrivateKey = keyPairSet.pdaGrantee.privateKey!;
+  senderEndpointCertificate = certPath.pdaGrantee;
 });
 const { undoGatewayRegistration } = mockGatewayRegistration(pkiFixtureRetriever);
 
@@ -122,7 +130,7 @@ describe('Authorization errors', () => {
     const parcelSerialized = arrayBufferFrom('the parcel');
     const signer = new ParcelDeliverySigner(
       gatewayCertificate, // Wrong certificate
-      endpointPrivateKey,
+      senderEndpointPrivateKey,
     );
     const countersignature = await signer.sign(parcelSerialized);
 
@@ -167,11 +175,16 @@ test('Malformed parcels should be refused with an HTTP 400 response', async () =
 
 test('Well-formed yet invalid parcels should be refused with an HTTP 422 response', async () => {
   const fastify = await makeServer();
-  const parcel = new Parcel('https://example.com', endpointCertificate, Buffer.from([]), {
-    creationDate: subSeconds(new Date(), 2),
-    ttl: 1,
-  });
-  const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
+  const parcel = new Parcel(
+    { id: recipientEndpointId },
+    senderEndpointCertificate,
+    Buffer.from([]),
+    {
+      creationDate: subSeconds(new Date(), 2),
+      ttl: 1,
+    },
+  );
+  const parcelSerialized = Buffer.from(await parcel.serialize(senderEndpointPrivateKey));
 
   const response = await postParcel(
     parcelSerialized,
@@ -193,8 +206,12 @@ test('Well-formed yet invalid parcels should be refused with an HTTP 422 respons
 
 test('Valid parcels should result in an HTTP 202 response', async () => {
   const fastify = await makeServer();
-  const parcel = new Parcel('https://example.com', endpointCertificate, Buffer.from([]));
-  const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
+  const parcel = new Parcel(
+    { id: recipientEndpointId },
+    senderEndpointCertificate,
+    Buffer.from([]),
+  );
+  const parcelSerialized = Buffer.from(await parcel.serialize(senderEndpointPrivateKey));
 
   const response = await postParcel(
     parcelSerialized,
@@ -219,8 +236,12 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
 
 test('Failing to save a valid parcel should result in an HTTP 500 response', async () => {
   const fastify = await makeServer();
-  const parcel = new Parcel('https://example.com', endpointCertificate, Buffer.from([]));
-  const parcelSerialized = Buffer.from(await parcel.serialize(endpointPrivateKey));
+  const parcel = new Parcel(
+    { id: recipientEndpointId },
+    senderEndpointCertificate,
+    Buffer.from([]),
+  );
+  const parcelSerialized = Buffer.from(await parcel.serialize(senderEndpointPrivateKey));
   const error = new Error('whoops');
   mockStoreInternetBoundParcel.mockRejectedValue(error);
 
@@ -257,7 +278,10 @@ async function postParcel(
 }
 
 async function countersignParcelDelivery(parcelSerialized: ArrayBuffer): Promise<string> {
-  const signer = new ParcelDeliverySigner(endpointCertificate, endpointPrivateKey);
+  const signer = new ParcelDeliverySigner(
+    recipientEndpointCertificate,
+    recipientEndpointPrivateKey,
+  );
   const countersignature = await signer.sign(parcelSerialized);
   return encodeAuthorizationHeaderValue(countersignature);
 }

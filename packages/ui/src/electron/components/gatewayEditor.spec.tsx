@@ -6,7 +6,7 @@ describe('GatewayEditor', () => {
   test('edits the gateway', async () => {
     const onMigrate = jest.fn();
     render(<GatewayEditor gateway="my.gateway.com" onMigrate={onMigrate} gatewayError={false} />);
-    expect(screen.getByText('Public gateway')).toBeInTheDocument();
+    expect(screen.getByText('Internet gateway')).toBeInTheDocument();
 
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'a.relaycorp.net' } });
     expect(screen.getByDisplayValue('a.relaycorp.net')).toBeInTheDocument();
@@ -60,7 +60,7 @@ describe('GatewayEditor', () => {
     const onMigrate = jest.fn();
     render(<GatewayEditor gateway="my.gateway.com" onMigrate={onMigrate} gatewayError={true} />);
     expect(
-      screen.getByText('Could not resolve public gateway address.', { exact: false }),
+      screen.getByText('Could not resolve Internet gateway address.', { exact: false }),
     ).toBeInTheDocument();
   });
 });

@@ -2,7 +2,7 @@ import { IPCMessage } from '../../ipc';
 
 export interface ParcelCollectionNotification extends IPCMessage {
   readonly parcelKey: string;
-  readonly recipientAddress: string;
+  readonly recipientId: string;
   readonly type: 'parcelCollection';
 }
 

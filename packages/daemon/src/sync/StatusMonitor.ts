@@ -6,12 +6,12 @@ import { Inject, Service } from 'typedi';
 
 import { CourierConnectionStatus } from './courierSync';
 import { CourierSyncManager } from './courierSync/CourierSyncManager';
-import { GatewayRegistrar } from './publicGateway/GatewayRegistrar';
-import { ParcelCollectorManager } from './publicGateway/parcelCollection/ParcelCollectorManager';
-import { PublicGatewayCollectionStatus } from './publicGateway/PublicGatewayCollectionStatus';
+import { GatewayRegistrar } from './internetGateway/GatewayRegistrar';
+import { ParcelCollectorManager } from './internetGateway/parcelCollection/ParcelCollectorManager';
+import { InternetGatewayCollectionStatus } from './internetGateway/InternetGatewayCollectionStatus';
 
 export enum ConnectionStatus {
-  CONNECTED_TO_PUBLIC_GATEWAY = 'CONNECTED_TO_PUBLIC_GATEWAY',
+  CONNECTED_TO_INTERNET_GATEWAY = 'CONNECTED_TO_INTERNET_GATEWAY',
   CONNECTED_TO_COURIER = 'CONNECTED_TO_COURIER',
   DISCONNECTED = 'DISCONNECTED',
   UNREGISTERED = 'UNREGISTERED',
@@ -53,15 +53,15 @@ export class StatusMonitor {
       this.setLastStatus(ConnectionStatus.UNREGISTERED);
     }
 
-    let isConnectedToPublicGateway = false;
+    let isConnectedToInternetGateway = false;
     let isConnectedToCourier = false;
 
     // tslint:disable-next-line:no-this-assignment
     const monitor = this;
     async function updateStatus(): Promise<void> {
       let newStatus: ConnectionStatus;
-      if (isConnectedToPublicGateway) {
-        newStatus = ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY;
+      if (isConnectedToInternetGateway) {
+        newStatus = ConnectionStatus.CONNECTED_TO_INTERNET_GATEWAY;
       } else {
         const isRegistered = await monitor.registrar.isRegistered();
         if (isRegistered) {
@@ -83,17 +83,17 @@ export class StatusMonitor {
         await updateStatus();
       }
     }
-    async function reflectPublicGatewayConnectionStatus(
-      statuses: AsyncIterable<PublicGatewayCollectionStatus>,
+    async function reflectInternetGatewayConnectionStatus(
+      statuses: AsyncIterable<InternetGatewayCollectionStatus>,
     ): Promise<void> {
       for await (const status of statuses) {
-        isConnectedToPublicGateway = status === PublicGatewayCollectionStatus.CONNECTED;
+        isConnectedToInternetGateway = status === InternetGatewayCollectionStatus.CONNECTED;
         await updateStatus();
       }
     }
     await Promise.all([
       pipe(this.courierSync.streamStatus(), reflectCourierConnectionStatus),
-      pipe(this.parcelCollectorManager.streamStatus(), reflectPublicGatewayConnectionStatus),
+      pipe(this.parcelCollectorManager.streamStatus(), reflectInternetGatewayConnectionStatus),
     ]);
   }
 

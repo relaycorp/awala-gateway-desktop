@@ -9,7 +9,7 @@ import { mockFork } from '../../../testUtils/subprocess';
 import { setImmediateAsync } from '../../../testUtils/timing';
 import { fork } from '../../../utils/subprocess/child';
 import { ParcelCollectorManager } from '../parcelCollection/ParcelCollectorManager';
-import { PublicGatewayCollectionStatus } from '../PublicGatewayCollectionStatus';
+import { InternetGatewayCollectionStatus } from '../InternetGatewayCollectionStatus';
 import { ParcelDeliveryManager } from './ParcelDeliveryManager';
 
 setUpTestDBConnection();
@@ -31,9 +31,9 @@ beforeEach(() => {
 });
 
 describe('deliverWhileConnected', () => {
-  test('Subprocess should never be started if we cannot reach the public gateway', async () => {
+  test('Subprocess should never be started if we cannot reach the Internet gateway', async () => {
     mockPubGatewayStatusStream.mockReturnValue(
-      arrayToAsyncIterable([PublicGatewayCollectionStatus.DISCONNECTED]),
+      arrayToAsyncIterable([InternetGatewayCollectionStatus.DISCONNECTED]),
     );
 
     await parcelDeliveryManager.deliverWhileConnected();
@@ -42,11 +42,11 @@ describe('deliverWhileConnected', () => {
     expect(fork).not.toBeCalled();
   });
 
-  test('Subprocess should be started when public gateway can be reached', async () => {
+  test('Subprocess should be started when Internet gateway can be reached', async () => {
     mockPubGatewayStatusStream.mockReturnValue(
       arrayToAsyncIterable([
-        PublicGatewayCollectionStatus.DISCONNECTED,
-        PublicGatewayCollectionStatus.CONNECTED,
+        InternetGatewayCollectionStatus.DISCONNECTED,
+        InternetGatewayCollectionStatus.CONNECTED,
       ]),
     );
 
@@ -60,9 +60,9 @@ describe('deliverWhileConnected', () => {
   test('Subprocess should not be started again if an instance is running', async () => {
     mockPubGatewayStatusStream.mockReturnValue(
       arrayToAsyncIterable([
-        PublicGatewayCollectionStatus.DISCONNECTED,
-        PublicGatewayCollectionStatus.CONNECTED,
-        PublicGatewayCollectionStatus.CONNECTED,
+        InternetGatewayCollectionStatus.DISCONNECTED,
+        InternetGatewayCollectionStatus.CONNECTED,
+        InternetGatewayCollectionStatus.CONNECTED,
       ]),
     );
 
@@ -72,11 +72,11 @@ describe('deliverWhileConnected', () => {
     expect(fork).toBeCalledTimes(1);
   });
 
-  test('Subprocess should be killed when connection to public gateway is lost', async () => {
+  test('Subprocess should be killed when connection to Internet gateway is lost', async () => {
     mockPubGatewayStatusStream.mockReturnValue(
       arrayToAsyncIterable([
-        PublicGatewayCollectionStatus.CONNECTED,
-        PublicGatewayCollectionStatus.DISCONNECTED,
+        InternetGatewayCollectionStatus.CONNECTED,
+        InternetGatewayCollectionStatus.DISCONNECTED,
       ]),
     );
 
@@ -89,9 +89,9 @@ describe('deliverWhileConnected', () => {
   test('Subprocess should not be attempted to be killed if it is not running', async () => {
     mockPubGatewayStatusStream.mockReturnValue(
       arrayToAsyncIterable([
-        PublicGatewayCollectionStatus.CONNECTED,
-        PublicGatewayCollectionStatus.DISCONNECTED,
-        PublicGatewayCollectionStatus.DISCONNECTED,
+        InternetGatewayCollectionStatus.CONNECTED,
+        InternetGatewayCollectionStatus.DISCONNECTED,
+        InternetGatewayCollectionStatus.DISCONNECTED,
       ]),
     );
 
@@ -119,8 +119,8 @@ describe('notifyAboutNewParcel', () => {
   test('Notification should be sent if connected', async () => {
     mockPubGatewayStatusStream.mockReturnValue(
       arrayToAsyncIterable([
-        PublicGatewayCollectionStatus.DISCONNECTED,
-        PublicGatewayCollectionStatus.CONNECTED,
+        InternetGatewayCollectionStatus.DISCONNECTED,
+        InternetGatewayCollectionStatus.CONNECTED,
       ]),
     );
     // tslint:disable-next-line:readonly-array

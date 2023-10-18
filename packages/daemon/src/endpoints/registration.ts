@@ -3,7 +3,7 @@
 import {
   getPublicKeyDigest,
   PrivateNodeRegistrationRequest,
-  PrivatePublicGatewayChannel,
+  PrivateInternetGatewayChannel,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { Inject, Service } from 'typedi';
@@ -61,7 +61,7 @@ export class EndpointRegistrar {
 
 async function validateRegistrationRequest(
   registrationRequestSerialized: Buffer,
-  channel: PrivatePublicGatewayChannel,
+  channel: PrivateInternetGatewayChannel,
 ): Promise<CryptoKey> {
   let request: PrivateNodeRegistrationRequest;
   try {

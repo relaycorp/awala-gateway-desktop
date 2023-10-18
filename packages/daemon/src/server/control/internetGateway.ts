@@ -1,15 +1,15 @@
-import { PublicAddressingError, UnreachableResolverError } from '@relaycorp/relaynet-core';
+import { InternetAddressingError, UnreachableResolverError } from '@relaycorp/relaynet-core';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import isValidDomain from 'is-valid-domain';
 import { Container } from 'typedi';
 
 import { Config, ConfigKey } from '../../Config';
-import { DEFAULT_PUBLIC_GATEWAY } from '../../constants';
-import { GatewayRegistrar } from '../../sync/publicGateway/GatewayRegistrar';
-import { ParcelCollectorManager } from '../../sync/publicGateway/parcelCollection/ParcelCollectorManager';
+import { DEFAULT_INTERNET_GATEWAY_ADDRESS } from '../../constants';
+import { GatewayRegistrar } from '../../sync/internetGateway/GatewayRegistrar';
+import { ParcelCollectorManager } from '../../sync/internetGateway/parcelCollection/ParcelCollectorManager';
 import { getBearerTokenFromAuthHeader } from '../../utils/auth';
 import RouteOptions from '../RouteOptions';
-import { NonExistingAddressError } from '../../sync/publicGateway/errors';
+import { NonExistingAddressError } from '../../sync/internetGateway/errors';
 
 enum ErrorCode {
   ADDRESS_RESOLUTION_FAILURE = 'ADDRESS_RESOLUTION_FAILURE',
@@ -33,9 +33,9 @@ export default async function registerRoutes(
     onRequest: makeAuthEnforcementHook(options.controlAuthToken),
     url: ENDPOINT_PATH,
     async handler(_request, reply): Promise<FastifyReply<any>> {
-      const registeredAddress = await config.get(ConfigKey.PUBLIC_GATEWAY_PUBLIC_ADDRESS);
-      const publicAddress = registeredAddress ?? DEFAULT_PUBLIC_GATEWAY;
-      return reply.header('Content-Type', 'application/json').code(200).send({ publicAddress });
+      const registeredAddress = await config.get(ConfigKey.INTERNET_GATEWAY_ADDRESS);
+      const internetAddress = registeredAddress ?? DEFAULT_INTERNET_GATEWAY_ADDRESS;
+      return reply.header('Content-Type', 'application/json').code(200).send({ internetAddress });
     },
   });
 
@@ -48,10 +48,10 @@ export default async function registerRoutes(
         return reply.header('Content-Type', 'application/json').code(415).send({});
       }
 
-      const publicAddress = (request.body as any).publicAddress?.replace(/\.$/, '');
+      const internetAddress = (request.body as any).internetAddress?.replace(/\.$/, '');
 
-      if (!isValidDomain(publicAddress)) {
-        request.log.warn({ publicAddress }, 'Malformed public address');
+      if (!isValidDomain(internetAddress)) {
+        request.log.warn({ internetAddress }, 'Malformed Internet address');
         return reply
           .header('Content-Type', 'application/json')
           .code(400)
@@ -59,13 +59,13 @@ export default async function registerRoutes(
       }
 
       try {
-        await registrar.register(publicAddress);
+        await registrar.register(internetAddress);
       } catch (err) {
-        return abortFailedMigration(err as Error, request, publicAddress, reply);
+        return abortFailedMigration(err as Error, request, internetAddress, reply);
       }
 
       await parcelCollectorManager.restart();
-      request.log.info({ publicAddress }, 'Gateway migration completed');
+      request.log.info({ internetAddress }, 'Gateway migration completed');
       return reply.header('Content-Type', 'application/json').code(204).send({});
     },
   });
@@ -74,22 +74,22 @@ export default async function registerRoutes(
 function abortFailedMigration(
   err: Error,
   request: FastifyRequest<{ readonly Body: string }>,
-  publicAddress: any,
+  internetAddress: any,
   reply: FastifyReply<any>,
 ): FastifyReply<any> {
   const statusCode = err instanceof NonExistingAddressError ? 400 : 500;
   const baseResponse = reply.header('Content-Type', 'application/json').code(statusCode);
   if (err instanceof NonExistingAddressError) {
-    request.log.warn({ publicAddress }, 'Public address does not exist');
+    request.log.warn({ internetAddress }, 'Internet address does not exist');
     return baseResponse.send({ code: ErrorCode.INVALID_ADDRESS });
   } else if (err instanceof UnreachableResolverError) {
     request.log.warn('Failed to reach DNS resolver');
     return baseResponse.send({ code: ErrorCode.ADDRESS_RESOLUTION_FAILURE });
-  } else if (err instanceof PublicAddressingError) {
-    request.log.warn({ err, publicAddress }, 'Failed to resolve public address');
+  } else if (err instanceof InternetAddressingError) {
+    request.log.warn({ err, internetAddress }, 'Failed to resolve Internet address');
     return baseResponse.send({ code: ErrorCode.ADDRESS_RESOLUTION_FAILURE });
   }
-  request.log.warn({ err, publicAddress }, 'Failed to complete registration');
+  request.log.warn({ err, internetAddress }, 'Failed to complete registration');
   return baseResponse.send({ code: ErrorCode.REGISTRATION_FAILURE });
 }
 

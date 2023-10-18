@@ -14,7 +14,7 @@ interface State {
 class Home extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { status: ConnectionStatus.CONNECTING_TO_PUBLIC_GATEWAY };
+    this.state = { status: ConnectionStatus.CONNECTING_TO_INTERNET_GATEWAY };
   }
 
   public override async componentDidMount(): Promise<void> {

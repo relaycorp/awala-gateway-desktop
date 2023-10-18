@@ -9,7 +9,7 @@ import { mockFork } from '../../../testUtils/subprocess';
 import { setImmediateAsync } from '../../../testUtils/timing';
 import { LOGGER } from '../../../tokens';
 import { fork } from '../../../utils/subprocess/child';
-import { PublicGatewayCollectionStatus } from '../PublicGatewayCollectionStatus';
+import { InternetGatewayCollectionStatus } from '../InternetGatewayCollectionStatus';
 import { ParcelCollectionNotification, ParcelCollectorMessage } from './messaging';
 import { ParcelCollectorManager } from './ParcelCollectorManager';
 
@@ -86,7 +86,7 @@ describe('streamStatus', () => {
 
     await expect(
       pipe(manager.streamStatus(), iterableTake(1), asyncIterableToArray),
-    ).resolves.toEqual([PublicGatewayCollectionStatus.DISCONNECTED]);
+    ).resolves.toEqual([InternetGatewayCollectionStatus.DISCONNECTED]);
   });
 
   test('DISCONNECTED should be returned if subprocess reports disconnection', async () => {
@@ -97,7 +97,7 @@ describe('streamStatus', () => {
 
     await expect(
       pipe(manager.streamStatus(), iterableTake(1), asyncIterableToArray),
-    ).resolves.toEqual([PublicGatewayCollectionStatus.DISCONNECTED]);
+    ).resolves.toEqual([InternetGatewayCollectionStatus.DISCONNECTED]);
   });
 
   test('CONNECTED should be returned if subprocess reports connection', async () => {
@@ -108,7 +108,7 @@ describe('streamStatus', () => {
 
     await expect(
       pipe(manager.streamStatus(), iterableTake(1), asyncIterableToArray),
-    ).resolves.toEqual([PublicGatewayCollectionStatus.CONNECTED]);
+    ).resolves.toEqual([InternetGatewayCollectionStatus.CONNECTED]);
   });
 
   test('Subsequent connection changes should be reflected', async () => {
@@ -122,9 +122,9 @@ describe('streamStatus', () => {
     await expect(
       pipe(manager.streamStatus(), iterableTake(3), asyncIterableToArray),
     ).resolves.toEqual([
-      PublicGatewayCollectionStatus.CONNECTED,
-      PublicGatewayCollectionStatus.DISCONNECTED,
-      PublicGatewayCollectionStatus.CONNECTED,
+      InternetGatewayCollectionStatus.CONNECTED,
+      InternetGatewayCollectionStatus.DISCONNECTED,
+      InternetGatewayCollectionStatus.CONNECTED,
     ]);
   });
 
@@ -137,7 +137,7 @@ describe('streamStatus', () => {
 
     await expect(
       pipe(manager.streamStatus(), iterableTake(1), asyncIterableToArray),
-    ).resolves.toEqual([PublicGatewayCollectionStatus.CONNECTED]);
+    ).resolves.toEqual([InternetGatewayCollectionStatus.CONNECTED]);
   });
 
   test('Non-connection messages should be ignored', async () => {
@@ -145,7 +145,7 @@ describe('streamStatus', () => {
     setImmediate(() => {
       emitValidSubprocessMessage({
         parcelKey: 'key',
-        recipientAddress: 'recipient',
+        recipientId: 'recipient',
         type: 'parcelCollection',
       });
       emitValidSubprocessMessage({ type: 'status', status: 'connected' });
@@ -153,7 +153,7 @@ describe('streamStatus', () => {
 
     await expect(
       pipe(manager.streamStatus(), iterableTake(1), asyncIterableToArray),
-    ).resolves.toEqual([PublicGatewayCollectionStatus.CONNECTED]);
+    ).resolves.toEqual([InternetGatewayCollectionStatus.CONNECTED]);
   });
 
   test('Breaking the iterable should not destroy the underlying stream', async () => {
@@ -184,8 +184,8 @@ describe('streamStatus', () => {
     await expect(
       pipe(manager.streamStatus(), iterableTake(2), asyncIterableToArray),
     ).resolves.toEqual([
-      PublicGatewayCollectionStatus.DISCONNECTED,
-      PublicGatewayCollectionStatus.CONNECTED,
+      InternetGatewayCollectionStatus.DISCONNECTED,
+      InternetGatewayCollectionStatus.CONNECTED,
     ]);
   });
 });
@@ -200,7 +200,7 @@ describe('watchCollectionsForRecipients', () => {
       await manager.start();
       const status: ParcelCollectionNotification = {
         parcelKey: PARCEL_KEY,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       };
       emitValidSubprocessMessage(status);
@@ -220,7 +220,7 @@ describe('watchCollectionsForRecipients', () => {
     setImmediate(async () => {
       emitValidSubprocessMessage({
         parcelKey: PARCEL_KEY,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       });
     });
@@ -241,12 +241,12 @@ describe('watchCollectionsForRecipients', () => {
     setImmediate(async () => {
       emitValidSubprocessMessage({
         parcelKey: PARCEL_KEY,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       });
       emitValidSubprocessMessage({
         parcelKey: parcel2Key,
-        recipientAddress: recipient2Address,
+        recipientId: recipient2Address,
         type: 'parcelCollection',
       });
     });
@@ -265,12 +265,12 @@ describe('watchCollectionsForRecipients', () => {
     setImmediate(async () => {
       emitValidSubprocessMessage({
         parcelKey: 'the parcel key',
-        recipientAddress: 'invalid recipient',
+        recipientId: 'invalid recipient',
         type: 'parcelCollection',
       });
       emitValidSubprocessMessage({
         parcelKey: PARCEL_KEY,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       });
     });
@@ -290,7 +290,7 @@ describe('watchCollectionsForRecipients', () => {
       getSubprocess().write({ foo: 'bar' });
       emitValidSubprocessMessage({
         parcelKey: PARCEL_KEY,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       });
     });
@@ -310,7 +310,7 @@ describe('watchCollectionsForRecipients', () => {
       emitValidSubprocessMessage({ type: 'status', status: 'connected' });
       emitValidSubprocessMessage({
         parcelKey: PARCEL_KEY,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       });
     });
@@ -329,7 +329,7 @@ describe('watchCollectionsForRecipients', () => {
     setImmediate(() => {
       emitValidSubprocessMessage({
         parcelKey: PARCEL_KEY,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       });
     });
@@ -355,13 +355,13 @@ describe('watchCollectionsForRecipients', () => {
     setImmediate(async () => {
       subprocess1.write({
         parcelKey: PARCEL_KEY,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       });
       await manager.restart();
       subprocess2.write({
         parcelKey: parcel2Key,
-        recipientAddress: RECIPIENT_ADDRESS,
+        recipientId: RECIPIENT_ADDRESS,
         type: 'parcelCollection',
       });
     });

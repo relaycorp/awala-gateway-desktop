@@ -112,7 +112,7 @@ async function doHandshake(
   }
 
   const endpointAddresses = await Promise.all(
-    endpointCertificates.map((c) => c.calculateSubjectPrivateAddress()),
+    endpointCertificates.map((c) => c.calculateSubjectId()),
   );
   logger.debug({ endpointAddresses }, 'Handshake completed successfully');
   return endpointAddresses;

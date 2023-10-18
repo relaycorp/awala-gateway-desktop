@@ -7,7 +7,7 @@ import { Inject, Service } from 'typedi';
 
 import { LOGGER } from '../../../tokens';
 import { fork } from '../../../utils/subprocess/child';
-import { PublicGatewayCollectionStatus } from '../PublicGatewayCollectionStatus';
+import { InternetGatewayCollectionStatus } from '../InternetGatewayCollectionStatus';
 import { ParcelCollectorMessage } from './messaging';
 
 @Service()
@@ -45,17 +45,17 @@ export class ParcelCollectorManager {
     }
   }
 
-  public async *streamStatus(): AsyncIterable<PublicGatewayCollectionStatus> {
+  public async *streamStatus(): AsyncIterable<InternetGatewayCollectionStatus> {
     yield* await pipe(
       this.streamMessages(),
       async function* (
         messages: AsyncIterable<ParcelCollectorMessage>,
-      ): AsyncIterable<PublicGatewayCollectionStatus> {
+      ): AsyncIterable<InternetGatewayCollectionStatus> {
         for await (const message of messages) {
           if (message.type === 'status') {
             yield message.status === 'connected'
-              ? PublicGatewayCollectionStatus.CONNECTED
-              : PublicGatewayCollectionStatus.DISCONNECTED;
+              ? InternetGatewayCollectionStatus.CONNECTED
+              : InternetGatewayCollectionStatus.DISCONNECTED;
           }
         }
       },
@@ -63,16 +63,13 @@ export class ParcelCollectorManager {
   }
 
   public async *watchCollectionsForRecipients(
-    recipientAddresses: readonly string[],
+    recipientIds: readonly string[],
   ): AsyncIterable<string> {
     yield* await pipe(
       this.streamMessages(),
       async function* (messages: AsyncIterable<ParcelCollectorMessage>): AsyncIterable<string> {
         for await (const message of messages) {
-          if (
-            message.type === 'parcelCollection' &&
-            recipientAddresses.includes(message.recipientAddress)
-          ) {
+          if (message.type === 'parcelCollection' && recipientIds.includes(message.recipientId)) {
             yield message.parcelKey;
           }
         }

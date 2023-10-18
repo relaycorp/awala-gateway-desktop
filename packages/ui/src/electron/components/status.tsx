@@ -19,7 +19,7 @@ class Status extends Component<Props> {
 
   public override render(): JSX.Element {
     switch (this.props.status) {
-      case ConnectionStatus.CONNECTED_TO_PUBLIC_GATEWAY:
+      case ConnectionStatus.CONNECTED_TO_INTERNET_GATEWAY:
         return (
           <HomeContent title="You are connected to Awala via the Internet" image={connected}>
             <p>

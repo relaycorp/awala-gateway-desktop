@@ -4,7 +4,7 @@ import { DeliverParcelCall, MockGSCClient } from '@relaycorp/relaynet-testing';
 import { PassThrough } from 'stream';
 import { Container } from 'typedi';
 
-import { DEFAULT_PUBLIC_GATEWAY } from '../../../constants';
+import { DEFAULT_INTERNET_GATEWAY_ADDRESS } from '../../../constants';
 import { ParcelStore } from '../../../parcelStore';
 import { useTemporaryAppDirs } from '../../../testUtils/appDirs';
 import { generatePKIFixture, mockGatewayRegistration } from '../../../testUtils/crypto';
@@ -52,11 +52,11 @@ test('Subprocess should abort if the gateway is unregistered', async () => {
   expect(mockLogs).toContainEqual(partialPinoLog('fatal', 'Private gateway is not registered'));
 });
 
-test('Client should connect to appropriate public gateway', async () => {
+test('Client should connect to appropriate Internet gateway', async () => {
   setImmediate(endParentStream);
   await runParcelDelivery(parentStream);
 
-  expect(mockMakeGSCClient).toBeCalledWith(DEFAULT_PUBLIC_GATEWAY);
+  expect(mockMakeGSCClient).toBeCalledWith(DEFAULT_INTERNET_GATEWAY_ADDRESS);
 });
 
 test('Subprocess should record a log when it is ready', async () => {
@@ -166,7 +166,7 @@ describe('Parcel delivery', () => {
       parcelStore.retrieve(parcelKey, MessageDirection.TOWARDS_INTERNET),
     ).resolves.toBeNull();
     expect(mockLogs).toContainEqual(
-      partialPinoLog('info', 'Parcel was refused by the public gateway', { parcelKey }),
+      partialPinoLog('info', 'Parcel was refused by the Internet gateway', { parcelKey }),
     );
   });
 

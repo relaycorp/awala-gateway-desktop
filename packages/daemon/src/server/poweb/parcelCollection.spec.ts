@@ -43,7 +43,7 @@ let trustedEndpointSigner: ParcelCollectionHandshakeSigner;
 let privateGatewayCertificate: Certificate;
 let privateGatewayPrivateKey: CryptoKey;
 const pkiFixtureRetriever = generatePKIFixture(async (keyPairSet, certPath) => {
-  trustedEndpointAddress = await certPath.privateEndpoint.calculateSubjectPrivateAddress();
+  trustedEndpointAddress = await certPath.privateEndpoint.calculateSubjectId();
   trustedEndpointSigner = new ParcelCollectionHandshakeSigner(
     certPath.privateEndpoint,
     keyPairSet.privateEndpoint.privateKey!,
@@ -235,7 +235,7 @@ describe('Handshake', () => {
 
     const endpointAddresses: readonly string[] = [
       trustedEndpointAddress,
-      await endpoint2Certificate.calculateSubjectPrivateAddress(),
+      await endpoint2Certificate.calculateSubjectId(),
     ];
     expect(mockLogs).toContainEqual(
       partialPinoLog('debug', 'Handshake completed successfully', {

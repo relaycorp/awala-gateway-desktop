@@ -1,9 +1,9 @@
 import { consume } from 'streaming-iterables';
 import { Container } from 'typedi';
 
-import { GatewayRegistrar } from './publicGateway/GatewayRegistrar';
-import { ParcelCollectorManager } from './publicGateway/parcelCollection/ParcelCollectorManager';
-import { ParcelDeliveryManager } from './publicGateway/parcelDelivery/ParcelDeliveryManager';
+import { GatewayRegistrar } from './internetGateway/GatewayRegistrar';
+import { ParcelCollectorManager } from './internetGateway/parcelCollection/ParcelCollectorManager';
+import { ParcelDeliveryManager } from './internetGateway/parcelDelivery/ParcelDeliveryManager';
 import { StatusMonitor } from './StatusMonitor';
 import { DBCertificateStore } from '../keystores/DBCertificateStore';
 

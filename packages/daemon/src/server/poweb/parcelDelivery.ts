@@ -9,7 +9,7 @@ import { FastifyInstance, FastifyLoggerInstance, FastifyReply } from 'fastify';
 import { Container } from 'typedi';
 
 import { ParcelStore } from '../../parcelStore';
-import { ParcelDeliveryManager } from '../../sync/publicGateway/parcelDelivery/ParcelDeliveryManager';
+import { ParcelDeliveryManager } from '../../sync/internetGateway/parcelDelivery/ParcelDeliveryManager';
 import { registerAllowedMethods } from '../http';
 import RouteOptions from '../RouteOptions';
 import { CONTENT_TYPES } from './contentTypes';

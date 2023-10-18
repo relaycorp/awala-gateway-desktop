@@ -13,7 +13,7 @@ This document is aimed at advanced users and (prospective) contributors. We aim 
 This private gateway implements [Awala bindings](https://specs.awala.network/RS-000#message-transport-bindings) as follows:
 
 - Local endpoints communicate with the private gateway via a [PoWeb](https://specs.awala.network/RS-016) server on `127.0.0.1:13276`. This server is implemented with the PoWeb binding, and the [Fastify](https://www.fastify.io/) and [`ws`](https://github.com/websockets/ws) servers.
-- When the Internet is available and the public gateway is reachable, this private gateway will communicate with its public counterpart using [Relaycorp's PoWeb client](https://github.com/relaycorp/relaynet-poweb-js).
+- When the Internet is available and the Internet gateway is reachable, this private gateway will communicate with its public counterpart using [Relaycorp's PoWeb client](https://github.com/relaycorp/relaynet-poweb-js).
 - When communicating with couriers over WiFi, this private gateway uses the [CogRPC binding](https://specs.awala.network/RS-008) through [Relaycorp's CogRPC client](https://github.com/relaycorp/relaynet-cogrpc-js).
 
 The local communication with endpoints does not use TLS, but all other connections are external and therefore require TLS.
@@ -28,13 +28,13 @@ The items below summarize the security and privacy considerations specific to th
 
 [This app does not (currently) support encryption at rest](https://github.com/relaycorp/awala-gateway-desktop/issues/441), so a malicious app on your computer could get hold of the private keys used by this gateway. Users are highly encouraged to use full-disk encryption to protect such keys in the event that the device were lost or stolen.
 
-Note that because Awala employs end-to-end encryption, compromising these keys won't compromise the encryption of the messages exchanged by your Awala-compatible apps. The keys of any private gateway are used to sign messages and issue Awala PKI certificates, and to encrypt/decrypt cargo exchanged with its public gateway.
+Note that because Awala employs end-to-end encryption, compromising these keys won't compromise the encryption of the messages exchanged by your Awala-compatible apps. The keys of any private gateway are used to sign messages and issue Awala PKI certificates, and to encrypt/decrypt cargo exchanged with its Internet gateway.
 
 ### External communication
 
-In addition to communicating with its public gateway, this app communicates with the following:
+In addition to communicating with its Internet gateway, this app communicates with the following:
 
-- `https://cloudflare-dns.com/dns-query` as the DNS-over-HTTPS (DoH) resolver. DoH is only used to resolve SRV records for the public gateway (e.g., [`_awala-gsc._tcp.frankfurt.relaycorp.cloud`](https://mxtoolbox.com/SuperTool.aspx?action=srv%3a_awala-gsc._tcp.frankfurt.relaycorp.cloud&run=toolpage)), as we delegate the DNSSEC validation to the DoH resolver.
+- `https://cloudflare-dns.com/dns-query` as the DNS-over-HTTPS (DoH) resolver. DoH is only used to resolve SRV records for the Internet gateway (e.g., [`_awala-gsc._tcp.frankfurt.relaycorp.cloud`](https://mxtoolbox.com/SuperTool.aspx?action=srv%3a_awala-gsc._tcp.frankfurt.relaycorp.cloud&run=toolpage)), as we delegate the DNSSEC validation to the DoH resolver.
 - The host running the DHCP server on port `21473`, when the device is connected to a WiFi network but disconnected from the Internet. We do this to check whether the device is connected to the WiFi hotspot of a courier.
 - Other apps on the same device can potentially communicate with the local PoWeb server provided by this app on `127.0.0.1:13276`. Because this server uses the HTTP and WebSocket protocols, we block web browser requests by disabling CORS and refusing WebSocket connections with the `Origin` header (per the PoWeb specification).
 
