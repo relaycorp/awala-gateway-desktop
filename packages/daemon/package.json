@@ -24,7 +24,7 @@
     "default-gateway": "^6.0.3",
     "env-paths": "^2.2.1",
     "env-var": "^7.1.1",
-    "fastify": "^3.29.4",
+    "fastify": "^5.0.0",
     "is-valid-domain": "0.1.6",
     "it-pipe": "^1.1.0",
     "make-promises-safe": "^5.1.0",
